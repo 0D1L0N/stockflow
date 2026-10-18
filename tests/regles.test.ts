@@ -12,7 +12,7 @@ import {
   assertFails, assertSucceeds, initializeTestEnvironment, type RulesTestEnvironment,
 } from "@firebase/rules-unit-testing";
 import {
-  doc, getDoc, increment, serverTimestamp, setDoc, updateDoc, writeBatch, type Firestore,
+  deleteDoc, doc, getDoc, increment, serverTimestamp, setDoc, updateDoc, writeBatch, type Firestore,
 } from "firebase/firestore";
 
 let env: RulesTestEnvironment;
@@ -40,6 +40,9 @@ beforeEach(async () => {
     await setDoc(doc(db, "clients/c2"), { nom: "Autre client", est_defaut: 0 });
     await setDoc(doc(db, `stats_jour/${JOUR}`), { ca: 100, nb_ventes: 1 });
     await setDoc(doc(db, "fournisseurs/fo1"), { nom: "Fournisseur", solde_argent: 0 });
+    await setDoc(doc(db, "commandes_fournisseur/cmd1"), { fournisseur_id: "fo1", lignes: [{ format_id: "f1", quantite: 5 }], statut: "envoyée", reception_id: null });
+    await setDoc(doc(db, "commandes_fournisseur/cmd-recue"), { fournisseur_id: "fo1", lignes: [{ format_id: "f1", quantite: 5 }], statut: "reçue", reception_id: "r0" });
+    await setDoc(doc(db, "receptions/r0"), { utilisateur_uid: "vendeur", fournisseur_id: "fo1", total: 1000 });
     await setDoc(doc(db, "ventes/v-autre"), { vendeur_uid: "autre", total: 1, statut: "validée", format_ids: [] });
   });
 });
@@ -66,9 +69,11 @@ function batchVente(db: Firestore, uid: string, opts: { total?: number; ca?: num
 }
 
 /** Livraison reçue : bon de réception, stock des formats, dette et casiers dus au fournisseur. */
-function batchReception(db: Firestore, uid: string, formats: string[], opts: { autreFormat?: string } = {}) {
+function batchReception(db: Firestore, uid: string, formats: string[], opts: { autreFormat?: string; commande?: string; fournisseur?: string } = {}) {
   const b = writeBatch(db);
-  b.set(doc(db, "receptions/r1"), { utilisateur_uid: uid, fournisseur_id: "fo1", format_ids: formats, total: 50000, cree_le: serverTimestamp() });
+  b.set(doc(db, "receptions/r1"), { utilisateur_uid: uid, fournisseur_id: opts.fournisseur ?? "fo1", format_ids: formats, total: 50000, cree_le: serverTimestamp() });
+  // Commande reprise : elle passe « reçue » en citant la réception
+  if (opts.commande) b.update(doc(db, `commandes_fournisseur/${opts.commande}`), { statut: "reçue", reception_id: "r1" });
   for (const id of [...formats, ...(opts.autreFormat ? [opts.autreFormat] : [])]) {
     b.update(doc(db, `formats/${id}`), { stock: increment(3), derniere_reception: "r1" });
     b.set(doc(db, `mouvements_stock/mr-${id}`), { format_id: id, utilisateur_uid: uid, type: "entrée", cree_le: serverTimestamp() });
@@ -79,6 +84,21 @@ function batchReception(db: Firestore, uid: string, formats: string[], opts: { a
 }
 
 describe("vendeur — usage normal", () => {
+  it("enregistre un bon de commande envoyé", async () => {
+    await assertSucceeds(setDoc(doc(en("vendeur"), "commandes_fournisseur/cmd2"), {
+      fournisseur_id: "fo1", lignes: [{ format_id: "f1", quantite: 3 }], statut: "envoyée", reception_id: null,
+      utilisateur_uid: "vendeur", cree_le: serverTimestamp(),
+    }));
+  });
+
+  it("réceptionne une commande en attente (la commande passe « reçue »)", async () => {
+    await assertSucceeds(batchReception(en("vendeur"), "vendeur", ["f1"], { commande: "cmd1" }).commit());
+  });
+
+  it("lit les commandes en attente", async () => {
+    await assertSucceeds(getDoc(doc(en("vendeur"), "commandes_fournisseur/cmd1")));
+  });
+
   it("réceptionne une livraison de 25 produits (stock, dette et casiers fournisseur)", async () => {
     const ids = Array.from({ length: 25 }, (_, i) => `h${i}`);
     await env.withSecurityRulesDisabled(async ctx => {
@@ -143,6 +163,32 @@ describe("vendeur — tentatives refusées", () => {
 
   it("effacer la dette d'un fournisseur sans opération", async () => {
     await assertFails(updateDoc(doc(en("vendeur"), "fournisseurs/fo1"), { solde_argent: -50000 }));
+  });
+
+  it("créer une commande déjà « reçue »", async () => {
+    await assertFails(setDoc(doc(en("vendeur"), "commandes_fournisseur/cmd3"), {
+      fournisseur_id: "fo1", lignes: [], statut: "reçue", reception_id: "r0", utilisateur_uid: "vendeur", cree_le: serverTimestamp(),
+    }));
+  });
+
+  it("changer les quantités d'une commande envoyée", async () => {
+    await assertFails(updateDoc(doc(en("vendeur"), "commandes_fournisseur/cmd1"), { lignes: [{ format_id: "f1", quantite: 50 }] }));
+  });
+
+  it("marquer une commande reçue sans réception dans le batch", async () => {
+    await assertFails(updateDoc(doc(en("vendeur"), "commandes_fournisseur/cmd1"), { statut: "reçue", reception_id: "r0" }));
+  });
+
+  it("solder une commande avec la livraison d'un autre fournisseur", async () => {
+    await assertFails(batchReception(en("vendeur"), "vendeur", ["f1"], { commande: "cmd1", fournisseur: "fo2" }).commit());
+  });
+
+  it("réceptionner deux fois la même commande", async () => {
+    await assertFails(batchReception(en("vendeur"), "vendeur", ["f1"], { commande: "cmd-recue" }).commit());
+  });
+
+  it("supprimer une commande, même le gérant", async () => {
+    await assertFails(deleteDoc(doc(en("gerant"), "commandes_fournisseur/cmd1")));
   });
 
   it("modifier un bon de réception", async () => {

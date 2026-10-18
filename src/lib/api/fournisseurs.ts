@@ -29,6 +29,15 @@ export interface Reception {
   commentaire: string | null; date: string; utilisateur_nom: string;
 }
 
+/** Bon de commande envoyé au fournisseur ; « reçue » quand une réception le reprend. */
+export interface LigneCommandeFournisseur { format_id: Id; quantite: number; produit_nom: string; volume: number; unite: string; }
+export interface CommandeFournisseur {
+  id: Id; numero: string; fournisseur_id: Id; fournisseur_nom: string;
+  lignes: LigneCommandeFournisseur[]; note: string | null;
+  statut: "envoyée" | "reçue"; reception_id: Id | null;
+  date: string; utilisateur_nom: string;
+}
+
 export interface OperationFournisseur {
   id: Id; fournisseur_id: Id; type: "réception" | "paiement";
   montant: number; emballages: Record<string, number>;
@@ -98,8 +107,16 @@ export const fournisseurs: Record<string, Commande> = {
    * Marchandises reçues : ajoute le stock de chaque ligne, enregistre le bon de réception,
    * la dette restante et les casiers échangés avec le fournisseur.
    */
-  creer_reception: async ({ fournisseurId, numeroBl, lignes, montantPaye, emballagesRendus, commentaire }) => {
+  creer_reception: async ({ fournisseurId, numeroBl, lignes, montantPaye, emballagesRendus, commentaire, commandeId }) => {
     const f = await lireFournisseur(fournisseurId as Id);
+    // Commande reprise : elle doit être en attente, chez ce fournisseur
+    const commandeRef = commandeId ? doc(db, "commandes_fournisseur", commandeId as Id) : null;
+    if (commandeRef) {
+      const c = await getDoc(commandeRef);
+      if (!c.exists()) throw new Error("Commande introuvable.");
+      if (c.data().fournisseur_id !== f.id) throw new Error("Cette commande a été passée chez un autre fournisseur.");
+      if (c.data().statut !== "envoyée") throw new Error("Cette commande a déjà été réceptionnée.");
+    }
     const [formats, produits] = await Promise.all([listerFormats(), listerProduits()]);
     const parId = new Map(formats.map(x => [x.id, x]));
     const noms = new Map(produits.map(p => [p.id, p.nom]));
@@ -159,8 +176,47 @@ export const fournisseurs: Record<string, Commande> = {
       batch.update(doc(db, "formats", fm.id), { stock: increment(l.quantite), derniere_reception: recRef.id });
     }
     mouvementCompte(batch, f.id, { type: "réception", montant: total - paye, emballages: delta, reception_id: recRef.id, numero });
+    // La commande cite la réception du batch (les règles le vérifient)
+    if (commandeRef) batch.update(commandeRef, { statut: "reçue", reception_id: recRef.id });
     await ecrire(batch.commit());
     return { id: recRef.id, numero, total, reste_du: total - paye };
+  },
+
+  /** Bon de commande envoyé (WhatsApp ou PDF) : gardé en attente jusqu'à la livraison. */
+  creer_commande_fournisseur: async ({ fournisseurId, lignes, note }) => {
+    const f = await lireFournisseur(fournisseurId as Id);
+    const [formats, produits] = await Promise.all([listerFormats(), listerProduits()]);
+    const parId = new Map(formats.map(x => [x.id, x]));
+    const noms = new Map(produits.map(p => [p.id, p.nom]));
+    const cumul = new Map<Id, number>();
+    for (const l of (lignes ?? []) as { formatId: Id; quantite: unknown }[]) {
+      const q = Math.trunc(Number(l.quantite));
+      if (!(q > 0)) continue;
+      if (!parId.has(l.formatId)) throw new Error("Un produit de la commande n'existe plus.");
+      cumul.set(l.formatId, (cumul.get(l.formatId) ?? 0) + q);
+    }
+    if (cumul.size === 0) throw new Error("Indiquez au moins une quantité.");
+    const lignesFinales: LigneCommandeFournisseur[] = [...cumul].map(([id, quantite]) => {
+      const fm = parId.get(id) as Format;
+      return { format_id: id, quantite, produit_nom: noms.get(fm.produit_id) ?? "?", volume: fm.volume, unite: fm.unite };
+    });
+    const ref = doc(col("commandes_fournisseur"));
+    const date = maintenant();
+    const numero = `BC-${date.slice(0, 10).replace(/-/g, "")}-${ref.id.slice(0, 4).toUpperCase()}`;
+    await ecrire(setDoc(ref, {
+      numero, fournisseur_id: f.id, fournisseur_nom: f.nom, lignes: lignesFinales,
+      note: String(note ?? "").trim() || null, statut: "envoyée", reception_id: null,
+      date, cree_le: serverTimestamp(), utilisateur_uid: auth.currentUser?.uid, utilisateur_nom: nomUtilisateur(),
+    }));
+    return { id: ref.id, numero, date };
+  },
+
+  /** Commandes, les plus récentes d'abord ; filtrables par fournisseur et par statut. */
+  get_commandes_fournisseur: async ({ fournisseurId, statut }) => {
+    const toutes = await lister<CommandeFournisseur>(fournisseurId
+      ? query(col("commandes_fournisseur"), where("fournisseur_id", "==", fournisseurId))
+      : col("commandes_fournisseur"));
+    return toutes.filter(c => !statut || c.statut === statut).sort(plusRecent);
   },
 
   /** Paiement au fournisseur et/ou casiers vides rendus en dehors d'une livraison. */
@@ -185,12 +241,17 @@ export const fournisseurs: Record<string, Commande> = {
       : col("receptions"))).sort(plusRecent),
 
   get_compte_fournisseur: async ({ fournisseurId }) => {
-    const [f, operations, receptions] = await Promise.all([
+    const [f, operations, receptions, commandes] = await Promise.all([
       lireFournisseur(fournisseurId as Id),
       lister<OperationFournisseur>(query(col("operations_fournisseur"), where("fournisseur_id", "==", fournisseurId))),
       lister<Reception>(query(col("receptions"), where("fournisseur_id", "==", fournisseurId))),
+      // Sans les commandes (règles pas encore à jour, hors ligne…), le compte reste consultable
+      lister<CommandeFournisseur>(query(col("commandes_fournisseur"), where("fournisseur_id", "==", fournisseurId))).catch(() => [] as CommandeFournisseur[]),
     ]);
-    return { fournisseur: f, operations: operations.sort(plusRecent), receptions: receptions.sort(plusRecent) };
+    return {
+      fournisseur: f, operations: operations.sort(plusRecent), receptions: receptions.sort(plusRecent),
+      commandes_en_attente: commandes.filter(c => c.statut === "envoyée").sort(plusRecent),
+    };
   },
 
   /** Dernier prix d'achat payé à ce fournisseur pour chaque format (pré-remplissage). */

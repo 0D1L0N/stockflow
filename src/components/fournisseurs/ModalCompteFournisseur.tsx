@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Wallet, Truck, ChevronDown, ChevronRight, PackageCheck } from "lucide-react";
+import { Wallet, Truck, ChevronDown, ChevronRight, PackageCheck, ClipboardList } from "lucide-react";
 import { invoke } from "@/lib/db";
 import { useToast } from "@/components/ui/Toast";
 import { useAppStore } from "@/stores/appStore";
@@ -19,17 +19,21 @@ interface Operation {
   id: string; type: "réception" | "paiement"; montant: number; emballages: Record<string, number>;
   numero: string | null; commentaire: string | null; date: string; utilisateur_nom: string;
 }
+interface CommandeAttente {
+  id: string; numero: string; date: string; utilisateur_nom: string;
+  lignes: { format_id: string; produit_nom: string; volume: number; unite: string; quantite: number }[];
+}
 interface Compte {
   fournisseur: { id: string; nom: string; telephone: string | null; solde_argent?: number; emballages_dus?: Record<string, number> };
-  operations: Operation[]; receptions: Reception[];
+  operations: Operation[]; receptions: Reception[]; commandes_en_attente: CommandeAttente[];
 }
 
 interface Props {
   fournisseur: { id: string; nom: string } | null;
   onClose: () => void;
   onChange?: () => void;
-  /** Ouvre la saisie d'une livraison pour ce fournisseur */
-  onReception?: (id: string) => void;
+  /** Ouvre la saisie d'une livraison pour ce fournisseur, éventuellement en reprenant une commande */
+  onReception?: (id: string, commandeId?: string) => void;
 }
 
 const dateCourte = (d: string) => new Date(d.replace(" ", "T")).toLocaleDateString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
@@ -113,6 +117,37 @@ export default function ModalCompteFournisseur({ fournisseur, onClose, onChange,
                 <Button icon={<PackageCheck size={16} />} onClick={() => onReception(fournisseur!.id)}>Réceptionner une livraison</Button>
               )}
             </div>
+
+            {/* Commandes envoyées, pas encore livrées */}
+            {compte.commandes_en_attente.length > 0 && (
+              <section className="rounded-2xl border border-secondary-200 bg-secondary-50/50 p-4 flex flex-col gap-3">
+                <h3 className="text-[13px] font-bold uppercase tracking-wide text-ink-600 flex items-center gap-2">
+                  <ClipboardList size={14} /> Commandes en attente ({compte.commandes_en_attente.length})
+                </h3>
+                {compte.commandes_en_attente.map(c => (
+                  <div key={c.id} className="rounded-xl bg-white border border-slate-200 p-3 flex flex-col gap-2">
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-semibold text-gray-800 truncate">{c.numero}</div>
+                        <div className="text-xs text-gray-400 truncate">Envoyée le {dateCourte(c.date)} · {c.utilisateur_nom}</div>
+                      </div>
+                      <span className="text-sm font-bold text-secondary-700 flex-shrink-0">{casiers(c.lignes.reduce((t, l) => t + l.quantite, 0))}</span>
+                    </div>
+                    <div className="flex flex-col gap-0.5">
+                      {c.lignes.map(l => (
+                        <div key={l.format_id} className="text-xs text-gray-600">{l.quantite} × {l.produit_nom} {volumeFr(l.volume, l.unite)}</div>
+                      ))}
+                    </div>
+                    {onReception && (
+                      <button onClick={() => onReception(fournisseur!.id, c.id)}
+                        className="self-start flex items-center gap-1.5 px-2.5 h-8 rounded-lg text-xs font-semibold text-secondary-700 bg-secondary-50 hover:bg-secondary-100">
+                        <PackageCheck size={13} /> Livraison reçue
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </section>
+            )}
 
             {/* Règlement */}
             <section className="rounded-2xl border border-slate-200 p-4 flex flex-col gap-3">

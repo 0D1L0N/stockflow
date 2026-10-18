@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, Truck, Phone, MapPin, Edit2, Trash2, PackageCheck, Wallet, ChevronRight } from "lucide-react";
+import { Plus, Truck, Phone, MapPin, Edit2, Trash2, PackageCheck, Wallet, ChevronRight, ClipboardList } from "lucide-react";
 import { invoke } from "@/lib/db";
 import { useToast } from "@/components/ui/Toast";
 import { useAppStore } from "@/stores/appStore";
@@ -21,6 +21,8 @@ interface Fournisseur {
   solde_argent?: number; emballages_dus?: Record<string, number>;
 }
 interface ReceptionResume { id: string; numero: string; fournisseur_nom: string; date: string; total: number; reste_du: number; lignes: { quantite: number }[]; }
+interface CommandeAttente { id: string; numero: string; fournisseur_id: string; fournisseur_nom: string; date: string; lignes: { quantite: number }[]; }
+type Reception = { ouvert: boolean; fournisseurId: string | null; commandeId?: string | null };
 
 const dateCourte = (d: string) => new Date(d.replace(" ", "T")).toLocaleDateString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
@@ -30,6 +32,7 @@ export default function Fournisseurs() {
   const estGerant = useAuthStore((s) => s.profil?.role === "gerant");
   const [fournisseurs, setFournisseurs] = useState<Fournisseur[]>([]);
   const [receptions, setReceptions] = useState<ReceptionResume[]>([]);
+  const [commandes, setCommandes] = useState<CommandeAttente[]>([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(false);
   const [edit, setEdit] = useState<Fournisseur | null>(null);
@@ -37,18 +40,19 @@ export default function Fournisseurs() {
   const [telephone, setTelephone] = useState("");
   const [adresse, setAdresse] = useState("");
   const [saving, setSaving] = useState(false);
-  const [reception, setReception] = useState<{ ouvert: boolean; fournisseurId: string | null }>({ ouvert: false, fournisseurId: null });
+  const [reception, setReception] = useState<Reception>({ ouvert: false, fournisseurId: null });
   const [compte, setCompte] = useState<Fournisseur | null>(null);
   const [version, setVersion] = useState(0);
 
   const load = async (silencieux = false) => {
     if (!silencieux) setLoading(true);
     try {
-      const [f, r] = await Promise.all([
+      const [f, r, c] = await Promise.all([
         invoke<Fournisseur[]>("get_fournisseurs"),
         invoke<ReceptionResume[]>("get_receptions", {}),
+        invoke<CommandeAttente[]>("get_commandes_fournisseur", { statut: "envoyée" }).catch(() => [] as CommandeAttente[]),
       ]);
-      setFournisseurs(f); setReceptions(r);
+      setFournisseurs(f); setReceptions(r); setCommandes(c);
     } catch (e) { toast(String(e), "error"); }
     setLoading(false);
   };
@@ -99,7 +103,30 @@ export default function Fournisseurs() {
         ]} />
 
       <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-28 lg:pb-8 [&>*]:w-full [&>*]:max-w-4xl [&>*]:mx-auto flex flex-col gap-3">
-        {loading ? <Skeleton variant="card" count={3} /> : fournisseurs.length === 0 ? (
+        {!loading && commandes.length > 0 && (
+          <section className="mb-2">
+            <h2 className="text-[15px] font-bold text-ink-900 mb-3 px-1 flex items-center gap-2">
+              <ClipboardList size={16} className="text-secondary-700" /> Commandes en attente de livraison
+            </h2>
+            <Card padding="none" className="overflow-hidden divide-y divide-slate-100">
+              {commandes.map(c => (
+                <div key={c.id} className="flex items-center gap-3 px-4 py-3">
+                  <Avatar nom={c.fournisseur_nom} taille="sm" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold text-gray-800 truncate">{c.fournisseur_nom}</div>
+                    <div className="text-xs text-gray-400 truncate">{c.numero} · {dateCourte(c.date)} · {casiers(c.lignes.reduce((t, l) => t + l.quantite, 0))}</div>
+                  </div>
+                  <button onClick={() => setReception({ ouvert: true, fournisseurId: c.fournisseur_id, commandeId: c.id })}
+                    className="flex items-center gap-1.5 px-2.5 h-8 rounded-lg text-xs font-semibold text-secondary-700 bg-secondary-50 hover:bg-secondary-100 flex-shrink-0">
+                    <PackageCheck size={13} /> Reçue
+                  </button>
+                </div>
+              ))}
+            </Card>
+          </section>
+        )}
+
+        {loading ?<Skeleton variant="card" count={3} /> : fournisseurs.length === 0 ? (
           <EtatVide icone={<Truck size={26} />} titre="Aucun fournisseur"
             texte="Ajoutez vos 2 ou 3 fournisseurs, puis enregistrez chaque livraison reçue : le stock se met à jour tout seul."
             action={<Button icon={<Plus size={16} />} onClick={openNew}>Nouveau fournisseur</Button>} />
@@ -108,6 +135,7 @@ export default function Fournisseurs() {
             {fournisseurs.map(f => {
               const solde = f.solde_argent ?? 0;
               const dus = Object.values(f.emballages_dus ?? {}).reduce((t, n) => t + Math.max(0, n), 0);
+              const enAttente = commandes.filter(c => c.fournisseur_id === f.id).length;
               return (
                 <Card key={f.id} padding="sm" onClick={() => setCompte(f)} className="sm:p-4">
                   <div className="flex items-center gap-3">
@@ -121,10 +149,11 @@ export default function Fournisseurs() {
                     </div>
                     <ChevronRight size={18} className="text-gray-300 flex-shrink-0" />
                   </div>
-                  {(solde > 0 || dus > 0) && (
+                  {(solde > 0 || dus > 0 || enAttente > 0) && (
                     <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
                       {solde > 0 && <span className="px-2 py-1 rounded-lg bg-amber-50 text-amber-800 flex items-center gap-1"><Wallet size={12} />On lui doit {formatPrix(solde)}</span>}
                       {dus > 0 && <span className="px-2 py-1 rounded-lg bg-amber-50 text-amber-800">{casiers(dus)} à lui rendre</span>}
+                      {enAttente > 0 && <span className="px-2 py-1 rounded-lg bg-secondary-50 text-secondary-800 flex items-center gap-1"><ClipboardList size={12} />{enAttente} commande{enAttente > 1 ? "s" : ""} en attente</span>}
                     </div>
                   )}
                   <div className="flex items-center gap-1 mt-3 pt-2.5 border-t border-slate-100">
@@ -183,10 +212,10 @@ export default function Fournisseurs() {
         </div>
       </Modal>
 
-      <ModalReception isOpen={reception.ouvert} fournisseurId={reception.fournisseurId}
+      <ModalReception isOpen={reception.ouvert} fournisseurId={reception.fournisseurId} commandeId={reception.commandeId}
         onClose={() => setReception({ ouvert: false, fournisseurId: null })} onDone={() => { setVersion(v => v + 1); load(true); }} />
       <ModalCompteFournisseur key={version} fournisseur={reception.ouvert ? null : compte} onClose={() => setCompte(null)} onChange={() => load(true)}
-        onReception={id => setReception({ ouvert: true, fournisseurId: id })} />
+        onReception={(id, commandeId) => setReception({ ouvert: true, fournisseurId: id, commandeId })} />
     </div>
   );
 }

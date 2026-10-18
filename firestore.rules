@@ -192,6 +192,23 @@ service cloud.firestore {
         && horodate();
       allow update, delete: if false;
     }
+    // Bons de commande : créés « envoyée » ; ne passent « reçue » qu'avec la réception
+    // du même batch, chez le même fournisseur. Les quantités commandées ne changent jamais.
+    match /commandes_fournisseur/{id} {
+      allow read: if aRole(['gerant', 'vendeur']);
+      allow create: if aRole(['gerant', 'vendeur'])
+        && request.resource.data.utilisateur_uid == request.auth.uid
+        && request.resource.data.statut == 'envoyée'
+        && request.resource.data.reception_id == null
+        && horodate();
+      allow update: if aRole(['gerant', 'vendeur'])
+        && seulementChamps(['statut', 'reception_id'])
+        && resource.data.statut == 'envoyée'
+        && request.resource.data.statut == 'reçue'
+        && receptionDuBatch(request.resource.data.reception_id)
+        && getAfter(/databases/$(database)/documents/receptions/$(request.resource.data.reception_id)).data.fournisseur_id == resource.data.fournisseur_id;
+      allow delete: if false;
+    }
 
     // ── Stock ────────────────────────────────────────────────────────────
     match /mouvements_stock/{id} {

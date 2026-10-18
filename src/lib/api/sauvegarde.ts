@@ -4,7 +4,7 @@ import { col, ecrire, maintenant, type Commande } from "./outils";
 
 // Toutes les collections de l'application (sauf config, gérée depuis la console)
 const COLLECTIONS = [
-  "parametres", "users", "emballages", "produits", "formats", "clients", "prix_clients", "groupes_prix", "prix_groupes", "fournisseurs", "receptions", "operations_fournisseur",
+  "parametres", "users", "emballages", "produits", "formats", "clients", "prix_clients", "groupes_prix", "prix_groupes", "fournisseurs", "receptions", "operations_fournisseur", "commandes_fournisseur",
   "ventes", "operations_client", "mouvements_stock", "stats_jour",
 ];
 

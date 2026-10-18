@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Search, Plus, Minus, Trash2, Truck, AlertTriangle, PackageCheck } from "lucide-react";
+import { Search, Plus, Minus, Trash2, Truck, AlertTriangle, PackageCheck, ClipboardList, X } from "lucide-react";
 import { invoke } from "@/lib/db";
 import { useToast } from "@/components/ui/Toast";
 import { useAppStore } from "@/stores/appStore";
@@ -16,6 +16,7 @@ interface FormatChoix {
   emballage_id: string | null; famille: string; seuil_alerte: number;
 }
 interface Ligne { formatId: string; quantite: string; prixAchat: string; }
+interface CommandeAttente { id: string; numero: string; date: string; lignes: { format_id: string; quantite: number }[]; }
 
 interface Props {
   isOpen: boolean;
@@ -23,12 +24,16 @@ interface Props {
   onDone?: () => void;
   /** Fournisseur présélectionné (depuis sa fiche) */
   fournisseurId?: string | null;
+  /** Commande en attente à reprendre d'office (de ce fournisseur) */
+  commandeId?: string | null;
 }
 
 const champ = "w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm bg-white focus:outline-none focus:border-secondary";
+const dateCourte = (d: string) => new Date(d.replace(" ", "T")).toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+const totalCommande = (c: CommandeAttente) => c.lignes.reduce((t, l) => t + l.quantite, 0);
 
 /** Saisie d'une livraison fournisseur : produits reçus, casiers échangés, paiement. */
-export default function ModalReception({ isOpen, onClose, onDone, fournisseurId }: Props) {
+export default function ModalReception({ isOpen, onClose, onDone, fournisseurId, commandeId: commandeInitiale }: Props) {
   const { toast } = useToast();
   const formatPrix = useAppStore((s) => s.formatMontant);
   const [fournisseurs, setFournisseurs] = useState<Fournisseur[]>([]);
@@ -43,11 +48,13 @@ export default function ModalReception({ isOpen, onClose, onDone, fournisseurId 
   const [paye, setPaye] = useState("");
   const [commentaire, setCommentaire] = useState("");
   const [derniersPrix, setDerniersPrix] = useState<Record<string, number>>({});
+  const [commandesAttente, setCommandesAttente] = useState<CommandeAttente[]>([]);
+  const [commande, setCommande] = useState<CommandeAttente | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
-    setFid(fournisseurId ?? ""); setNouveauNom(""); setBl(""); setLignes([]); setRecherche("");
+    setFid(fournisseurId ?? ""); setNouveauNom(""); setBl(""); setLignes([]); setRecherche(""); setCommande(null);
     setRendus({}); setPaye(""); setCommentaire("");
     invoke<Fournisseur[]>("get_fournisseurs").then(setFournisseurs).catch(() => {});
     invoke<{ id: string; nom: string }[]>("get_emballages").then(setEmballages).catch(() => {});
@@ -61,11 +68,29 @@ export default function ModalReception({ isOpen, onClose, onDone, fournisseurId 
     })().catch(e => toast(String(e), "error"));
   }, [isOpen]);
 
-  // Derniers prix d'achat de ce fournisseur, pour pré-remplir
+  /** Lignes pré-remplies avec les quantités commandées, à corriger selon ce qui est arrivé. */
+  const reprendre = (c: CommandeAttente, prix = derniersPrix) => {
+    setCommande(c);
+    setLignes(c.lignes.map(l => ({ formatId: l.format_id, quantite: String(l.quantite), prixAchat: prix[l.format_id] ? String(prix[l.format_id]) : "" })));
+  };
+
+  // Derniers prix d'achat et commandes en attente de ce fournisseur
   useEffect(() => {
+    if (!isOpen) return;
+    setCommande(null); setCommandesAttente([]);
     if (!fid) { setDerniersPrix({}); return; }
-    invoke<Record<string, number>>("get_derniers_prix_achat", { fournisseurId: fid }).then(setDerniersPrix).catch(() => setDerniersPrix({}));
-  }, [fid]);
+    let annule = false;
+    Promise.all([
+      invoke<Record<string, number>>("get_derniers_prix_achat", { fournisseurId: fid }).catch(() => ({} as Record<string, number>)),
+      invoke<CommandeAttente[]>("get_commandes_fournisseur", { fournisseurId: fid, statut: "envoyée" }).catch(() => [] as CommandeAttente[]),
+    ]).then(([prix, cmds]) => {
+      if (annule) return;
+      setDerniersPrix(prix); setCommandesAttente(cmds);
+      const aReprendre = cmds.find(c => c.id === commandeInitiale);
+      if (aReprendre) reprendre(aReprendre, prix);
+    });
+    return () => { annule = true; };
+  }, [isOpen, fid]);
 
   const parId = useMemo(() => new Map(formats.map(f => [f.id, f])), [formats]);
   const libelle = (f: FormatChoix) => `${f.produit_nom} ${volumeFr(f.volume, f.unite)}`;
@@ -118,8 +143,9 @@ export default function ModalReception({ isOpen, onClose, onDone, fournisseurId 
         montantPaye: payeNombre,
         emballagesRendus: Object.fromEntries(Object.keys(livres).map(e => [e, parseInt(rendu(e)) || 0])),
         commentaire,
+        commandeId: commande?.id ?? null,
       });
-      toast(`Livraison ${res.numero} enregistrée : ${casiers(nbCasiers)} ajoutés au stock`, "success");
+      toast(`Livraison ${res.numero} enregistrée : ${casiers(nbCasiers)} ajoutés au stock${commande ? ` · commande ${commande.numero} reçue` : ""}`, "success");
       onDone?.();
       onClose();
     } catch (e) { toast(String(e), "error"); }
@@ -144,6 +170,34 @@ export default function ModalReception({ isOpen, onClose, onDone, fournisseurId 
           </div>
           <Input label="N° du bon de livraison (facultatif)" value={bl} onChange={e => setBl(e.target.value)} placeholder="ex. : BL 2026-418" />
         </div>
+
+        {/* Commande envoyée à ce fournisseur */}
+        {commande ? (
+          <div className="flex items-start gap-2.5 rounded-xl bg-secondary-50 text-secondary-800 px-3 py-2.5 text-sm">
+            <ClipboardList size={17} className="flex-shrink-0 mt-0.5" />
+            <span className="flex-1">
+              Commande <b>{commande.numero}</b> reprise : corrigez les quantités selon ce qui est vraiment arrivé.
+            </span>
+            <button onClick={() => setCommande(null)} aria-label="Ne plus lier à la commande"
+              className="p-1 -m-1 rounded-lg hover:bg-secondary-100"><X size={15} /></button>
+          </div>
+        ) : commandesAttente.length > 0 && (
+          <section className="rounded-xl border border-secondary-200 bg-secondary-50/50 p-3 flex flex-col gap-2">
+            <h3 className="text-[13px] font-bold text-ink-900 flex items-center gap-2">
+              <ClipboardList size={15} className="text-secondary-700" /> Reprendre une commande en attente
+            </h3>
+            {commandesAttente.map(c => (
+              <button key={c.id} onClick={() => reprendre(c)}
+                className="flex items-center gap-3 rounded-lg bg-white border border-slate-200 px-3 py-2 text-left hover:border-secondary">
+                <span className="flex-1 min-w-0">
+                  <span className="block text-sm font-semibold text-gray-800 truncate">{c.numero}</span>
+                  <span className="block text-xs text-gray-400">Envoyée le {dateCourte(c.date)} · {c.lignes.length} produit{c.lignes.length > 1 ? "s" : ""}</span>
+                </span>
+                <span className="text-sm font-bold text-secondary-700 flex-shrink-0">{casiers(totalCommande(c))}</span>
+              </button>
+            ))}
+          </section>
+        )}
 
         {/* Produits reçus */}
         <section className="flex flex-col gap-2.5">
@@ -180,11 +234,19 @@ export default function ModalReception({ isOpen, onClose, onDone, fournisseurId 
                 const f = parId.get(l.formatId);
                 if (!f) return null;
                 const q = parseInt(l.quantite) || 0;
+                const commandee = commande ? commande.lignes.find(x => x.format_id === l.formatId)?.quantite ?? 0 : null;
                 return (
                   <div key={l.formatId} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2.5">
                     <div className="flex-1 min-w-[140px]">
                       <div className="text-sm font-semibold text-gray-800 truncate">{libelle(f)}</div>
-                      <div className="text-xs text-gray-400">Stock {f.stock} → {f.stock + q}</div>
+                      <div className="text-xs text-gray-400">
+                        Stock {f.stock} → {f.stock + q}
+                        {commandee !== null && (
+                          <span className={commandee === q ? "" : "text-amber-700 font-semibold"}>
+                            {commandee ? ` · commandé ${commandee}` : " · hors commande"}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div className="flex items-center border border-slate-200 rounded-lg overflow-hidden">
                       <button aria-label="Un de moins" onClick={() => modifier(l.formatId, { quantite: String(Math.max(1, q - 1)) })}

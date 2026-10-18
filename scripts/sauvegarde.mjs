@@ -17,7 +17,7 @@ import { getFirestore } from "firebase-admin/firestore";
 
 // Même liste que la sauvegarde manuelle (src/lib/api/sauvegarde.ts)
 const COLLECTIONS = [
-  "parametres", "users", "emballages", "produits", "formats", "clients", "prix_clients", "groupes_prix", "prix_groupes", "fournisseurs", "receptions", "operations_fournisseur",
+  "parametres", "users", "emballages", "produits", "formats", "clients", "prix_clients", "groupes_prix", "prix_groupes", "fournisseurs", "receptions", "operations_fournisseur", "commandes_fournisseur",
   "ventes", "operations_client", "mouvements_stock", "stats_jour",
 ];
 
