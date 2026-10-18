@@ -276,19 +276,20 @@ export default function Vente() {
 
   // Fonction de rendu (et non composant) : sinon React remonte le panier à chaque
   // frappe et les champs de saisie perdent le focus.
-  const renderPanier = () => (
-    <div className="flex flex-col h-full bg-white">
-      <div className="flex items-center gap-2 pl-4 pr-12 lg:pr-4 py-3 border-b border-slate-100">
+  // Sur téléphone tout le panier défile d'un bloc ; sur grand écran seule la liste défile
+  const renderPanier = (mobile = false) => (
+    <div className={mobile ? "flex flex-col bg-white" : "flex flex-col h-full bg-white"}>
+      <div className={["flex items-center gap-2 pl-4 pr-12 lg:pr-4 py-3 border-b border-slate-100", mobile ? "sticky top-0 z-10 bg-white" : ""].join(" ")}>
         <ShoppingCart size={18} className="text-primary" />
         <span className="font-bold text-gray-900">Panier</span>
         {items.length > 0 && (
           <span className="ml-auto text-xs font-semibold text-gray-500">
-            {casiers(items.reduce((s, i) => s + i.quantite, 0))}
+            {casiers(items.reduce((s, i) => s + i.quantite, 0))}{mobile && <span className="text-ink-900 font-bold"> · {formatPrix(total)}</span>}
           </span>
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className={mobile ? "" : "flex-1 overflow-y-auto"}>
         {items.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-2 text-gray-400 py-12">
             <ShoppingCart size={40} strokeWidth={1.2} />
@@ -623,8 +624,8 @@ export default function Vente() {
             <button onClick={() => setShowCart(false)} className="absolute top-5 right-3 p-2 rounded-full hover:bg-slate-100" aria-label="Fermer le panier">
               <X size={16} className="text-gray-500" />
             </button>
-            <div className="flex-1 overflow-hidden">
-              {renderPanier()}
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+              {renderPanier(true)}
             </div>
           </div>
         </>
