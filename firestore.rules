@@ -1,0 +1,122 @@
+rules_version = '2';
+
+// Règles de sécurité StockFlow.
+// Ce sont elles qui protègent les données : l'interface ne fait que masquer
+// ce qu'un rôle ne peut pas faire. Garder cohérent avec src/lib/roles.ts.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Fonctions utilitaires ─────────────────────────────────────────────
+    function connecte()   { return request.auth != null; }
+    function profil()     { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data; }
+    function actif()      { return connecte()
+                                   && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+                                   && profil().actif == true; }
+    function aRole(roles) { return actif() && profil().role in roles; }
+    function gerant()     { return aRole(['gerant']); }
+    function seulementChamps(champs) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(champs);
+    }
+
+    // ── Configuration ────────────────────────────────────────────────────
+    // proprietaire : créé une seule fois, à la première installation.
+    match /config/proprietaire {
+      allow get: if true;
+      allow create: if connecte()
+        && request.resource.data.uid == request.auth.uid
+        && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'gerant';
+      allow update, delete: if false;
+    }
+    // app : version_min, modifiable seulement depuis la console Firebase.
+    match /config/app {
+      allow read: if connecte();
+      allow write: if false;
+    }
+
+    // ── Utilisateurs ─────────────────────────────────────────────────────
+    match /users/{uid} {
+      allow read: if connecte() && (request.auth.uid == uid || gerant());
+      // Le gérant crée les comptes ; exception : le tout premier gérant.
+      allow create: if gerant()
+        || (connecte() && request.auth.uid == uid
+            && request.resource.data.role == 'gerant'
+            && !exists(/databases/$(database)/documents/config/proprietaire)
+            && getAfter(/databases/$(database)/documents/config/proprietaire).data.uid == uid);
+      // Personne ne peut changer son propre rôle ; le gérant ne peut pas se désactiver.
+      allow update: if gerant()
+        && (uid != request.auth.uid
+            || (request.resource.data.role == 'gerant' && request.resource.data.actif == true));
+      allow delete: if false;
+    }
+
+    // ── Catalogue ────────────────────────────────────────────────────────
+    match /produits/{id} {
+      allow read: if actif();
+      allow write: if gerant();
+    }
+    match /formats/{id} {
+      allow read: if actif();
+      allow create, delete: if gerant();
+      // Vendeur (vente) et magasinier (réappro / ajustement) ne touchent qu'au stock.
+      allow update: if gerant()
+        || (aRole(['vendeur', 'magasinier']) && seulementChamps(['stock']));
+    }
+    match /clients/{id} {
+      allow read: if aRole(['gerant', 'vendeur']);
+      allow create: if aRole(['gerant', 'vendeur']);
+      // Le vendeur ne touche qu'aux soldes (ventes à crédit, paiements, retours
+      // de casiers) ; chaque mouvement est tracé dans operations_client.
+      allow update: if gerant()
+        || (aRole(['vendeur']) && seulementChamps(['solde_argent', 'emballages_dus']));
+      allow delete: if gerant();
+    }
+    // Journal des dettes d'un client : on ajoute, on ne modifie ni ne supprime jamais.
+    match /operations_client/{id} {
+      allow read: if aRole(['gerant', 'vendeur']);
+      allow create: if aRole(['gerant', 'vendeur'])
+        && request.resource.data.utilisateur_uid == request.auth.uid;
+      allow update, delete: if false;
+    }
+    match /emballages/{id} {
+      allow read: if actif();
+      allow write: if gerant();
+    }
+    match /prix_clients/{id} {
+      allow read: if aRole(['gerant', 'vendeur']);
+      allow write: if gerant();
+    }
+
+    // ── Ventes ───────────────────────────────────────────────────────────
+    match /ventes/{id} {
+      allow read: if gerant()
+        || (aRole(['vendeur']) && resource.data.vendeur_uid == request.auth.uid);
+      allow create: if aRole(['gerant', 'vendeur'])
+        && request.resource.data.vendeur_uid == request.auth.uid
+        && request.resource.data.statut == 'validée';
+      // Seul le gérant annule une vente (statut uniquement).
+      allow update: if gerant() && seulementChamps(['statut', 'date_annulation']);
+      allow delete: if false;
+    }
+
+    // ── Stock ────────────────────────────────────────────────────────────
+    match /mouvements_stock/{id} {
+      // Le vendeur cumule pour l'instant les tâches de magasinier
+      allow read: if aRole(['gerant', 'vendeur', 'magasinier']);
+      allow create: if actif() && request.resource.data.utilisateur_uid == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    // ── Statistiques pré-calculées (dashboard) ───────────────────────────
+    match /stats_jour/{jour} {
+      allow read: if gerant();
+      allow create, update: if aRole(['gerant', 'vendeur']);
+      allow delete: if false;
+    }
+
+    // ── Paramètres du commerce ───────────────────────────────────────────
+    match /parametres/{id} {
+      allow read: if actif();
+      allow write: if gerant();
+    }
+  }
+}

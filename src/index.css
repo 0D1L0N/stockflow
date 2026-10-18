@@ -1,0 +1,39 @@
+/* La police Inter est embarquée via @fontsource (main.tsx) : elle fonctionne hors ligne. */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background-color: theme('colors.background');
+    color: #1f2937;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Pas de flèches sur les champs numériques : plus propre sur mobile */
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type="number"] { -moz-appearance: textfield; }
+
+  ::selection { background: theme('colors.secondary.200'); }
+}
+
+@layer utilities {
+  /* Zones sûres des téléphones à encoche (iPhone, Android plein écran) */
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+  .pt-safe { padding-top: env(safe-area-inset-top); }
+
+  .scrollbar-fin::-webkit-scrollbar { width: 6px; height: 6px; }
+  .scrollbar-fin::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
+}

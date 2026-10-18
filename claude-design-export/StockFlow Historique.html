@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StockFlow — Historique des ventes</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="design-canvas.jsx"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', sans-serif; }
+  :root {
+    --primary: #1e3a5f;
+    --green: #10b981;
+    --bg: #f3f4f6;
+    --text: #1f2937;
+    --muted: #6b7280;
+    --border: #e5e7eb;
+    --red: #ef4444;
+    --orange: #f59e0b;
+  }
+  input, select, button { font-family: 'Inter', sans-serif; }
+  input:focus, select:focus { outline: none; }
+  input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0.5; cursor: pointer; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+
+// ── Icons ──────────────────────────────────────────────────
+const Icon = ({ name, size = 16, color = 'currentColor', sw = 1.8 }) => {
+  const p = {
+    back:      <polyline points="15 18 9 12 15 6"/>,
+    eye:       <><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></>,
+    print:     <><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></>,
+    cancel:    <><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></>,
+    download:  <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></>,
+    filter:    <><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></>,
+    chevleft:  <polyline points="15 18 9 12 15 6"/>,
+    chevright: <polyline points="9 18 15 12 9 6"/>,
+    calendar:  <><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></>,
+    user:      <><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></>,
+    x:         <><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>,
+    check:     <polyline points="20 6 9 17 4 12"/>,
+    trend:     <><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></>,
+  };
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round">
+      {p[name]}
+    </svg>
+  );
+};
+
+// ── Data ──────────────────────────────────────────────────
+const fmt = (n) => n.toLocaleString('fr-FR') + ' FCFA';
+
+const ALL_SALES = [
+  { id:'FACT-20260419-0001', date:'2026-04-19', heure:'14:32', client:'Client standard',    total:12500, statut:'valide' },
+  { id:'FACT-20260419-0002', date:'2026-04-19', heure:'15:10', client:'Restaurant Le Phare',total:45000, statut:'valide' },
+  { id:'FACT-20260418-0025', date:'2026-04-18', heure:'18:45', client:'Bar Central',         total:28300, statut:'valide' },
+  { id:'FACT-20260418-0024', date:'2026-04-18', heure:'17:20', client:'Client standard',    total:8750,  statut:'valide' },
+  { id:'FACT-20260418-0023', date:'2026-04-18', heure:'16:05', client:"Épicerie du Coin",   total:15600, statut:'valide' },
+  { id:'FACT-20260417-0018', date:'2026-04-17', heure:'11:20', client:'Bar Central',         total:32000, statut:'valide' },
+  { id:'FACT-20260417-0017', date:'2026-04-17', heure:'10:05', client:'Hôtel du Lac',        total:67500, statut:'annule' },
+  { id:'FACT-20260416-0012', date:'2026-04-16', heure:'16:40', client:"Épicerie du Coin",   total:9200,  statut:'valide' },
+  { id:'FACT-20260416-0011', date:'2026-04-16', heure:'14:15', client:'Restaurant Le Phare',total:38400, statut:'valide' },
+  { id:'FACT-20260415-0008', date:'2026-04-15', heure:'09:30', client:'Client standard',    total:5500,  statut:'valide' },
+];
+
+const CLIENTS_LIST = ['Tous les clients', 'Client standard', 'Restaurant Le Phare', 'Bar Central', "Épicerie du Coin", 'Hôtel du Lac'];
+
+const PAGE_SIZE = 5;
+
+// ── Modal: Détail vente ────────────────────────────────────
+const DETAIL_LINES = [
+  { name:'Coca-Cola 33cl', qty:3, pu:14400, total:43200 },
+  { name:'Heineken 50cl',  qty:2, pu:16200, total:32400 },
+  { name:'Evian 1.5L',     qty:5, pu:7800,  total:39000 },
+];
+
+function DetailModal({ sale, onClose }) {
+  return (
+    <div style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0.5)', zIndex:200, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
+      <div style={{ background:'#fff', borderRadius:14, width:'100%', maxWidth:520, boxShadow:'0 24px 64px rgba(0,0,0,0.2)', display:'flex', flexDirection:'column', maxHeight:'85%' }}>
+        {/* Header */}
+        <div style={{ padding:'18px 20px', borderBottom:'1px solid var(--border)', display:'flex', alignItems:'center', gap:10, flexShrink:0 }}>
+          <div style={{ flex:1 }}>
+            <div style={{ fontWeight:700, fontSize:15, color:'var(--text)' }}>{sale.id}</div>
+            <div style={{ fontSize:12, color:'var(--muted)', marginTop:2 }}>{sale.date.split('-').reverse().join('/')} à {sale.heure} · {sale.client}</div>
+          </div>
+          <button onClick={onClose} style={{ background:'none', border:'none', cursor:'pointer', padding:4, borderRadius:6, display:'flex' }}
+            onMouseEnter={e=>e.currentTarget.style.background='#f3f4f6'} onMouseLeave={e=>e.currentTarget.style.background='none'}>
+            <Icon name="x" size={18} color="var(--muted)"/>
+          </button>
+        </div>
+        {/* Lines */}
+        <div style={{ flex:1, overflowY:'auto', padding:'16px 20px' }}>
+          {/* Sub-header */}
+          <div style={{ display:'grid', gridTemplateColumns:'2fr 60px 80px 80px', gap:8, padding:'6px 10px', marginBottom:6 }}>
+            {['Produit','Qté','P.U.','Total'].map(h=>(
+              <div key={h} style={{ fontSize:10, fontWeight:700, color:'var(--muted)', textTransform:'uppercase', letterSpacing:'0.04em' }}>{h}</div>
+            ))}
+          </div>
+          {DETAIL_LINES.map((l,i)=>(
+            <div key={i} style={{ display:'grid', gridTemplateColumns:'2fr 60px 80px 80px', gap:8, padding:'10px 10px', background: i%2===0?'#f9fafb':'#fff', borderRadius:8, marginBottom:4, alignItems:'center' }}>
+              <div style={{ fontSize:13, fontWeight:600, color:'var(--text)' }}>{l.name}</div>
+              <div style={{ fontSize:13, color:'var(--muted)', textAlign:'center' }}>{l.qty}</div>
+              <div style={{ fontSize:12, color:'var(--muted)' }}>{l.pu.toLocaleString('fr-FR')}</div>
+              <div style={{ fontSize:13, fontWeight:700, color:'var(--text)' }}>{l.total.toLocaleString('fr-FR')}</div>
+            </div>
+          ))}
+        </div>
+        {/* Footer */}
+        <div style={{ padding:'14px 20px', borderTop:'1px solid var(--border)', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}>
+          <div>
+            <span style={{ fontSize:12, color:'var(--muted)' }}>Total facture</span>
+            <div style={{ fontWeight:800, fontSize:20, color:'var(--primary)' }}>{fmt(sale.total)}</div>
+          </div>
+          <button onClick={onClose} style={{ background:'var(--primary)', color:'#fff', border:'none', borderRadius:8, padding:'10px 20px', fontWeight:600, fontSize:13, cursor:'pointer' }}>Fermer</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Cancel confirm ─────────────────────────────────────────
+function CancelConfirm({ sale, onConfirm, onCancel }) {
+  return (
+    <div style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0.5)', zIndex:200, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
+      <div style={{ background:'#fff', borderRadius:14, padding:28, maxWidth:360, width:'100%', boxShadow:'0 24px 64px rgba(0,0,0,0.2)', textAlign:'center' }}>
+        <div style={{ width:52,height:52,borderRadius:'50%',background:'#fee2e2',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 16px' }}>
+          <Icon name="cancel" size={22} color="var(--red)"/>
+        </div>
+        <div style={{ fontWeight:700, fontSize:16, color:'var(--text)', marginBottom:8 }}>Annuler cette vente ?</div>
+        <div style={{ fontSize:13, color:'var(--muted)', marginBottom:24 }}>La vente <strong>{sale.id}</strong> sera marquée comme annulée. Cette action est irréversible.</div>
+        <div style={{ display:'flex', gap:10 }}>
+          <button onClick={onCancel} style={{ flex:1, padding:'10px', background:'#f3f4f6', border:'none', borderRadius:8, fontWeight:600, fontSize:13, color:'var(--muted)', cursor:'pointer' }}>Retour</button>
+          <button onClick={onConfirm} style={{ flex:1, padding:'10px', background:'var(--red)', border:'none', borderRadius:8, fontWeight:700, fontSize:13, color:'#fff', cursor:'pointer' }}>Annuler la vente</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Toast ──────────────────────────────────────────────────
+function Toast({ msg, onDone }) {
+  React.useEffect(() => { const t = setTimeout(onDone, 2200); return () => clearTimeout(t); }, []);
+  return (
+    <div style={{ position:'absolute', bottom:16, left:'50%', transform:'translateX(-50%)', background:'var(--primary)', color:'#fff', borderRadius:10, padding:'10px 18px', fontSize:13, fontWeight:600, zIndex:300, display:'flex', alignItems:'center', gap:8, boxShadow:'0 8px 24px rgba(0,0,0,0.2)', whiteSpace:'nowrap' }}>
+      <Icon name="check" size={13} color="var(--green)" sw={2.5}/> {msg}
+    </div>
+  );
+}
+
+// ── Pagination ─────────────────────────────────────────────
+function Pagination({ page, total, pageSize, onChange }) {
+  const pages = Math.ceil(total / pageSize);
+  if (pages <= 1) return null;
+  const range = Array.from({ length: pages }, (_, i) => i + 1);
+  return (
+    <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:4, paddingTop:16 }}>
+      <button onClick={() => onChange(Math.max(1, page-1))} disabled={page===1}
+        style={{ width:32, height:32, border:'1px solid var(--border)', borderRadius:8, background:'#fff', cursor:page===1?'not-allowed':'pointer', display:'flex', alignItems:'center', justifyContent:'center', opacity:page===1?0.4:1 }}>
+        <Icon name="chevleft" size={14} color="var(--text)" sw={2}/>
+      </button>
+      {range.map(n => (
+        <button key={n} onClick={() => onChange(n)}
+          style={{ width:32, height:32, border: n===page ? 'none' : '1px solid var(--border)', borderRadius:8, background: n===page ? 'var(--primary)' : '#fff', color: n===page ? '#fff' : 'var(--text)', fontSize:13, fontWeight: n===page ? 700 : 400, cursor:'pointer' }}>
+          {n}
+        </button>
+      ))}
+      <button onClick={() => onChange(Math.min(pages, page+1))} disabled={page===pages}
+        style={{ width:32, height:32, border:'1px solid var(--border)', borderRadius:8, background:'#fff', cursor:page===pages?'not-allowed':'pointer', display:'flex', alignItems:'center', justifyContent:'center', opacity:page===pages?0.4:1 }}>
+        <Icon name="chevright" size={14} color="var(--text)" sw={2}/>
+      </button>
+    </div>
+  );
+}
+
+// ── Main screen ────────────────────────────────────────────
+function HistoriqueScreen({ isMobile=false }) {
+  const [dateDebut, setDateDebut] = React.useState('2026-04-17');
+  const [dateFin, setDateFin]     = React.useState('2026-04-19');
+  const [client, setClient]       = React.useState('Tous les clients');
+  const [sales, setSales]         = React.useState(ALL_SALES);
+  const [page, setPage]           = React.useState(1);
+  const [detail, setDetail]       = React.useState(null);
+  const [cancelTarget, setCancelTarget] = React.useState(null);
+  const [toast, setToast]         = React.useState(null);
+
+  const filtered = sales.filter(s => {
+    const inRange = (!dateDebut || s.date >= dateDebut) && (!dateFin || s.date <= dateFin);
+    const inClient = client === 'Tous les clients' || s.client === client;
+    return inRange && inClient;
+  });
+
+  const paginated = filtered.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE);
+
+  const totalFiltered = filtered.reduce((s,v) => s + (v.statut==='valide'?v.total:0), 0);
+
+  const handleFilter = () => setPage(1);
+
+  const handleCancel = (id) => {
+    setSales(prev => prev.map(s => s.id===id ? { ...s, statut:'annule' } : s));
+    setCancelTarget(null);
+    setToast('Vente annulée avec succès');
+  };
+
+  const px = isMobile ? 14 : 24;
+
+  // row actions
+  const ActionBtn = ({ icon, color, title, onClick }) => (
+    <button onClick={onClick} title={title}
+      style={{ width:30, height:30, background:'none', border:'1px solid var(--border)', borderRadius:7, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', transition:'background 0.1s, border-color 0.1s' }}
+      onMouseEnter={e => { e.currentTarget.style.background=color+'18'; e.currentTarget.style.borderColor=color+'66'; }}
+      onMouseLeave={e => { e.currentTarget.style.background='none'; e.currentTarget.style.borderColor='var(--border)'; }}>
+      <Icon name={icon} size={13} color={color} sw={2}/>
+    </button>
+  );
+
+  return (
+    <div style={{ height:'100%', display:'flex', flexDirection:'column', background:'var(--bg)', fontFamily:"'Inter',sans-serif", position:'relative', overflow:'hidden' }}>
+
+      {/* HEADER */}
+      <div style={{ background:'var(--primary)', padding:`${isMobile?13:18}px ${px}px`, flexShrink:0 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+          <button style={{ width:34,height:34,borderRadius:8,background:'rgba(255,255,255,0.1)',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center' }}>
+            <Icon name="back" size={18} color="#fff" sw={2}/>
+          </button>
+          <div style={{ flex:1 }}>
+            <div style={{ color:'#fff', fontWeight:700, fontSize:isMobile?15:20 }}>Historique des ventes</div>
+            <div style={{ color:'rgba(255,255,255,0.5)', fontSize:11, marginTop:1 }}>{filtered.length} transaction{filtered.length>1?'s':''} · {fmt(totalFiltered)}</div>
+          </div>
+          {/* Export button desktop */}
+          {!isMobile && (
+            <button style={{ display:'flex', alignItems:'center', gap:7, background:'rgba(255,255,255,0.1)', color:'#fff', border:'1.5px solid rgba(255,255,255,0.2)', borderRadius:9, padding:'9px 16px', fontWeight:600, fontSize:13, cursor:'pointer' }}
+              onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,0.2)'}
+              onMouseLeave={e=>e.currentTarget.style.background='rgba(255,255,255,0.1)'}>
+              <Icon name="download" size={15} color="#fff" sw={2}/>
+              Exporter Excel
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* FILTERS */}
+      <div style={{ background:'#fff', borderBottom:'1px solid var(--border)', padding:`12px ${px}px`, flexShrink:0 }}>
+        <div style={{ display:'flex', flexWrap: isMobile?'wrap':'nowrap', gap:10, alignItems:'flex-end' }}>
+          {/* Date début */}
+          <div style={{ flex: isMobile ? '1 1 calc(50% - 5px)' : 1 }}>
+            <label style={{ fontSize:10, fontWeight:600, color:'var(--muted)', textTransform:'uppercase', letterSpacing:'0.04em', display:'block', marginBottom:4 }}>Du</label>
+            <div style={{ position:'relative' }}>
+              <input type="date" value={dateDebut} onChange={e=>setDateDebut(e.target.value)}
+                style={{ width:'100%', padding:'9px 12px', border:'1.5px solid var(--border)', borderRadius:8, fontSize:12, color:'var(--text)', background:'#f9fafb' }}
+                onFocus={e=>e.target.style.borderColor='var(--primary)'}
+                onBlur={e=>e.target.style.borderColor='var(--border)'}/>
+            </div>
+          </div>
+          {/* Date fin */}
+          <div style={{ flex: isMobile ? '1 1 calc(50% - 5px)' : 1 }}>
+            <label style={{ fontSize:10, fontWeight:600, color:'var(--muted)', textTransform:'uppercase', letterSpacing:'0.04em', display:'block', marginBottom:4 }}>Au</label>
+            <input type="date" value={dateFin} onChange={e=>setDateFin(e.target.value)}
+              style={{ width:'100%', padding:'9px 12px', border:'1.5px solid var(--border)', borderRadius:8, fontSize:12, color:'var(--text)', background:'#f9fafb' }}
+              onFocus={e=>e.target.style.borderColor='var(--primary)'}
+              onBlur={e=>e.target.style.borderColor='var(--border)'}/>
+          </div>
+          {/* Client */}
+          <div style={{ flex: isMobile ? '1 1 100%' : 1.4 }}>
+            <label style={{ fontSize:10, fontWeight:600, color:'var(--muted)', textTransform:'uppercase', letterSpacing:'0.04em', display:'block', marginBottom:4 }}>Client</label>
+            <select value={client} onChange={e=>setClient(e.target.value)}
+              style={{ width:'100%', padding:'9px 12px', border:'1.5px solid var(--border)', borderRadius:8, fontSize:12, color:'var(--text)', background:'#f9fafb', cursor:'pointer' }}>
+              {CLIENTS_LIST.map(c=><option key={c}>{c}</option>)}
+            </select>
+          </div>
+          {/* Buttons */}
+          <div style={{ display:'flex', gap:8, flexShrink:0 }}>
+            <button onClick={handleFilter}
+              style={{ padding:'9px 18px', background:'var(--primary)', color:'#fff', border:'none', borderRadius:8, fontWeight:600, fontSize:13, cursor:'pointer', display:'flex', alignItems:'center', gap:6, whiteSpace:'nowrap' }}
+              onMouseEnter={e=>e.currentTarget.style.background='#152d4a'}
+              onMouseLeave={e=>e.currentTarget.style.background='var(--primary)'}>
+              <Icon name="filter" size={13} color="#fff" sw={2}/>
+              Filtrer
+            </button>
+            {isMobile && (
+              <button style={{ padding:'9px 14px', background:'#f3f4f6', border:'1px solid var(--border)', borderRadius:8, cursor:'pointer', display:'flex', alignItems:'center' }}>
+                <Icon name="download" size={15} color="var(--muted)" sw={2}/>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Summary row */}
+        {!isMobile && (
+          <div style={{ display:'flex', gap:24, marginTop:10, paddingTop:10, borderTop:'1px solid #f3f4f6' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+              <span style={{ fontWeight:800, fontSize:16, color:'var(--primary)' }}>{filtered.length}</span>
+              <span style={{ fontSize:12, color:'var(--muted)' }}>ventes</span>
+            </div>
+            <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+              <Icon name="trend" size={13} color="var(--green)" sw={2}/>
+              <span style={{ fontWeight:800, fontSize:16, color:'var(--green)' }}>{fmt(totalFiltered)}</span>
+              <span style={{ fontSize:12, color:'var(--muted)' }}>encaissés</span>
+            </div>
+            <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+              <span style={{ fontWeight:800, fontSize:16, color:'var(--red)' }}>{sales.filter(s=>s.statut==='annule').length}</span>
+              <span style={{ fontSize:12, color:'var(--muted)' }}>annulées</span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* TABLE / CARDS */}
+      <div style={{ flex:1, overflowY:'auto', padding:`16px ${px}px` }}>
+
+        {/* DESKTOP TABLE */}
+        {!isMobile && (
+          <div style={{ background:'#fff', borderRadius:12, overflow:'hidden', boxShadow:'0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04)' }}>
+            {/* Header */}
+            <div style={{ display:'grid', gridTemplateColumns:'2fr 1.4fr 1.6fr 1fr 100px', padding:'11px 20px', background:'#f8fafc', borderBottom:'1px solid var(--border)' }}>
+              {['N° Facture','Date & heure','Client','Total','Actions'].map((h,i) => (
+                <div key={h} style={{ fontSize:11, fontWeight:700, color:'var(--muted)', textTransform:'uppercase', letterSpacing:'0.05em', textAlign: i>=3?'center':'left' }}>{h}</div>
+              ))}
+            </div>
+            {/* Rows */}
+            {paginated.length === 0 ? (
+              <div style={{ padding:'48px 20px', textAlign:'center', color:'var(--muted)', fontSize:13 }}>Aucune vente pour ces critères.</div>
+            ) : paginated.map((s, ri) => (
+              <div key={s.id} style={{
+                display:'grid', gridTemplateColumns:'2fr 1.4fr 1.6fr 1fr 100px',
+                padding:'13px 20px', alignItems:'center',
+                borderBottom: ri < paginated.length-1 ? '1px solid #f3f4f6' : 'none',
+                background: s.statut==='annule' ? '#fafafa' : '#fff',
+                transition:'background 0.1s', opacity: s.statut==='annule' ? 0.65 : 1,
+              }}
+                onMouseEnter={e=>{ if(s.statut!=='annule') e.currentTarget.style.background='#f9fafb'; }}
+                onMouseLeave={e=>e.currentTarget.style.background=s.statut==='annule'?'#fafafa':'#fff'}
+              >
+                {/* Facture */}
+                <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                  <div style={{ width:8, height:8, borderRadius:'50%', background: s.statut==='annule' ? 'var(--red)' : 'var(--green)', flexShrink:0 }}/>
+                  <span style={{ fontWeight:700, fontSize:13, color:'var(--primary)', fontVariantNumeric:'tabular-nums' }}>{s.id}</span>
+                </div>
+                {/* Date */}
+                <div>
+                  <div style={{ fontSize:13, fontWeight:600, color:'var(--text)' }}>{s.date.split('-').reverse().join('/')}</div>
+                  <div style={{ fontSize:11, color:'var(--muted)' }}>{s.heure}</div>
+                </div>
+                {/* Client */}
+                <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                  <div style={{ width:28, height:28, borderRadius:'50%', background:'#eff6ff', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                    <span style={{ fontSize:11, fontWeight:700, color:'var(--primary)' }}>{s.client[0]}</span>
+                  </div>
+                  <span style={{ fontSize:13, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{s.client}</span>
+                </div>
+                {/* Total */}
+                <div style={{ textAlign:'center' }}>
+                  {s.statut==='annule'
+                    ? <span style={{ fontSize:11, fontWeight:600, background:'#fee2e2', color:'var(--red)', padding:'3px 8px', borderRadius:20 }}>Annulée</span>
+                    : <span style={{ fontWeight:800, fontSize:14, color:'var(--text)' }}>{fmt(s.total)}</span>
+                  }
+                </div>
+                {/* Actions */}
+                <div style={{ display:'flex', justifyContent:'center', gap:4 }}>
+                  <ActionBtn icon="eye" color="var(--primary)" title="Voir détails" onClick={()=>setDetail(s)}/>
+                  <ActionBtn icon="print" color="var(--muted)" title="Réimprimer"/>
+                  {s.statut !== 'annule' && <ActionBtn icon="cancel" color="var(--red)" title="Annuler" onClick={()=>setCancelTarget(s)}/>}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* MOBILE CARDS */}
+        {isMobile && (
+          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+            {paginated.length === 0 ? (
+              <div style={{ textAlign:'center', padding:'48px 20px', color:'var(--muted)', fontSize:13 }}>Aucune vente pour ces critères.</div>
+            ) : paginated.map(s => (
+              <div key={s.id} style={{
+                background:'#fff', borderRadius:12, overflow:'hidden',
+                boxShadow:'0 1px 3px rgba(0,0,0,0.06)',
+                borderLeft: `4px solid ${s.statut==='annule'?'var(--red)':'var(--green)'}`,
+                opacity: s.statut==='annule'?0.7:1,
+              }}>
+                <div style={{ padding:'13px 14px', display:'flex', alignItems:'flex-start', gap:10 }}>
+                  <div style={{ width:38,height:38,borderRadius:'50%',background:'#eff6ff',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0 }}>
+                    <span style={{ fontSize:13,fontWeight:700,color:'var(--primary)' }}>{s.client[0]}</span>
+                  </div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontWeight:700, fontSize:12, color:'var(--primary)', fontVariantNumeric:'tabular-nums' }}>{s.id}</div>
+                    <div style={{ fontSize:12, color:'var(--muted)', marginTop:1 }}>{s.date.split('-').reverse().join('/')} à {s.heure}</div>
+                    <div style={{ fontSize:12, fontWeight:600, color:'var(--text)', marginTop:2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{s.client}</div>
+                  </div>
+                  <div style={{ textAlign:'right', flexShrink:0 }}>
+                    {s.statut==='annule'
+                      ? <span style={{ fontSize:10, fontWeight:700, background:'#fee2e2', color:'var(--red)', padding:'3px 8px', borderRadius:20 }}>Annulée</span>
+                      : <div style={{ fontWeight:800, fontSize:15, color:'var(--text)' }}>{fmt(s.total)}</div>
+                    }
+                  </div>
+                </div>
+                {/* Mobile actions */}
+                <div style={{ borderTop:'1px solid #f3f4f6', display:'flex' }}>
+                  {[
+                    { icon:'eye', label:'Détails', color:'var(--primary)', action:()=>setDetail(s) },
+                    { icon:'print', label:'Imprimer', color:'var(--muted)', action:()=>{} },
+                    ...(s.statut!=='annule' ? [{ icon:'cancel', label:'Annuler', color:'var(--red)', action:()=>setCancelTarget(s) }] : []),
+                  ].map((a,i,arr)=>(
+                    <button key={a.icon} onClick={a.action}
+                      style={{ flex:1, padding:'9px 4px', background:'none', border:'none', borderRight: i<arr.length-1?'1px solid #f3f4f6':'none', cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', gap:3 }}
+                      onMouseEnter={e=>e.currentTarget.style.background='#f9fafb'}
+                      onMouseLeave={e=>e.currentTarget.style.background='none'}>
+                      <Icon name={a.icon} size={14} color={a.color} sw={2}/>
+                      <span style={{ fontSize:10, fontWeight:600, color:a.color }}>{a.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* PAGINATION */}
+        <Pagination page={page} total={filtered.length} pageSize={PAGE_SIZE} onChange={setPage}/>
+      </div>
+
+      {/* MODALS */}
+      {detail && <DetailModal sale={detail} onClose={()=>setDetail(null)}/>}
+      {cancelTarget && <CancelConfirm sale={cancelTarget} onConfirm={()=>handleCancel(cancelTarget.id)} onCancel={()=>setCancelTarget(null)}/>}
+      {toast && <Toast msg={toast} onDone={()=>setToast(null)}/>}
+    </div>
+  );
+}
+
+// ── App ────────────────────────────────────────────────────
+function App() {
+  return (
+    <DesignCanvas>
+      <DCSection title="StockFlow — Historique des ventes" subtitle="Desktop (tableau) et Mobile (cards)">
+        <DCArtboard label="Desktop — 1280×800" width={1280} height={800}>
+          <HistoriqueScreen isMobile={false}/>
+        </DCArtboard>
+        <DCArtboard label="Mobile — 390×844" width={390} height={844}>
+          <HistoriqueScreen isMobile={true}/>
+        </DCArtboard>
+      </DCSection>
+    </DesignCanvas>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

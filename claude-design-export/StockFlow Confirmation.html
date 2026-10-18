@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StockFlow — Confirmation de vente</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="design-canvas.jsx"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', sans-serif; }
+  :root {
+    --primary: #1e3a5f;
+    --green: #10b981;
+    --bg: #f3f4f6;
+    --text: #1f2937;
+    --muted: #6b7280;
+    --border: #e5e7eb;
+    --red: #ef4444;
+  }
+
+  /* Checkmark animation */
+  @keyframes scaleIn {
+    0%   { transform: scale(0); opacity: 0; }
+    60%  { transform: scale(1.15); opacity: 1; }
+    100% { transform: scale(1); }
+  }
+  @keyframes drawCheck {
+    0%   { stroke-dashoffset: 60; }
+    100% { stroke-dashoffset: 0; }
+  }
+  @keyframes fadeSlideUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes confettiFall {
+    0%   { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(320px) rotate(720deg); opacity: 0; }
+  }
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(16,185,129,0.35); }
+    50%       { box-shadow: 0 0 0 10px rgba(16,185,129,0); }
+  }
+
+  .check-circle {
+    animation: scaleIn 0.5s cubic-bezier(0.34,1.56,0.64,1) 0.1s both;
+  }
+  .check-path {
+    stroke-dasharray: 60;
+    stroke-dashoffset: 60;
+    animation: drawCheck 0.4s ease 0.55s forwards;
+  }
+  .fade-1 { animation: fadeSlideUp 0.4s ease 0.3s both; }
+  .fade-2 { animation: fadeSlideUp 0.4s ease 0.45s both; }
+  .fade-3 { animation: fadeSlideUp 0.4s ease 0.6s both; }
+  .fade-4 { animation: fadeSlideUp 0.4s ease 0.75s both; }
+  .fade-5 { animation: fadeSlideUp 0.4s ease 0.9s both; }
+  .fade-6 { animation: fadeSlideUp 0.4s ease 1.05s both; }
+
+  .btn-print { animation: pulse 2s ease 1.2s infinite; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+
+const fmt = (n) => n.toLocaleString('fr-FR') + ' FCFA';
+
+// ── Icons ─────────────────────────────────────────────────
+const Icon = ({ name, size=16, color='currentColor', sw=1.8 }) => {
+  const p = {
+    print:    <><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></>,
+    download: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></>,
+    mail:     <><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></>,
+    cart:     <><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></>,
+    home:     <><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></>,
+    user:     <><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></>,
+    calendar: <><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></>,
+    money:    <><circle cx="12" cy="12" r="10"/><path d="M12 6v12M9 9.5C9 8.12 10.34 7 12 7s3 1.12 3 2.5c0 3-6 3-6 6C9 16.88 10.34 18 12 18s3-1.12 3-2.5"/></>,
+    receipt:  <><path d="M14 2H6a2 2 0 0 0-2 2v16l4-2 4 2 4-2 4 2V4a2 2 0 0 0-2-2z"/><line x1="9" y1="9" x2="15" y2="9"/><line x1="9" y1="13" x2="15" y2="13"/></>,
+    arrow:    <><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></>,
+  };
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round">
+      {p[name]}
+    </svg>
+  );
+};
+
+// ── Confetti particle ─────────────────────────────────────
+function Confetti({ count = 22 }) {
+  const colors = ['#10b981','#1e3a5f','#f59e0b','#8b5cf6','#ef4444','#0ea5e9','#f472b6'];
+  const shapes = ['square','circle','rect'];
+  const items = React.useMemo(() =>
+    Array.from({ length: count }, (_, i) => ({
+      id: i,
+      left: Math.random() * 100,
+      delay: Math.random() * 0.8,
+      duration: 1.4 + Math.random() * 1,
+      color: colors[i % colors.length],
+      shape: shapes[i % shapes.length],
+      size: 6 + Math.random() * 8,
+    })),
+  []);
+  return (
+    <div style={{ position:'absolute', inset:0, overflow:'hidden', pointerEvents:'none', zIndex:10 }}>
+      {items.map(p => (
+        <div key={p.id} style={{
+          position:'absolute',
+          top: -20,
+          left: `${p.left}%`,
+          width: p.shape==='rect' ? p.size*1.8 : p.size,
+          height: p.size,
+          background: p.color,
+          borderRadius: p.shape==='circle' ? '50%' : p.shape==='square' ? 2 : 1,
+          opacity: 0,
+          animation: `confettiFall ${p.duration}s ease-in ${p.delay}s 1 forwards`,
+        }}/>
+      ))}
+    </div>
+  );
+}
+
+// ── Animated check ────────────────────────────────────────
+function AnimatedCheck({ size = 72 }) {
+  return (
+    <div className="check-circle" style={{
+      width: size, height: size, borderRadius: '50%',
+      background: 'linear-gradient(135deg, #10b981, #059669)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      boxShadow: '0 8px 32px rgba(16,185,129,0.35)',
+      flexShrink: 0,
+    }}>
+      <svg width={size*0.5} height={size*0.5} viewBox="0 0 24 24" fill="none">
+        <polyline className="check-path" points="20 6 9 17 4 12"
+          stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+    </div>
+  );
+}
+
+// ── Mini invoice preview ──────────────────────────────────
+function InvoicePreview({ compact = false }) {
+  const lines = [
+    { name:'Coca-Cola 33cl ×24',  qty:2, pu:14400, total:28800 },
+    { name:'Heineken 50cl ×12',   qty:1, pu:16200, total:16200 },
+    { name:'Evian 1.5L ×12',     qty:3, pu: 7800,  total:23400 },
+  ];
+  const scale = compact ? 0.68 : 1;
+  return (
+    <div style={{
+      width: 280, transformOrigin: 'top center',
+      transform: `scale(${scale})`,
+      marginBottom: compact ? -(280*(1-scale)*0.6) : 0,
+      background: '#fff',
+      borderRadius: 10,
+      border: '1px solid var(--border)',
+      overflow: 'hidden',
+      boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+      fontFamily: "'Inter', sans-serif",
+    }}>
+      {/* Invoice header */}
+      <div style={{ background:'var(--primary)', padding:'14px 16px' }}>
+        <div style={{ color:'#fff', fontWeight:800, fontSize:16 }}>Stock<span style={{color:'#10b981'}}>Flow</span></div>
+        <div style={{ color:'rgba(255,255,255,0.6)', fontSize:10, marginTop:2 }}>Dépôt de Boissons</div>
+      </div>
+      <div style={{ padding:'14px 16px', borderBottom:'1px dashed var(--border)', display:'flex', justifyContent:'space-between' }}>
+        <div>
+          <div style={{ fontSize:9, color:'var(--muted)', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.04em' }}>Facture N°</div>
+          <div style={{ fontWeight:700, fontSize:11, color:'var(--text)', marginTop:1 }}>FACT-20260419-0001</div>
+        </div>
+        <div style={{ textAlign:'right' }}>
+          <div style={{ fontSize:9, color:'var(--muted)', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.04em' }}>Date</div>
+          <div style={{ fontWeight:600, fontSize:11, color:'var(--text)', marginTop:1 }}>19/04/2026 14:32</div>
+        </div>
+      </div>
+      <div style={{ padding:'10px 16px', borderBottom:'1px dashed var(--border)', background:'#f8fafc' }}>
+        <div style={{ fontSize:9, color:'var(--muted)', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:4 }}>Client</div>
+        <div style={{ fontWeight:700, fontSize:12, color:'var(--text)' }}>Restaurant Le Phare</div>
+        <div style={{ fontSize:10, color:'var(--muted)', marginTop:1 }}>Cotonou Centre</div>
+      </div>
+      {/* Lines header */}
+      <div style={{ display:'grid', gridTemplateColumns:'2fr 30px 55px 55px', gap:4, padding:'8px 16px 4px', background:'#f8fafc', borderBottom:'1px solid var(--border)' }}>
+        {['Produit','Qté','P.U.','Total'].map(h=>(
+          <div key={h} style={{ fontSize:8, fontWeight:700, color:'var(--muted)', textTransform:'uppercase' }}>{h}</div>
+        ))}
+      </div>
+      {lines.map((l,i)=>(
+        <div key={i} style={{ display:'grid', gridTemplateColumns:'2fr 30px 55px 55px', gap:4, padding:'6px 16px', borderBottom:'1px solid #f3f4f6', alignItems:'center' }}>
+          <div style={{ fontSize:10, fontWeight:500, color:'var(--text)' }}>{l.name}</div>
+          <div style={{ fontSize:10, color:'var(--muted)', textAlign:'center' }}>{l.qty}</div>
+          <div style={{ fontSize:9, color:'var(--muted)' }}>{l.pu.toLocaleString('fr-FR')}</div>
+          <div style={{ fontSize:10, fontWeight:600, color:'var(--text)' }}>{l.total.toLocaleString('fr-FR')}</div>
+        </div>
+      ))}
+      {/* Total */}
+      <div style={{ padding:'10px 16px', borderTop:'2px solid var(--primary)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+        <span style={{ fontWeight:700, fontSize:12, color:'var(--text)' }}>Total</span>
+        <span style={{ fontWeight:800, fontSize:15, color:'var(--primary)' }}>45 000 FCFA</span>
+      </div>
+      <div style={{ padding:'6px 16px 12px', display:'flex', justifyContent:'space-between', fontSize:10, color:'var(--muted)' }}>
+        <span>Reçu : 50 000 FCFA</span>
+        <span style={{ fontWeight:600, color:'var(--green)' }}>Rendu : 5 000 FCFA</span>
+      </div>
+    </div>
+  );
+}
+
+// ── Confirmation screen ───────────────────────────────────
+function ConfirmScreen({ isMobile=false }) {
+  const [triggered, setTriggered] = React.useState(false);
+  const [emailSent, setEmailSent] = React.useState(false);
+
+  // re-trigger animation on reset
+  const [key, setKey] = React.useState(0);
+  const replay = () => { setKey(k=>k+1); setEmailSent(false); };
+
+  const px = isMobile ? 18 : 0;
+
+  const infoRows = [
+    { icon:'user',     label:'Client',          val:'Restaurant Le Phare',   bold:false },
+    { icon:'calendar', label:'Date',             val:'19/04/2026 à 14:32',    bold:false },
+    { icon:'money',    label:'Total',            val:'45 000 FCFA',           bold:true,  accent:'var(--primary)' },
+    { icon:'money',    label:'Montant reçu',     val:'50 000 FCFA',           bold:false },
+    { icon:'arrow',    label:'Monnaie rendue',   val:'5 000 FCFA',            bold:true,  accent:'var(--green)' },
+  ];
+
+  const content = (
+    <div key={key} style={{
+      display:'flex', flexDirection: isMobile ? 'column' : 'row',
+      gap: 0, height:'100%', overflow:'hidden', position:'relative',
+    }}>
+      <Confetti count={26}/>
+
+      {/* LEFT / TOP — success info */}
+      <div style={{
+        flex:1, overflowY:'auto', padding: isMobile ? '28px 18px 24px' : '36px 36px 28px',
+        display:'flex', flexDirection:'column', gap: isMobile ? 20 : 24,
+      }}>
+        {/* Check + title */}
+        <div className="fade-1" style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:14, textAlign:'center' }}>
+          <AnimatedCheck size={isMobile ? 72 : 80}/>
+          <div>
+            <div style={{ fontWeight:800, fontSize: isMobile ? 20 : 22, color:'var(--text)', lineHeight:1.2 }}>Vente enregistrée<br/>avec succès !</div>
+            <div style={{ marginTop:6, fontSize:12, color:'var(--muted)', fontWeight:500 }}>Facture N° <strong style={{color:'var(--primary)'}}>FACT-20260419-0001</strong></div>
+          </div>
+        </div>
+
+        {/* Info rows */}
+        <div className="fade-2" style={{ background:'#f8fafc', borderRadius:12, border:'1px solid var(--border)', overflow:'hidden' }}>
+          {infoRows.map((r,i)=>(
+            <div key={r.label} style={{
+              display:'flex', alignItems:'center', justifyContent:'space-between',
+              padding:'11px 16px',
+              borderBottom: i<infoRows.length-1 ? '1px solid var(--border)' : 'none',
+              background: r.bold ? '#fff' : 'transparent',
+            }}>
+              <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                <Icon name={r.icon} size={14} color="var(--muted)" sw={1.8}/>
+                <span style={{ fontSize:13, color:'var(--muted)' }}>{r.label}</span>
+              </div>
+              <span style={{ fontSize: r.bold ? 15 : 13, fontWeight: r.bold ? 800 : 600, color: r.accent || 'var(--text)' }}>{r.val}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Action buttons */}
+        <div className="fade-3" style={{ display:'flex', flexDirection:'column', gap:10 }}>
+          {/* Primary: Print */}
+          <button className="btn-print" autoFocus
+            style={{
+              width:'100%', padding:'13px 16px', background:'var(--primary)', color:'#fff',
+              border:'none', borderRadius:10, fontWeight:700, fontSize:14, cursor:'pointer',
+              display:'flex', alignItems:'center', justifyContent:'center', gap:10,
+              transition:'background 0.15s',
+            }}
+            onMouseEnter={e=>e.currentTarget.style.background='#152d4a'}
+            onMouseLeave={e=>e.currentTarget.style.background='var(--primary)'}>
+            <Icon name="print" size={18} color="#fff" sw={2}/>
+            Imprimer la facture
+          </button>
+
+          {/* Secondary: Download + Email */}
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+            <button style={{
+              padding:'11px', background:'var(--green)', color:'#fff', border:'none',
+              borderRadius:10, fontWeight:600, fontSize:13, cursor:'pointer',
+              display:'flex', alignItems:'center', justifyContent:'center', gap:7,
+              transition:'background 0.15s',
+            }}
+              onMouseEnter={e=>e.currentTarget.style.background='#059669'}
+              onMouseLeave={e=>e.currentTarget.style.background='var(--green)'}>
+              <Icon name="download" size={15} color="#fff" sw={2}/>
+              PDF
+            </button>
+            <button onClick={()=>setEmailSent(true)}
+              style={{
+                padding:'11px', background: emailSent ? '#f0fdf4' : '#f3f4f6',
+                color: emailSent ? 'var(--green)' : 'var(--muted)',
+                border: emailSent ? '1.5px solid #bbf7d0' : '1.5px solid var(--border)',
+                borderRadius:10, fontWeight:600, fontSize:13, cursor:'pointer',
+                display:'flex', alignItems:'center', justifyContent:'center', gap:7,
+                transition:'all 0.2s',
+              }}>
+              <Icon name="mail" size={15} color={emailSent?'var(--green)':'var(--muted)'} sw={2}/>
+              {emailSent ? 'Envoyé !' : 'Email'}
+            </button>
+          </div>
+        </div>
+
+        {/* Secondary actions */}
+        <div className="fade-4" style={{ display:'flex', flexDirection:'column', gap:8 }}>
+          <button onClick={replay}
+            style={{
+              width:'100%', padding:'12px', background:'var(--green)', color:'#fff',
+              border:'none', borderRadius:10, fontWeight:700, fontSize:14, cursor:'pointer',
+              display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+              boxShadow:'0 4px 14px rgba(16,185,129,0.3)', transition:'background 0.15s',
+            }}
+            onMouseEnter={e=>e.currentTarget.style.background='#059669'}
+            onMouseLeave={e=>e.currentTarget.style.background='var(--green)'}>
+            <Icon name="cart" size={16} color="#fff" sw={2}/>
+            Nouvelle vente
+          </button>
+          <button style={{ width:'100%', padding:'10px', background:'none', border:'none', color:'var(--muted)', fontWeight:500, fontSize:13, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}
+            onMouseEnter={e=>e.currentTarget.style.color='var(--text)'}
+            onMouseLeave={e=>e.currentTarget.style.color='var(--muted)'}>
+            <Icon name="home" size={14} color="var(--muted)" sw={1.8}/>
+            Retour au dashboard
+          </button>
+        </div>
+      </div>
+
+      {/* RIGHT — invoice preview (desktop only) */}
+      {!isMobile && (
+        <div className="fade-5" style={{
+          width:320, background:'#f0f4f8', borderLeft:'1px solid var(--border)',
+          display:'flex', flexDirection:'column', alignItems:'center',
+          justifyContent:'flex-start', padding:'28px 20px', gap:16,
+          flexShrink:0,
+        }}>
+          <div style={{ fontSize:11, fontWeight:700, color:'var(--muted)', textTransform:'uppercase', letterSpacing:'0.05em', alignSelf:'flex-start' }}>Aperçu facture</div>
+          <InvoicePreview compact={false}/>
+          <div style={{ fontSize:11, color:'var(--muted)', textAlign:'center' }}>
+            Cliquez sur <strong>Imprimer</strong> ou <strong>Télécharger</strong><br/>pour obtenir la version complète.
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  if (isMobile) {
+    // Fullscreen on mobile
+    return (
+      <div style={{ height:'100%', background:'#fff', fontFamily:"'Inter',sans-serif", position:'relative', overflow:'hidden' }}>
+        {content}
+      </div>
+    );
+  }
+
+  // Modal overlay on desktop
+  return (
+    <div style={{ height:'100%', background:'linear-gradient(135deg,#1e3a5f 0%,#2d5a8e 100%)', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:"'Inter',sans-serif", position:'relative' }}>
+      {/* Blurred background pattern */}
+      <div style={{ position:'absolute', inset:0, opacity:0.07, backgroundImage:'radial-gradient(circle, #fff 1px, transparent 1px)', backgroundSize:'32px 32px' }}/>
+
+      {/* Modal */}
+      <div style={{
+        width:760, maxHeight:600, background:'#fff', borderRadius:16,
+        overflow:'hidden', display:'flex', flexDirection:'column',
+        boxShadow:'0 32px 80px rgba(0,0,0,0.4)',
+        position:'relative',
+      }}>
+        {content}
+      </div>
+    </div>
+  );
+}
+
+// ── App ───────────────────────────────────────────────────
+function App() {
+  return (
+    <DesignCanvas>
+      <DCSection title="StockFlow — Confirmation de vente" subtitle="Desktop (modal) et Mobile (plein écran). Cliquez 'Nouvelle vente' pour rejouer l'animation.">
+        <DCArtboard label="Desktop — Modal 760×600 sur fond app" width={1100} height={700}>
+          <ConfirmScreen isMobile={false}/>
+        </DCArtboard>
+        <DCArtboard label="Mobile — 390×844 plein écran" width={390} height={844}>
+          <ConfirmScreen isMobile={true}/>
+        </DCArtboard>
+      </DCSection>
+    </DesignCanvas>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

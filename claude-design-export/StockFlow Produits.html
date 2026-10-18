@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StockFlow — Produits</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="design-canvas.jsx"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', sans-serif; }
+  :root {
+    --primary: #1e3a5f;
+    --green: #10b981;
+    --bg: #f3f4f6;
+    --text: #1f2937;
+    --text-light: #6b7280;
+    --border: #e5e7eb;
+    --red: #ef4444;
+    --orange: #f59e0b;
+    --white: #fff;
+  }
+  input, select, button, textarea { font-family: 'Inter', sans-serif; }
+  input:focus, select:focus, textarea:focus { outline: none; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+
+// ── Icons ─────────────────────────────────────────────────────
+const Icon = ({ name, size = 16, color = 'currentColor', sw = 1.8 }) => {
+  const p = {
+    search: <><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></>,
+    plus: <><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></>,
+    edit: <><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></>,
+    trash: <><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></>,
+    chevdown: <polyline points="6 9 12 15 18 9"/>,
+    chevup: <polyline points="18 15 12 9 6 15"/>,
+    back: <><polyline points="15 18 9 12 15 6"/></>,
+    check: <polyline points="20 6 9 17 4 12"/>,
+    x: <><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>,
+    package: <><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></>,
+    filter: <><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></>,
+  };
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round">
+      {p[name]}
+    </svg>
+  );
+};
+
+// ── Data ──────────────────────────────────────────────────────
+const INITIAL_PRODUCTS = [
+  {
+    id: 1, name: 'Coca-Cola', category: 'Sodas',
+    formats: [
+      { label: '33cl', volume: '33cl', price: 14.40, stock: 120, seuil: 30 },
+      { label: '50cl', volume: '50cl', price: 10.80, stock: 80,  seuil: 20 },
+      { label: '1L',   volume: '1L',   price: 13.20, stock: 45,  seuil: 15 },
+    ],
+  },
+  {
+    id: 2, name: 'Fanta Orange', category: 'Sodas',
+    formats: [
+      { label: '33cl', volume: '33cl', price: 13.20, stock: 8,  seuil: 30 },
+      { label: '50cl', volume: '50cl', price: 10.20, stock: 7,  seuil: 20 },
+    ],
+  },
+  {
+    id: 3, name: 'Sprite', category: 'Sodas',
+    formats: [
+      { label: '33cl', volume: '33cl', price: 13.80, stock: 89, seuil: 25 },
+    ],
+  },
+  {
+    id: 4, name: 'Eau minérale', category: 'Eaux',
+    formats: [
+      { label: '50cl', volume: '50cl', price: 8.40,  stock: 3, seuil: 40 },
+      { label: '1L',   volume: '1L',   price: 9.60,  stock: 2, seuil: 30 },
+      { label: '1.5L', volume: '1.5L', price: 7.80,  stock: 3, seuil: 35 },
+    ],
+  },
+  {
+    id: 5, name: "Jus d'orange", category: 'Jus',
+    formats: [
+      { label: '1L', volume: '1L', price: 16.80, stock: 34, seuil: 20 },
+    ],
+  },
+];
+
+// ── Helpers ───────────────────────────────────────────────────
+const totalStock = (p) => p.formats.reduce((s, f) => s + f.stock, 0);
+
+const stockStatus = (p) => {
+  const t = totalStock(p);
+  const minSeuil = Math.min(...p.formats.map(f => f.seuil));
+  if (t === 0 || p.formats.some(f => f.stock < f.seuil * 0.3)) return 'alert';
+  if (t < minSeuil * 1.5 || p.formats.some(f => f.stock < f.seuil)) return 'low';
+  return 'ok';
+};
+
+const STATUS = {
+  ok:    { label: 'OK',        bg: '#d1fae5', color: '#065f46', dot: '#10b981' },
+  low:   { label: 'STOCK BAS', bg: '#fef3c7', color: '#92400e', dot: '#f59e0b' },
+  alert: { label: 'ALERTE',    bg: '#fee2e2', color: '#991b1b', dot: '#ef4444' },
+};
+
+const Badge = ({ status, small = false }) => {
+  const s = STATUS[status];
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 5,
+      background: s.bg, color: s.color,
+      fontSize: small ? 10 : 11, fontWeight: 700,
+      padding: small ? '2px 7px' : '3px 9px', borderRadius: 20,
+      letterSpacing: '0.03em', whiteSpace: 'nowrap',
+    }}>
+      <span style={{ width: 6, height: 6, borderRadius: '50%', background: s.dot, display: 'inline-block' }} />
+      {s.label}
+    </span>
+  );
+};
+
+const FormatTag = ({ label }) => (
+  <span style={{
+    display: 'inline-block', background: '#eff6ff', color: '#1e40af',
+    fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 5,
+    border: '1px solid #bfdbfe',
+  }}>{label}</span>
+);
+
+// ── Modal: Nouveau / Modifier produit ─────────────────────────
+function ProductModal({ product, onSave, onClose }) {
+  const isEdit = !!product;
+  const [name, setName] = React.useState(product?.name || '');
+  const [cat, setCat] = React.useState(product?.category || 'Sodas');
+  const [formats, setFormats] = React.useState(
+    product?.formats || [{ label: '33cl', volume: '33cl', price: '', stock: '', seuil: '' }]
+  );
+
+  const addFormat = () => setFormats(f => [...f, { label: '', volume: '', price: '', stock: '', seuil: '' }]);
+  const removeFormat = (i) => setFormats(f => f.filter((_, j) => j !== i));
+  const updateFormat = (i, key, val) => setFormats(f => { const n = [...f]; n[i] = { ...n[i], [key]: val }; return n; });
+
+  const handleSave = () => {
+    if (!name.trim()) return;
+    onSave({ id: product?.id || Date.now(), name, category: cat, formats: formats.map(f => ({ ...f, price: parseFloat(f.price) || 0, stock: parseInt(f.stock) || 0, seuil: parseInt(f.seuil) || 0 })) });
+  };
+
+  return (
+    <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+      <div style={{ background: '#fff', borderRadius: 14, width: '100%', maxWidth: 520, maxHeight: '90%', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 64px rgba(0,0,0,0.2)' }}>
+        {/* Header */}
+        <div style={{ padding: '18px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+          <Icon name="package" size={18} color="var(--primary)" />
+          <span style={{ fontWeight: 700, fontSize: 16, color: 'var(--text)', flex: 1 }}>{isEdit ? 'Modifier le produit' : 'Nouveau produit'}</span>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, borderRadius: 6, display: 'flex' }}
+            onMouseEnter={e => e.currentTarget.style.background='#f3f4f6'} onMouseLeave={e => e.currentTarget.style.background='none'}>
+            <Icon name="x" size={18} color="var(--text-light)" />
+          </button>
+        </div>
+        {/* Body */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {/* Name */}
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-light)', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: 5 }}>Nom du produit *</label>
+            <input value={name} onChange={e => setName(e.target.value)} placeholder="Ex: Coca-Cola"
+              style={{ width: '100%', padding: '10px 12px', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: 13, color: 'var(--text)' }}
+              onFocus={e => e.target.style.borderColor='var(--green)'} onBlur={e => e.target.style.borderColor='var(--border)'} />
+          </div>
+          {/* Category */}
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-light)', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: 5 }}>Catégorie</label>
+            <select value={cat} onChange={e => setCat(e.target.value)}
+              style={{ width: '100%', padding: '10px 12px', border: '1.5px solid var(--border)', borderRadius: 8, fontSize: 13, color: 'var(--text)', background: '#fff' }}>
+              {['Sodas','Bières','Eaux','Jus','Vins','Spiritueux','Autres'].map(c => <option key={c}>{c}</option>)}
+            </select>
+          </div>
+          {/* Formats */}
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-light)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Formats & stock</label>
+              <button onClick={addFormat} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: '1px dashed var(--green)', color: 'var(--green)', fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 6, cursor: 'pointer' }}>
+                <Icon name="plus" size={11} color="var(--green)" sw={2.5} /> Ajouter
+              </button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {/* Column headers */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 28px', gap: 6 }}>
+                {['Format','Prix (€)','Stock','Seuil',''].map((h, i) => (
+                  <div key={i} style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-light)', textTransform: 'uppercase', letterSpacing: '0.03em', paddingLeft: 2 }}>{h}</div>
+                ))}
+              </div>
+              {formats.map((f, i) => (
+                <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 28px', gap: 6, alignItems: 'center' }}>
+                  {['label','price','stock','seuil'].map(key => (
+                    <input key={key} value={f[key]} onChange={e => updateFormat(i, key, e.target.value)}
+                      placeholder={key === 'label' ? '33cl' : key === 'price' ? '14.40' : '0'}
+                      type={key === 'label' ? 'text' : 'number'}
+                      style={{ padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 7, fontSize: 12, color: 'var(--text)', width: '100%', background: '#fafafa' }}
+                      onFocus={e => e.target.style.borderColor='var(--green)'} onBlur={e => e.target.style.borderColor='var(--border)'} />
+                  ))}
+                  <button onClick={() => removeFormat(i)} disabled={formats.length === 1}
+                    style={{ background: 'none', border: 'none', cursor: formats.length === 1 ? 'not-allowed' : 'pointer', opacity: formats.length === 1 ? 0.3 : 1, padding: 4, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    onMouseEnter={e => { if (formats.length > 1) e.currentTarget.style.background='#fef2f2'; }}
+                    onMouseLeave={e => e.currentTarget.style.background='none'}>
+                    <Icon name="trash" size={14} color="#ef4444" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+        {/* Footer */}
+        <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border)', display: 'flex', gap: 10, flexShrink: 0 }}>
+          <button onClick={onClose} style={{ flex: 1, padding: '10px', background: '#f3f4f6', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 13, color: 'var(--text-light)', cursor: 'pointer' }}>Annuler</button>
+          <button onClick={handleSave} style={{ flex: 2, padding: '10px', background: 'var(--green)', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 13, color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+            <Icon name="check" size={14} color="#fff" sw={2.5} /> {isEdit ? 'Enregistrer' : 'Créer le produit'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Delete confirm ────────────────────────────────────────────
+function DeleteConfirm({ product, onConfirm, onCancel }) {
+  return (
+    <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+      <div style={{ background: '#fff', borderRadius: 14, padding: 28, maxWidth: 360, width: '100%', boxShadow: '0 24px 64px rgba(0,0,0,0.2)', textAlign: 'center' }}>
+        <div style={{ width: 52, height: 52, borderRadius: '50%', background: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+          <Icon name="trash" size={22} color="var(--red)" />
+        </div>
+        <div style={{ fontWeight: 700, fontSize: 16, color: 'var(--text)', marginBottom: 8 }}>Supprimer ce produit ?</div>
+        <div style={{ fontSize: 13, color: 'var(--text-light)', marginBottom: 24 }}>
+          «&nbsp;{product.name}&nbsp;» sera définitivement supprimé avec tous ses formats.
+        </div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button onClick={onCancel} style={{ flex: 1, padding: '10px', background: '#f3f4f6', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 13, color: 'var(--text-light)', cursor: 'pointer' }}>Annuler</button>
+          <button onClick={onConfirm} style={{ flex: 1, padding: '10px', background: 'var(--red)', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 13, color: '#fff', cursor: 'pointer' }}>Supprimer</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main Screen ───────────────────────────────────────────────
+function ProduitsScreen({ isMobile = false }) {
+  const [products, setProducts] = React.useState(INITIAL_PRODUCTS);
+  const [search, setSearch] = React.useState('');
+  const [expanded, setExpanded] = React.useState({});
+  const [modal, setModal] = React.useState(null); // null | 'new' | product
+  const [delTarget, setDelTarget] = React.useState(null);
+
+  const filtered = products.filter(p =>
+    p.name.toLowerCase().includes(search.toLowerCase()) ||
+    p.category.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const toggle = (id) => setExpanded(e => ({ ...e, [id]: !e[id] }));
+
+  const saveProduct = (p) => {
+    setProducts(prev => prev.some(x => x.id === p.id) ? prev.map(x => x.id === p.id ? p : x) : [...prev, p]);
+    setModal(null);
+  };
+
+  const deleteProduct = (id) => { setProducts(p => p.filter(x => x.id !== id)); setDelTarget(null); };
+
+  const px = isMobile ? 14 : 24;
+
+  return (
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--bg)', fontFamily: "'Inter', sans-serif", position: 'relative', overflow: 'hidden' }}>
+
+      {/* HEADER */}
+      <div style={{ background: 'var(--primary)', padding: `${isMobile ? 13 : 18}px ${px}px`, display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+        <button style={{ width: 34, height: 34, borderRadius: 8, background: 'rgba(255,255,255,0.1)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Icon name="back" size={18} color="#fff" sw={2} />
+        </button>
+        <div style={{ flex: 1 }}>
+          <div style={{ color: '#fff', fontWeight: 700, fontSize: isMobile ? 16 : 20 }}>Produits</div>
+          <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11 }}>{products.length} références actives</div>
+        </div>
+        <button onClick={() => setModal('new')}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            background: 'var(--green)', color: '#fff', border: 'none',
+            borderRadius: 8, padding: isMobile ? '8px 12px' : '9px 16px',
+            fontWeight: 600, fontSize: isMobile ? 12 : 13, cursor: 'pointer',
+            boxShadow: '0 2px 8px rgba(16,185,129,0.35)',
+            transition: 'background 0.15s',
+          }}
+          onMouseEnter={e => e.currentTarget.style.background='#059669'}
+          onMouseLeave={e => e.currentTarget.style.background='var(--green)'}
+        >
+          <Icon name="plus" size={14} color="#fff" sw={2.5} />
+          {isMobile ? 'Nouveau' : 'Nouveau produit'}
+        </button>
+      </div>
+
+      {/* SEARCH + STATS */}
+      <div style={{ padding: `14px ${px}px`, background: '#fff', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+        <div style={{ position: 'relative' }}>
+          <div style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }}>
+            <Icon name="search" size={15} color="var(--text-light)" />
+          </div>
+          <input type="text" placeholder="Rechercher un produit..."
+            value={search} onChange={e => setSearch(e.target.value)}
+            style={{
+              width: '100%', padding: '10px 14px 10px 38px',
+              border: '1.5px solid var(--border)', borderRadius: 9,
+              fontSize: 13, color: 'var(--text)', background: '#f9fafb',
+            }}
+            onFocus={e => e.target.style.borderColor='var(--green)'}
+            onBlur={e => e.target.style.borderColor='var(--border)'}
+          />
+        </div>
+        {/* Quick stats */}
+        {!isMobile && (
+          <div style={{ display: 'flex', gap: 16, marginTop: 12 }}>
+            {[
+              { label: 'Total produits', val: products.length, color: 'var(--primary)' },
+              { label: 'Stock OK', val: products.filter(p => stockStatus(p) === 'ok').length, color: 'var(--green)' },
+              { label: 'Stock bas', val: products.filter(p => stockStatus(p) === 'low').length, color: 'var(--orange)' },
+              { label: 'En alerte', val: products.filter(p => stockStatus(p) === 'alert').length, color: 'var(--red)' },
+            ].map(s => (
+              <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontWeight: 800, fontSize: 18, color: s.color }}>{s.val}</span>
+                <span style={{ fontSize: 12, color: 'var(--text-light)' }}>{s.label}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* CONTENT */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: `16px ${px}px` }}>
+
+        {/* DESKTOP TABLE */}
+        {!isMobile && (
+          <div style={{ background: '#fff', borderRadius: 12, overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04)' }}>
+            {/* Table header */}
+            <div style={{
+              display: 'grid', gridTemplateColumns: '2fr 1.4fr 100px 110px 80px',
+              padding: '12px 20px', background: '#f8fafc',
+              borderBottom: '1px solid var(--border)',
+            }}>
+              {['Produit', 'Formats', 'Stock total', 'État', 'Actions'].map((h, i) => (
+                <div key={h} style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-light)', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: i >= 2 ? 'center' : 'left' }}>{h}</div>
+              ))}
+            </div>
+
+            {/* Rows */}
+            {filtered.map((p, ri) => {
+              const st = stockStatus(p);
+              const isOpen = expanded[p.id];
+              return (
+                <React.Fragment key={p.id}>
+                  {/* Main row */}
+                  <div
+                    style={{
+                      display: 'grid', gridTemplateColumns: '2fr 1.4fr 100px 110px 80px',
+                      padding: '14px 20px', alignItems: 'center',
+                      borderBottom: isOpen ? 'none' : ri < filtered.length - 1 ? '1px solid #f3f4f6' : 'none',
+                      background: isOpen ? '#fafcff' : '#fff',
+                      cursor: 'pointer', transition: 'background 0.1s',
+                    }}
+                    onClick={() => toggle(p.id)}
+                    onMouseEnter={e => { if (!isOpen) e.currentTarget.style.background='#f9fafb'; }}
+                    onMouseLeave={e => { if (!isOpen) e.currentTarget.style.background='#fff'; }}
+                  >
+                    {/* Name */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{ width: 36, height: 36, borderRadius: 9, background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{p.name[0]}</span>
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text)' }}>{p.name}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-light)', marginTop: 1 }}>{p.category}</div>
+                      </div>
+                    </div>
+                    {/* Formats */}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                      {p.formats.map(f => <FormatTag key={f.label} label={f.label} />)}
+                    </div>
+                    {/* Stock */}
+                    <div style={{ textAlign: 'center', fontWeight: 700, fontSize: 16, color: 'var(--text)' }}>{totalStock(p)}</div>
+                    {/* Status */}
+                    <div style={{ display: 'flex', justifyContent: 'center' }}><Badge status={st} /></div>
+                    {/* Actions */}
+                    <div style={{ display: 'flex', justifyContent: 'center', gap: 4 }} onClick={e => e.stopPropagation()}>
+                      <button onClick={() => setModal(p)}
+                        style={{ width: 32, height: 32, background: 'none', border: '1px solid var(--border)', borderRadius: 7, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        onMouseEnter={e => { e.currentTarget.style.background='#eff6ff'; e.currentTarget.style.borderColor='#bfdbfe'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background='none'; e.currentTarget.style.borderColor='var(--border)'; }}>
+                        <Icon name="edit" size={13} color="var(--primary)" />
+                      </button>
+                      <button onClick={() => setDelTarget(p)}
+                        style={{ width: 32, height: 32, background: 'none', border: '1px solid var(--border)', borderRadius: 7, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        onMouseEnter={e => { e.currentTarget.style.background='#fef2f2'; e.currentTarget.style.borderColor='#fecaca'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background='none'; e.currentTarget.style.borderColor='var(--border)'; }}>
+                        <Icon name="trash" size={13} color="var(--red)" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Expanded format detail */}
+                  {isOpen && (
+                    <div style={{ borderBottom: ri < filtered.length - 1 ? '1px solid #f3f4f6' : 'none', background: '#f8fafc', padding: '0 20px 14px 20px' }}>
+                      {/* Sub-header */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px 80px 80px 80px 80px', gap: 8, padding: '8px 12px', marginBottom: 6 }}>
+                        {['Format', 'Volume', 'Prix', 'Stock', 'Seuil', 'État'].map(h => (
+                          <div key={h} style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-light)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</div>
+                        ))}
+                      </div>
+                      {p.formats.map((f, fi) => {
+                        const fst = f.stock === 0 ? 'alert' : f.stock < f.seuil ? (f.stock < f.seuil * 0.3 ? 'alert' : 'low') : 'ok';
+                        return (
+                          <div key={fi} style={{
+                            display: 'grid', gridTemplateColumns: '1fr 80px 80px 80px 80px 80px', gap: 8,
+                            padding: '9px 12px', background: '#fff', borderRadius: 8, marginBottom: 6,
+                            border: '1px solid var(--border)', alignItems: 'center',
+                          }}>
+                            <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text)' }}>{p.name} {f.label}</div>
+                            <div style={{ fontSize: 13, color: 'var(--text-light)' }}>{f.volume}</div>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--primary)' }}>{f.price.toFixed(2)} €</div>
+                            <div style={{ fontSize: 14, fontWeight: 700, color: fst === 'alert' ? 'var(--red)' : fst === 'low' ? 'var(--orange)' : 'var(--text)' }}>{f.stock}</div>
+                            <div style={{ fontSize: 13, color: 'var(--text-light)' }}>{f.seuil}</div>
+                            <Badge status={fst} small />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </React.Fragment>
+              );
+            })}
+
+            {filtered.length === 0 && (
+              <div style={{ padding: '48px 20px', textAlign: 'center', color: 'var(--text-light)', fontSize: 13 }}>
+                Aucun produit trouvé pour « {search} »
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* MOBILE CARDS */}
+        {isMobile && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {filtered.map(p => {
+              const st = stockStatus(p);
+              const isOpen = expanded[p.id];
+              return (
+                <div key={p.id} style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
+                  {/* Card header */}
+                  <div onClick={() => toggle(p.id)} style={{ padding: '13px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ width: 38, height: 38, borderRadius: 9, background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>{p.name[0]}</span>
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>{p.name}</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginTop: 4 }}>
+                        {p.formats.map(f => <FormatTag key={f.label} label={f.label} />)}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 5, flexShrink: 0 }}>
+                      <Badge status={st} small />
+                      <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{totalStock(p)} u.</span>
+                    </div>
+                    <div style={{ marginLeft: 4, color: 'var(--text-light)' }}>
+                      <Icon name={isOpen ? 'chevup' : 'chevdown'} size={16} color="var(--text-light)" />
+                    </div>
+                  </div>
+
+                  {/* Expanded */}
+                  {isOpen && (
+                    <div style={{ borderTop: '1px solid #f3f4f6', padding: '10px 14px', background: '#f8fafc', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {p.formats.map((f, fi) => {
+                        const fst = f.stock === 0 ? 'alert' : f.stock < f.seuil ? (f.stock < f.seuil * 0.3 ? 'alert' : 'low') : 'ok';
+                        return (
+                          <div key={fi} style={{ background: '#fff', borderRadius: 8, padding: '10px 12px', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontWeight: 600, fontSize: 12, color: 'var(--text)' }}>{f.label}</div>
+                              <div style={{ fontSize: 11, color: 'var(--text-light)', marginTop: 2 }}>{f.price.toFixed(2)} € · seuil {f.seuil}</div>
+                            </div>
+                            <div style={{ fontWeight: 800, fontSize: 16, color: fst === 'alert' ? 'var(--red)' : fst === 'low' ? 'var(--orange)' : 'var(--text)' }}>{f.stock}</div>
+                            <Badge status={fst} small />
+                          </div>
+                        );
+                      })}
+                      {/* Card actions */}
+                      <div style={{ display: 'flex', gap: 8, paddingTop: 4 }}>
+                        <button onClick={() => setModal(p)} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '9px', background: '#eff6ff', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 12, color: 'var(--primary)', cursor: 'pointer' }}>
+                          <Icon name="edit" size={13} color="var(--primary)" /> Modifier
+                        </button>
+                        <button onClick={() => setDelTarget(p)} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '9px', background: '#fef2f2', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: 12, color: 'var(--red)', cursor: 'pointer' }}>
+                          <Icon name="trash" size={13} color="var(--red)" /> Supprimer
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {filtered.length === 0 && (
+              <div style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--text-light)', fontSize: 13 }}>
+                Aucun produit trouvé pour « {search} »
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* MODAL */}
+      {modal && (
+        <ProductModal
+          product={modal === 'new' ? null : modal}
+          onSave={saveProduct}
+          onClose={() => setModal(null)}
+        />
+      )}
+
+      {/* DELETE CONFIRM */}
+      {delTarget && (
+        <DeleteConfirm
+          product={delTarget}
+          onConfirm={() => deleteProduct(delTarget.id)}
+          onCancel={() => setDelTarget(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── App ───────────────────────────────────────────────────────
+function App() {
+  return (
+    <DesignCanvas>
+      <DCSection title="StockFlow — Gestion des Produits" subtitle="Desktop (tableau dépliable) et Mobile (cards empilées)">
+        <DCArtboard label="Desktop — 1280×800" width={1280} height={800}>
+          <ProduitsScreen isMobile={false} />
+        </DCArtboard>
+        <DCArtboard label="Mobile — 390×844" width={390} height={844}>
+          <ProduitsScreen isMobile={true} />
+        </DCArtboard>
+      </DCSection>
+    </DesignCanvas>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

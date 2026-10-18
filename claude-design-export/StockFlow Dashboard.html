@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StockFlow — Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="design-canvas.jsx"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', sans-serif; background: #f0eee9; }
+  :root {
+    --primary: #1e3a5f;
+    --secondary: #10b981;
+    --bg: #f3f4f6;
+    --text: #1f2937;
+    --text-light: #6b7280;
+    --badge-ok: #10b981;
+    --badge-low: #f59e0b;
+    --badge-alert: #ef4444;
+    --white: #ffffff;
+    --border: #e5e7eb;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.06);
+  }
+</style>
+</head>
+<body>
+<script type="text/babel">
+
+// ── Icons (inline SVG helpers) ──────────────────────────────────────────
+const Icon = ({ name, size = 20, color = 'currentColor', strokeWidth = 1.8 }) => {
+  const paths = {
+    dollar: <><circle cx="12" cy="12" r="10"/><path d="M12 6v12M9 9.5C9 8.12 10.34 7 12 7s3 1.12 3 2.5c0 3-6 3-6 6C9 16.88 10.34 18 12 18s3-1.12 3-2.5"/></>,
+    cart: <><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></>,
+    bell: <><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></>,
+    box: <><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></>,
+    plus: <><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></>,
+    grid: <><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></>,
+    tag: <><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></>,
+    users: <><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></>,
+    archive: <><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></>,
+    clock: <><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></>,
+    trending: <><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></>,
+    medal: <><path d="M12 15a7 7 0 1 0 0-14 7 7 0 0 0 0 14z"/><path d="M8.21 13.89L7 23l5-3 5 3-1.21-9.12"/></>,
+    chevronup: <polyline points="18 15 12 9 6 15"/>,
+    chevrondown: <polyline points="6 9 12 15 18 9"/>,
+  };
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+      {paths[name]}
+    </svg>
+  );
+};
+
+// ── Data ────────────────────────────────────────────────────────────────
+const metrics = [
+  { id: 1, label: "Chiffre d'affaires", sub: "Aujourd'hui", value: "A", compare: "+12% vs hier", up: true, icon: "dollar", accent: "#10b981" },
+  { id: 2, label: "Ventes du jour", sub: "Commandes", value: "38", compare: "+5 vs hier", up: true, icon: "cart", accent: "#1e3a5f" },
+  { id: 3, label: "Alertes stock", sub: "Produits critiques", value: "4", compare: "À réapprovisionner", up: false, icon: "bell", accent: "#ef4444", danger: true },
+  { id: 4, label: "Total en stock", sub: "Références actives", value: "1 243", compare: "247 références", up: null, icon: "box", accent: "#f59e0b" },
+];
+
+const alerts = [
+  { name: "Coca-Cola", format: "33cl x24", stock: 5, seuil: 20 },
+  { name: "Heineken", format: "50cl x12", stock: 8, seuil: 30 },
+  { name: "Orangina", format: "25cl x24", stock: 3, seuil: 15 },
+];
+
+const top3 = [
+  { name: "Coca-Cola 33cl", qty: 142, medal: "🥇", color: "#f59e0b" },
+  { name: "Kronenbourg 50cl", qty: 98, medal: "🥈", color: "#9ca3af" },
+  { name: "Evian 1.5L", qty: 76, medal: "🥉", color: "#b45309" },
+];
+
+const navItems = [
+  { id: "dashboard", label: "Dashboard", icon: "grid" },
+  { id: "vente", label: "Vente", icon: "cart" },
+  { id: "produits", label: "Produits", icon: "tag" },
+  { id: "clients", label: "Clients", icon: "users" },
+  { id: "stock", label: "Stock", icon: "box" },
+  { id: "historique", label: "Historique", icon: "clock" },
+];
+
+// ── Shared Dashboard Content ─────────────────────────────────────────────
+function DashboardContent({ isMobile = false }) {
+  const [activeNav, setActiveNav] = React.useState("dashboard");
+  const today = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const todayCap = today.charAt(0).toUpperCase() + today.slice(1);
+
+  const px = isMobile ? 16 : 24;
+  const titleSize = isMobile ? 20 : 22;
+  const sectionGap = isMobile ? 20 : 28;
+
+  return (
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--bg)', fontFamily: "'Inter', sans-serif", position: 'relative', overflow: 'hidden' }}>
+
+      {/* HEADER */}
+      <div style={{ background: 'var(--primary)', padding: `${isMobile ? 14 : 18}px ${px}px`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+        <div>
+          <div style={{ color: '#fff', fontWeight: 800, fontSize: isMobile ? 20 : 24, letterSpacing: '-0.5px' }}>
+            Stock<span style={{ color: '#10b981' }}>Flow</span>
+          </div>
+          <div style={{ color: 'rgba(255,255,255,0.55)', fontSize: 11, marginTop: 2 }}>{todayCap}</div>
+        </div>
+        <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(255,255,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+          <span style={{ color: '#fff', fontWeight: 700, fontSize: 14 }}>A</span>
+        </div>
+      </div>
+
+      {/* SCROLLABLE BODY */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: `${sectionGap}px ${px}px`, paddingBottom: isMobile ? 80 : 28, display: 'flex', flexDirection: 'column', gap: sectionGap }}>
+
+        {/* METRIC CARDS — 2×2 grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: isMobile ? 12 : 16 }}>
+          {metrics.map(m => (
+            <div key={m.id} style={{
+              background: '#fff', borderRadius: 12, padding: isMobile ? '14px 14px' : '18px 18px',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.05)',
+              display: 'flex', flexDirection: 'column', gap: 8, cursor: 'pointer',
+              transition: 'transform 0.15s, box-shadow 0.15s',
+            }}
+              onMouseEnter={e => { e.currentTarget.style.transform='translateY(-2px)'; e.currentTarget.style.boxShadow='0 4px 8px rgba(0,0,0,0.08),0 8px 24px rgba(0,0,0,0.08)'; }}
+              onMouseLeave={e => { e.currentTarget.style.transform=''; e.currentTarget.style.boxShadow='0 1px 3px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.05)'; }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ fontSize: isMobile ? 10 : 11, fontWeight: 600, color: 'var(--text-light)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{m.label}</div>
+                <div style={{ width: 30, height: 30, borderRadius: 8, background: m.accent + '18', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Icon name={m.icon} size={15} color={m.accent} strokeWidth={2} />
+                </div>
+              </div>
+              <div style={{ fontSize: isMobile ? 22 : 26, fontWeight: 800, color: m.danger ? '#ef4444' : 'var(--text)', letterSpacing: '-0.5px', lineHeight: 1 }}>{m.value}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                {m.up !== null && (
+                  <Icon name={m.up ? 'chevronup' : 'chevrondown'} size={12} color={m.up ? '#10b981' : '#ef4444'} strokeWidth={2.5} />
+                )}
+                <span style={{ fontSize: 11, color: m.up === true ? '#10b981' : m.up === false ? '#ef4444' : 'var(--text-light)', fontWeight: 500 }}>{m.compare}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* ALERT SECTION */}
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <div style={{ fontWeight: 700, fontSize: isMobile ? 14 : 16, color: 'var(--text)' }}>Produits à réapprovisionner</div>
+            <span style={{ fontSize: 11, color: '#10b981', fontWeight: 600, cursor: 'pointer' }}>Voir tout →</span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {alerts.map((a, i) => (
+              <div key={i} style={{
+                background: '#fff', borderRadius: 10, padding: isMobile ? '12px 14px' : '14px 16px',
+                display: 'flex', alignItems: 'center', gap: 12,
+                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                borderLeft: '3px solid #ef4444',
+              }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, fontSize: isMobile ? 13 : 14, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.name}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-light)', marginTop: 2 }}>{a.format}</div>
+                </div>
+                <div style={{ textAlign: 'center', flexShrink: 0 }}>
+                  <div style={{ fontSize: isMobile ? 16 : 18, fontWeight: 800, color: '#ef4444', lineHeight: 1 }}>{a.stock}</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-light)' }}>seuil {a.seuil}</div>
+                </div>
+                <div style={{ background: '#fef2f2', color: '#ef4444', fontSize: 10, fontWeight: 700, padding: '4px 8px', borderRadius: 6, letterSpacing: '0.04em', flexShrink: 0 }}>ALERTE</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* TOP 3 */}
+        <div>
+          <div style={{ fontWeight: 700, fontSize: isMobile ? 14 : 16, color: 'var(--text)', marginBottom: 12 }}>Top 3 produits vendus</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {top3.map((p, i) => (
+              <div key={i} style={{
+                background: '#fff', borderRadius: 10, padding: isMobile ? '12px 14px' : '14px 16px',
+                display: 'flex', alignItems: 'center', gap: 12,
+                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+              }}>
+                <div style={{ fontSize: isMobile ? 20 : 24, lineHeight: 1, flexShrink: 0 }}>{p.medal}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, fontSize: isMobile ? 13 : 14, color: 'var(--text)' }}>{p.name}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-light)', marginTop: 2 }}>Unités vendues aujourd'hui</div>
+                </div>
+                <div style={{ flexShrink: 0 }}>
+                  <div style={{ fontSize: isMobile ? 16 : 18, fontWeight: 800, color: p.color, lineHeight: 1 }}>{p.qty}</div>
+                </div>
+                {/* Mini bar */}
+                <div style={{ width: isMobile ? 36 : 48, height: 6, background: '#f3f4f6', borderRadius: 3, flexShrink: 0, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', borderRadius: 3, background: p.color, width: `${(p.qty / top3[0].qty) * 100}%`, transition: 'width 0.8s ease' }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+      </div>
+
+      {/* MOBILE BOTTOM NAV */}
+      {isMobile && (
+        <div style={{
+          position: 'absolute', bottom: 0, left: 0, right: 0,
+          background: '#fff', borderTop: '1px solid var(--border)',
+          display: 'flex', padding: '8px 0 10px',
+          boxShadow: '0 -4px 16px rgba(0,0,0,0.08)',
+        }}>
+          {[
+            { id: 'dashboard', label: 'Accueil', icon: 'grid' },
+            { id: 'vente', label: 'Vente', icon: 'cart' },
+            { id: 'stock', label: 'Stock', icon: 'box' },
+            { id: 'plus', label: 'Plus', icon: 'archive' },
+          ].map(item => (
+            <button key={item.id} onClick={() => setActiveNav(item.id)}
+              style={{
+                flex: 1, background: 'none', border: 'none', cursor: 'pointer',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '4px 0',
+              }}>
+              <Icon name={item.icon} size={20} color={activeNav === item.id ? '#10b981' : '#9ca3af'} strokeWidth={activeNav === item.id ? 2.2 : 1.8} />
+              <span style={{ fontSize: 10, fontWeight: activeNav === item.id ? 600 : 400, color: activeNav === item.id ? '#10b981' : '#9ca3af' }}>{item.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* FAB */}
+      <div style={{
+        position: 'absolute',
+        bottom: isMobile ? 72 : 24,
+        right: isMobile ? 16 : 24,
+        width: 56, height: 56,
+        background: '#10b981',
+        borderRadius: '50%',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        boxShadow: '0 4px 16px rgba(16,185,129,0.4)',
+        cursor: 'pointer',
+        transition: 'transform 0.15s, box-shadow 0.15s',
+        zIndex: 10,
+      }}
+        onMouseEnter={e => { e.currentTarget.style.transform='scale(1.08)'; e.currentTarget.style.boxShadow='0 6px 20px rgba(16,185,129,0.5)'; }}
+        onMouseLeave={e => { e.currentTarget.style.transform=''; e.currentTarget.style.boxShadow='0 4px 16px rgba(16,185,129,0.4)'; }}
+        title="Nouvelle vente"
+      >
+        <Icon name="plus" size={24} color="#fff" strokeWidth={2.5} />
+      </div>
+    </div>
+  );
+}
+
+// ── Desktop Layout (sidebar + content) ──────────────────────────────────
+function DesktopApp() {
+  const [activeNav, setActiveNav] = React.useState("dashboard");
+
+  return (
+    <div style={{ width: '100%', height: '100%', display: 'flex', fontFamily: "'Inter', sans-serif", background: 'var(--bg)' }}>
+
+      {/* SIDEBAR */}
+      <div style={{ width: 220, background: 'var(--primary)', display: 'flex', flexDirection: 'column', flexShrink: 0, height: '100%' }}>
+        {/* Logo */}
+        <div style={{ padding: '24px 20px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <div style={{ color: '#fff', fontWeight: 800, fontSize: 22, letterSpacing: '-0.5px' }}>
+            Stock<span style={{ color: '#10b981' }}>Flow</span>
+          </div>
+          <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, marginTop: 3 }}>Gestion de dépôt</div>
+        </div>
+
+        {/* Nav items */}
+        <nav style={{ flex: 1, padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {navItems.map(item => {
+            const isActive = activeNav === item.id;
+            return (
+              <button key={item.id} onClick={() => setActiveNav(item.id)}
+                style={{
+                  width: '100%', background: isActive ? 'rgba(16,185,129,0.15)' : 'none',
+                  border: 'none', borderRadius: 8,
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '10px 12px', cursor: 'pointer',
+                  transition: 'background 0.15s',
+                  borderLeft: isActive ? '3px solid #10b981' : '3px solid transparent',
+                }}
+                onMouseEnter={e => { if (!isActive) e.currentTarget.style.background='rgba(255,255,255,0.06)'; }}
+                onMouseLeave={e => { if (!isActive) e.currentTarget.style.background='none'; }}
+              >
+                <Icon name={item.icon} size={17} color={isActive ? '#10b981' : 'rgba(255,255,255,0.55)'} strokeWidth={isActive ? 2.2 : 1.8} />
+                <span style={{ fontSize: 13, fontWeight: isActive ? 600 : 400, color: isActive ? '#fff' : 'rgba(255,255,255,0.55)' }}>{item.label}</span>
+                {item.id === 'stock' && <span style={{ marginLeft: 'auto', background: '#ef4444', color: '#fff', fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 10 }}>4</span>}
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* User bottom */}
+        <div style={{ padding: '16px 16px 20px', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <span style={{ color: '#fff', fontWeight: 700, fontSize: 13 }}>A</span>
+          </div>
+          <div>
+            <div style={{ color: '#fff', fontSize: 12, fontWeight: 600 }}>Admin</div>
+            <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10 }}>Gérant</div>
+          </div>
+        </div>
+      </div>
+
+      {/* MAIN CONTENT */}
+      <div style={{ flex: 1, overflow: 'hidden' }}>
+        <DashboardContent isMobile={false} />
+      </div>
+    </div>
+  );
+}
+
+// ── App with Design Canvas ──────────────────────────────────────────────
+function App() {
+  return (
+    <DesignCanvas>
+      <DCSection title="StockFlow — Dashboard" subtitle="Vue desktop (sidebar + contenu) et mobile (bottom nav)">
+        <DCArtboard label="Desktop — 1280×800" width={1280} height={800}>
+          <DesktopApp />
+        </DCArtboard>
+        <DCArtboard label="Mobile — 390×844" width={390} height={844}>
+          <DashboardContent isMobile={true} />
+        </DCArtboard>
+      </DCSection>
+    </DesignCanvas>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+<div id="root"></div>
+</body>
+</html>
