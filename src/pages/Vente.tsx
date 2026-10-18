@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
-import { Search, ShoppingCart, Plus, Minus, Trash2, Check, User, ChevronDown, X } from "lucide-react";
+import { Search, ShoppingCart, Plus, Minus, Trash2, Check, User, ChevronDown, X, FileText } from "lucide-react";
 import { invoke } from "@/lib/db";
 import { useToast } from "@/components/ui/Toast";
 import { useVenteStore, type VenteItem } from "@/stores/venteStore";
 import { useAppStore } from "@/stores/appStore";
 import ModalConfirmationVente from "./ModalConfirmationVente";
+import ModalApercuFacture from "@/components/facture/ModalApercuFacture";
+import { construireCompte } from "@/lib/pdf";
 import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
@@ -49,7 +51,7 @@ export default function Vente() {
   // Store
   const { client_id, items, total, montant_recu, monnaie_rendue,
     setClient, addItem, removeItem, updateQuantite, updatePrix, setMontantRecu, resetPanier } = useVenteStore();
-  const { loadAlertes, formatMontant, symbole } = useAppStore();
+  const { loadAlertes, formatMontant, symbole, position } = useAppStore();
   const formatPrix = formatMontant;
 
   // UI locale
@@ -68,6 +70,7 @@ export default function Vente() {
   useRetourFerme(showCart, () => setShowCart(false));
   const [montantRecuStr, setMontantRecuStr] = useState(montant_recu > 0 ? String(montant_recu) : "");
   const [validating, setValidating] = useState(false);
+  const [showApercu, setShowApercu] = useState(false);
   const [venteResult, setVenteResult] = useState<VenteResult | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
 
@@ -208,6 +211,32 @@ export default function Vente() {
   // Positif : nouvelle dette ; négatif : le client rembourse une partie de l'ancienne
   const resteDu = total - montantPaye;
   const laisseUneDette = resteDu > 0 || casiersNonRendus > 0;
+
+  // ── Aperçu de la facture : mêmes chiffres que ceux que la vente enregistrera ──
+  const clientNomme = !!selectedClient && selectedClient.est_defaut !== 1;
+  const apercuFacture = () => {
+    const recu = !paiementPartiel && montant_recu > 0 ? montant_recu : null;
+    return {
+      date: new Date().toLocaleString("fr-FR", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }),
+      client: { nom: selectedClient?.nom ?? "Client", telephone: selectedClient?.telephone ?? "", adresse: "" },
+      items: items.map(i => ({
+        nom_produit: i.nom, volume: volumeFr(i.volume, i.unite, i.casier),
+        quantite: i.quantite, prix_unitaire: i.prix, sous_total: i.sous_total,
+      })),
+      total,
+      montant_recu: recu,
+      monnaie_rendue: recu === null ? null : Math.max(0, recu - total),
+      devise: { symbole, position },
+      compte: construireCompte({
+        total, montant_paye: montantPaye, emballages_livres: livres,
+        emballages_rendus: Object.fromEntries(Object.entries(rendus).filter(([, n]) => n > 0)),
+        solde_avant: {
+          argent: clientNomme ? selectedClient?.solde_argent ?? 0 : 0,
+          emballages: clientNomme ? { ...(selectedClient?.emballages_dus ?? {}) } : {},
+        },
+      }, nomEmballage),
+    };
+  };
 
   const validerVente = async (clientForce?: Client) => {
     if (items.length === 0) { toast("Le panier est vide", "warning"); return; }
@@ -456,6 +485,10 @@ export default function Vente() {
               Le client repart avec une dette : son nom et son téléphone seront demandés à la validation.
             </p>
           )}
+          <button onClick={() => setShowApercu(true)}
+            className="w-full h-11 rounded-lg border border-slate-300 text-gray-700 font-semibold flex items-center justify-center gap-2 text-[14px] hover:bg-slate-50">
+            <FileText size={16} /> Voir la facture avant de valider
+          </button>
           <button onClick={() => validerVente()} disabled={validating}
             className="w-full h-12 bg-secondary-600 text-white font-semibold rounded-lg flex items-center justify-center gap-2 text-[15px] shadow-sm hover:bg-secondary-700 active:translate-y-px transition-colors disabled:opacity-60">
             <Check size={16} strokeWidth={2.5} />
@@ -629,6 +662,12 @@ export default function Vente() {
             </div>
           </div>
         </>
+      )}
+
+      {/* Aperçu de la facture, avant d'enregistrer */}
+      {showApercu && items.length > 0 && (
+        <ModalApercuFacture isOpen={showApercu} onClose={() => setShowApercu(false)} data={apercuFacture()} validating={validating}
+          onValider={() => { setShowApercu(false); validerVente(); }} />
       )}
 
       {/* Modal confirmation */}

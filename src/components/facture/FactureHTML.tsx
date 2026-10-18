@@ -11,7 +11,8 @@ function initials(nom: string): string {
   return nom.split(" ").slice(0, 2).map(w => w[0] ?? "").join("").toUpperCase() || "SF";
 }
 
-export function FactureHTML({ data }: { data: FactureData }) {
+/** apercu : vente pas encore enregistrée (rien n'est « acquitté » ni « réglé » à ce stade). */
+export function FactureHTML({ data, apercu = false }: { data: FactureData; apercu?: boolean }) {
   const { numero_facture, date, client, items, total, montant_recu, monnaie_rendue, commerce, devise, compte } = data;
   const acquittee = !compte?.argent || compte.argent.nouveau <= 0;
 
@@ -35,8 +36,8 @@ export function FactureHTML({ data }: { data: FactureData }) {
             <div><strong style={{ color: "#1f2937" }}>N° {numero_facture}</strong></div>
             <div>Date : <strong style={{ color: "#1f2937" }}>{date}</strong></div>
           </div>
-          <div style={{ display: "inline-flex", alignItems: "center", gap: 4, background: acquittee ? "#d1fae5" : "#ffedd5", color: acquittee ? "#065f46" : "#9a3412", fontSize: 7.5, fontWeight: 800, padding: "2px 8px", borderRadius: 20, marginTop: 4, textTransform: "uppercase" }}>
-            ● {acquittee ? "Facture acquittée" : "Reste à payer"}
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 4, background: apercu ? "#fef3c7" : acquittee ? "#d1fae5" : "#ffedd5", color: apercu ? "#92400e" : acquittee ? "#065f46" : "#9a3412", fontSize: 7.5, fontWeight: 800, padding: "2px 8px", borderRadius: 20, marginTop: 4, textTransform: "uppercase" }}>
+            ● {apercu ? "Aperçu — non enregistrée" : acquittee ? "Facture acquittée" : "Reste à payer"}
           </div>
         </div>
       </div>
@@ -176,7 +177,9 @@ export function FactureHTML({ data }: { data: FactureData }) {
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 7.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 3 }}>Conditions & mentions légales</div>
             <div style={{ fontSize: 7.5, color: "#6b7280", lineHeight: 1.7 }}>
-              {acquittee
+              {apercu
+                ? (acquittee ? "Aperçu : à régler en entier à la validation de la vente." : `Aperçu : resterait dû par le client ${fmt(compte!.argent!.nouveau, devise)}.`)
+                : acquittee
                 ? `Facture acquittée — réglée en espèces le ${date.split(" à")[0]}.`
                 : `Reste dû par le client : ${fmt(compte!.argent!.nouveau, devise)}.`}<br />
               Aucun échange ni remboursement après validation de la vente.<br />
