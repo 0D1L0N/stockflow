@@ -14,7 +14,7 @@ export interface VenteRaw {
   solde_avant?: { argent: number; emballages: Record<string, number> } | null;
 }
 
-export interface DetailRaw {
+export interface DetailRaw { casier?: number | null;
   id: string; vente_id: string; format_id: string;
   produit_nom: string | null; volume: number | null; unite: string | null;
   quantite: number; prix_utilise: number;
@@ -52,7 +52,7 @@ export function prepareVenteData(
 
   const items: FactureItem[] = details.map(d => ({
     nom_produit: d.produit_nom ?? "—",
-    volume: volumeFr(d.volume, d.unite),
+    volume: volumeFr(d.volume, d.unite, d.casier),
     quantite: d.quantite,
     prix_unitaire: d.prix_utilise,
     sous_total: d.quantite * d.prix_utilise,

@@ -16,7 +16,7 @@ import { useAuthStore } from "@/stores/authStore";
 import Pastilles from "@/components/ui/Pastilles";
 import { familleDe, grouperParFamille, type CleFamille, type Rayon } from "@/lib/familles";
 
-interface Format { id: string; produit_id: string; volume: number; unite: string; prix: number; stock: number; seuil_alerte: number; emballage_id?: string | null; }
+interface Format { casier?: number | null; id: string; produit_id: string; volume: number; unite: string; prix: number; stock: number; seuil_alerte: number; emballage_id?: string | null; }
 interface ProduitAvecFormats { produit: { id: string; nom: string; rayon?: Rayon | null }; formats: Format[]; }
 interface Client {
   id: string; nom: string; telephone: string | null; est_defaut: number;
@@ -141,10 +141,10 @@ export default function Vente() {
     const existing = items.find(i => i.format_id === f.id);
     const currentQty = existing ? existing.quantite : 0;
     if (currentQty + 1 > f.stock) {
-      toast(`Stock insuffisant pour ${produitNom} ${volumeFr(f.volume, f.unite)} (stock : ${f.stock})`, "error");
+      toast(`Stock insuffisant pour ${produitNom} ${volumeFr(f.volume, f.unite, f.casier)} (stock : ${f.stock})`, "error");
       return;
     }
-    addItem({ format_id: f.id, nom: produitNom, volume: f.volume, unite: f.unite, prix: prixDe(f), stock: f.stock });
+    addItem({ format_id: f.id, nom: produitNom, volume: f.volume, unite: f.unite, casier: f.casier ?? null, prix: prixDe(f), stock: f.stock });
   };
 
   /** Nouveau prix saisi au panier : appliqué à la vente et retenu dans les prix du client. */
@@ -212,7 +212,7 @@ export default function Vente() {
     // Vérification stock avant envoi
     for (const item of items) {
       if (item.quantite > item.stock) {
-        toast(`Stock insuffisant pour ${item.nom} ${volumeFr(item.volume, item.unite)}`, "error");
+        toast(`Stock insuffisant pour ${item.nom} ${volumeFr(item.volume, item.unite, item.casier)}`, "error");
         return;
       }
     }
@@ -298,7 +298,7 @@ export default function Vente() {
               <div key={item.format_id} className="flex gap-3 items-start pb-2 border-b border-slate-100 last:border-0">
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-semibold text-gray-800 truncate">{item.nom}</div>
-                  <div className="text-xs text-gray-400">{volumeFr(item.volume, item.unite)}</div>
+                  <div className="text-xs text-gray-400">{volumeFr(item.volume, item.unite, item.casier)}</div>
                   {item.quantite > item.stock && (
                     <div className="text-[10px] text-danger font-semibold mt-0.5">Stock insuffisant !</div>
                   )}
@@ -717,7 +717,7 @@ function ProduitCard({
             <button key={f.id} onClick={() => setFormatIdx(i)}
               className={["px-2 py-1 rounded-lg text-[11px] font-semibold border transition-colors",
                 i === formatIdx ? "bg-gray-900 text-white border-gray-900" : "bg-white text-gray-600 border-slate-300 hover:border-slate-400"].join(" ")}>
-              {volumeFr(f.volume, f.unite)}
+              {volumeFr(f.volume, f.unite, f.casier)}
             </button>
           ))}
         </div>
@@ -726,12 +726,12 @@ function ProduitCard({
         <select value={formatIdx} onChange={e => setFormatIdx(+e.target.value)}
           className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-slate-50 focus:outline-none focus:border-secondary">
           {formats.map((f, i) => (
-            <option key={f.id} value={i}>{volumeFr(f.volume, f.unite)} — {formatPrix(prixDe(f))}</option>
+            <option key={f.id} value={i}>{volumeFr(f.volume, f.unite, f.casier)} — {formatPrix(prixDe(f))}</option>
           ))}
         </select>
       )}
       {formats.length === 1 && (
-        <span className="self-start px-2 py-0.5 rounded-lg bg-slate-100 text-[11px] font-semibold text-gray-600">{volumeFr(fmt.volume, fmt.unite)}</span>
+        <span className="self-start px-2 py-0.5 rounded-lg bg-slate-100 text-[11px] font-semibold text-gray-600">{volumeFr(fmt.volume, fmt.unite, fmt.casier)}</span>
       )}
 
       <div className="mt-auto">

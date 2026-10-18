@@ -17,13 +17,13 @@ import Badge from "@/components/ui/Badge";
 import { volumeFr } from "@/lib/format";
 import { useTempsReel } from "@/lib/tempsReel";
 
-interface FormatAlerte {
+interface FormatAlerte { casier?: number | null;
   id: string; produit_id: string; produit_nom: string;
   volume: number; unite: string; prix: number;
   stock: number; seuil_alerte: number; en_alerte: number; quantite_manquante: number;
 }
 
-interface Mouvement {
+interface Mouvement { casier?: number | null;
   id: string; produit_nom: string | null; volume: number | null; unite: string | null;
   type: string; quantite: number; stock_avant: number; stock_apres: number;
   source: string; commentaire: string | null; date: string | null;
@@ -103,7 +103,7 @@ export default function Reappro() {
         quantite: qty,
         commentaire: commentaire || null,
       });
-      toast(`+${qty} casier${qty > 1 ? "s" : ""} ajouté${qty > 1 ? "s" : ""} — ${selectedFormat.produit_nom} ${volumeFr(selectedFormat.volume, selectedFormat.unite)}`, "success");
+      toast(`+${qty} casier${qty > 1 ? "s" : ""} ajouté${qty > 1 ? "s" : ""} — ${selectedFormat.produit_nom} ${volumeFr(selectedFormat.volume, selectedFormat.unite, selectedFormat.casier)}`, "success");
       setModal(false);
       await Promise.all([load(), loadAlertes()]);
     } catch (e) { toast(String(e), "error"); }
@@ -152,7 +152,7 @@ export default function Reappro() {
         }
       />
 
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-28 lg:pb-8 [&>*]:w-full [&>*]:max-w-4xl [&>*]:mx-auto flex flex-col gap-4">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-28 lg:pb-8 [&>*]:w-full [&>*]:max-w-4xl [&>*]:mx-auto [&>*]:flex-shrink-0 flex flex-col gap-4">
         {/* Formats en alerte */}
         <div className="flex flex-col gap-3">
           {loading ? (
@@ -169,7 +169,7 @@ export default function Reappro() {
                       <Avatar nom={f.produit_nom} taille="lg" />
                       <div className="min-w-0">
                         <div className="font-display font-bold text-ink-900 truncate">{f.produit_nom}</div>
-                        <div className="text-xs text-gray-500 mt-0.5">{volumeFr(f.volume, f.unite)}</div>
+                        <div className="text-xs text-gray-500 mt-0.5">{volumeFr(f.volume, f.unite, f.casier)}</div>
                       </div>
                     </div>
 
@@ -211,7 +211,7 @@ export default function Reappro() {
                   <Badge variant="success">+{m.quantite}</Badge>
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium text-gray-800 truncate">
-                      {m.produit_nom} {volumeFr(m.volume, m.unite)}
+                      {m.produit_nom} {volumeFr(m.volume, m.unite, m.casier)}
                     </div>
                     <div className="text-xs text-gray-400">{formatDate(m.date)}</div>
                     {m.commentaire && (
@@ -233,7 +233,7 @@ export default function Reappro() {
         {selectedFormat && (
           <div className="p-6 flex flex-col gap-4">
             <div className="bg-slate-50 rounded-lg p-3 text-sm">
-              <div className="font-semibold">{selectedFormat.produit_nom} {volumeFr(selectedFormat.volume, selectedFormat.unite)}</div>
+              <div className="font-semibold">{selectedFormat.produit_nom} {volumeFr(selectedFormat.volume, selectedFormat.unite, selectedFormat.casier)}</div>
               <div className="text-gray-500 mt-0.5">Stock actuel : <strong className="text-danger">{selectedFormat.stock}</strong></div>
             </div>
             <Input label="Nombre de casiers à ajouter" type="number" min="1" value={quantite}
@@ -261,7 +261,7 @@ export default function Reappro() {
         {selectedFormat && (
           <div className="p-6 flex flex-col gap-4">
             <div className="bg-slate-50 rounded-lg p-3 text-sm">
-              <div className="font-semibold">{selectedFormat.produit_nom} {volumeFr(selectedFormat.volume, selectedFormat.unite)}</div>
+              <div className="font-semibold">{selectedFormat.produit_nom} {volumeFr(selectedFormat.volume, selectedFormat.unite, selectedFormat.casier)}</div>
               <div className="text-gray-500 mt-0.5">Stock actuel : <strong>{selectedFormat.stock}</strong></div>
             </div>
             <Input label="Nouveau stock" type="number" min="0" value={nouvStock}

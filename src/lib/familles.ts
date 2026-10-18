@@ -1,10 +1,10 @@
 /**
  * Familles d'articles, dans l'ordre des fiches de prix papier :
- * grandes bouteilles (casier 12), casier 20, petites (casier 24), eaux, PET.
+ * grandes bouteilles (casier 12), casier 20, petites (casier 24), eaux, PET, canettes.
  * La famille d'un format vient de son casier ; sans casier, du rayon du produit.
  */
-export type Rayon = "eau" | "pet";
-export type CleFamille = "casier-12" | "casier-20" | "casier-24" | "eau" | "pet" | "autres";
+export type Rayon = "eau" | "pet" | "canette";
+export type CleFamille = "casier-12" | "casier-20" | "casier-24" | "eau" | "pet" | "canette" | "autres";
 
 export const FAMILLES: { cle: CleFamille; label: string; court: string }[] = [
   { cle: "casier-12", label: "Grandes bouteilles · casier de 12", court: "Casier 12" },
@@ -12,6 +12,7 @@ export const FAMILLES: { cle: CleFamille; label: string; court: string }[] = [
   { cle: "casier-24", label: "Petites bouteilles · casier de 24", court: "Casier 24" },
   { cle: "eau", label: "Eaux · packs", court: "Eaux" },
   { cle: "pet", label: "PET · packs", court: "PET" },
+  { cle: "canette", label: "Canettes", court: "Canettes" },
   { cle: "autres", label: "Autres", court: "Autres" },
 ];
 
@@ -19,6 +20,7 @@ export const RAYONS: { valeur: "" | Rayon; label: string }[] = [
   { valeur: "", label: "Bières et sucreries en casier" },
   { valeur: "eau", label: "Eaux (packs)" },
   { valeur: "pet", label: "PET (sucreries en bouteille plastique)" },
+  { valeur: "canette", label: "Canettes (taille unique, sans consigne)" },
 ];
 
 export function familleDe(emballageId: string | null | undefined, rayon: Rayon | null | undefined): CleFamille {

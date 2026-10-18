@@ -11,7 +11,7 @@ import { volumeFr, casiers } from "@/lib/format";
 import { familleDe, FAMILLES, type Rayon } from "@/lib/familles";
 
 interface Fournisseur { id: string; nom: string; }
-interface FormatChoix {
+interface FormatChoix { casier?: number | null;
   id: string; produit_nom: string; volume: number; unite: string; stock: number;
   emballage_id: string | null; famille: string; seuil_alerte: number;
 }
@@ -93,7 +93,7 @@ export default function ModalReception({ isOpen, onClose, onDone, fournisseurId,
   }, [isOpen, fid]);
 
   const parId = useMemo(() => new Map(formats.map(f => [f.id, f])), [formats]);
-  const libelle = (f: FormatChoix) => `${f.produit_nom} ${volumeFr(f.volume, f.unite)}`;
+  const libelle = (f: FormatChoix) => `${f.produit_nom} ${volumeFr(f.volume, f.unite, f.casier)}`;
   const nomFamille = (cle: string) => FAMILLES.find(f => f.cle === cle)?.court ?? "";
   const nomEmballage = (id: string) => emballages.find(e => e.id === id)?.nom ?? id;
 

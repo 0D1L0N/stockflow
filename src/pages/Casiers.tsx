@@ -11,7 +11,7 @@ import Skeleton from "@/components/ui/Skeleton";
 import EtatVide from "@/components/ui/EtatVide";
 import { volumeFr, casiers } from "@/lib/format";
 
-interface Plein { format_id: string; produit_nom: string; volume: number; unite: string; stock: number; }
+interface Plein { casier?: number | null; format_id: string; produit_nom: string; volume: number; unite: string; stock: number; }
 interface TypeCasier {
   id: string; nom: string; vides: number; dernier_comptage: string | null;
   pleins: Plein[]; chez_clients: number; a_rendre_fournisseurs: number;
@@ -161,7 +161,7 @@ export default function Casiers() {
                       <div className="px-3 pt-2.5 pb-1 text-[11px] font-bold uppercase tracking-wide text-gray-400 bg-slate-50">Pleins (par boisson)</div>
                     )}
                     {t.pleins.map(p => (
-                      <LigneComptage key={p.format_id} libelle={`${p.produit_nom} ${volumeFr(p.volume, p.unite)}`} app={p.stock}
+                      <LigneComptage key={p.format_id} libelle={`${p.produit_nom} ${volumeFr(p.volume, p.unite, p.casier)}`} app={p.stock}
                         valeur={pleins[p.format_id]} onChange={v => setPleins(x => ({ ...x, [p.format_id]: v }))} />
                     ))}
                   </div>
@@ -189,7 +189,7 @@ export default function Casiers() {
                 </div>
                 <div className="divide-y divide-slate-100 border-t border-slate-100">
                   {data.sans_casier.map(p => (
-                    <LigneComptage key={p.format_id} libelle={`${p.produit_nom} ${volumeFr(p.volume, p.unite)}`} app={p.stock}
+                    <LigneComptage key={p.format_id} libelle={`${p.produit_nom} ${volumeFr(p.volume, p.unite, p.casier)}`} app={p.stock}
                       valeur={pleins[p.format_id]} onChange={v => setPleins(x => ({ ...x, [p.format_id]: v }))} />
                   ))}
                 </div>

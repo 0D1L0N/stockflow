@@ -34,7 +34,7 @@ function arrondir(prix: number, multiple: number, versLeHaut: boolean): number {
   return (versLeHaut ? Math.ceil(q - 1e-9) : Math.floor(q + 1e-9)) * multiple;
 }
 
-interface ChangementPrix {
+interface ChangementPrix { casier?: number | null;
   client_id: Id | null; client_nom: string | null; format_id: Id;
   groupe_id?: Id | null;
   produit_nom: string; volume: number; unite: string;
@@ -107,7 +107,7 @@ export const clients: Record<string, Commande> = {
       .map(f => ({
         famille: familleDe(f.emballage_id, rayons.get(f.produit_id)),
         format_id: f.id, produit_id: f.produit_id, produit_nom: noms.get(f.produit_id) ?? "?",
-        volume: f.volume, unite: f.unite, prix_base: f.prix,
+        volume: f.volume, unite: f.unite, casier: f.casier ?? null, prix_base: f.prix,
         prix_groupe: prixGroupe.get(f.id) ?? null, groupe_nom: groupeNom,
         prix_client: (prix.get(f.id)?.prix as number | undefined) ?? null,
         date_maj: (prix.get(f.id)?.date_maj as string | undefined) ?? null,
@@ -159,7 +159,7 @@ export const clients: Record<string, Commande> = {
       for (const f of formats) {
         if (!garder(f.produit_id)) continue;
         changements.push({ client_id: null, client_nom: null, format_id: f.id, produit_nom: noms.get(f.produit_id) ?? "?",
-          volume: f.volume, unite: f.unite, ancien_prix: f.prix, nouveau_prix: 0 });
+          volume: f.volume, unite: f.unite, casier: f.casier ?? null, ancien_prix: f.prix, nouveau_prix: 0 });
       }
     }
     for (const d of prixSnap?.docs ?? []) {
@@ -167,7 +167,7 @@ export const clients: Record<string, Commande> = {
       const f = formatsParId.get(pc.format_id);
       if (!f || !garder(f.produit_id)) continue;
       changements.push({ client_id: pc.client_id, client_nom: nomsClients.get(pc.client_id) ?? "?", format_id: f.id,
-        produit_nom: noms.get(f.produit_id) ?? "?", volume: f.volume, unite: f.unite, ancien_prix: pc.prix, nouveau_prix: 0 });
+        produit_nom: noms.get(f.produit_id) ?? "?", volume: f.volume, unite: f.unite, casier: f.casier ?? null, ancien_prix: pc.prix, nouveau_prix: 0 });
     }
 
     for (const d of groupesSnap?.docs ?? []) {
@@ -175,14 +175,14 @@ export const clients: Record<string, Commande> = {
       const f = formatsParId.get(pg.format_id);
       if (!f || !garder(f.produit_id)) continue;
       changements.push({ client_id: null, groupe_id: pg.groupe_id, client_nom: `Groupe ${nomsGroupes.get(pg.groupe_id) ?? "?"}`, format_id: f.id,
-        produit_nom: noms.get(f.produit_id) ?? "?", volume: f.volume, unite: f.unite, ancien_prix: pg.prix, nouveau_prix: 0 });
+        produit_nom: noms.get(f.produit_id) ?? "?", volume: f.volume, unite: f.unite, casier: f.casier ?? null, ancien_prix: pg.prix, nouveau_prix: 0 });
     }
 
     for (const c of changements) {
       const brut = mode === "pourcentage" ? c.ancien_prix * (1 + v / 100) : c.ancien_prix + v;
       c.nouveau_prix = arrondir(brut, multiple, v >= 0);
       if (c.nouveau_prix <= 0) {
-        throw new Error(`Le nouveau prix de ${c.produit_nom} ${volumeFr(c.volume, c.unite)} serait négatif ou nul.`);
+        throw new Error(`Le nouveau prix de ${c.produit_nom} ${volumeFr(c.volume, c.unite, c.casier)} serait négatif ou nul.`);
       }
     }
 

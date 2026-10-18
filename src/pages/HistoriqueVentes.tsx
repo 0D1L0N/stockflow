@@ -25,7 +25,7 @@ interface Vente {
   total: number; montant_recu: number | null; monnaie_rendue: number | null; statut: string;
   reste_du?: number;
 }
-interface DetailVente {
+interface DetailVente { casier?: number | null;
   id: string; vente_id: string; format_id: string;
   produit_nom: string | null; volume: number | null; unite: string | null;
   quantite: number; prix_utilise: number;
@@ -159,7 +159,7 @@ export default function HistoriqueVentes() {
           { label: "Annulées", valeur: nbAnnulees, ton: nbAnnulees > 0 ? "danger" : "neutre" },
         ]} />
 
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-28 lg:pb-8 [&>*]:w-full [&>*]:max-w-4xl [&>*]:mx-auto flex flex-col gap-3">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-28 lg:pb-8 [&>*]:w-full [&>*]:max-w-4xl [&>*]:mx-auto [&>*]:flex-shrink-0 flex flex-col gap-3">
         {/* Filtres date */}
         <Card className="flex flex-wrap gap-3 items-end">
           <div className="flex-1 min-w-32">
@@ -253,7 +253,7 @@ export default function HistoriqueVentes() {
                 <div key={d.id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0 text-sm">
                   <div>
                     <span className="font-medium text-gray-800">{d.produit_nom}</span>
-                    {d.volume && <span className="text-gray-400 text-xs ml-1">{volumeFr(d.volume, d.unite)}</span>}
+                    {d.volume && <span className="text-gray-400 text-xs ml-1">{volumeFr(d.volume, d.unite, d.casier)}</span>}
                   </div>
                   <div className="text-right">
                     <div className="text-gray-500 text-xs">{d.quantite} × {formatPrix(d.prix_utilise)}</div>

@@ -13,9 +13,9 @@ import { volumeFr } from "@/lib/format";
 import { useTempsReel } from "@/lib/tempsReel";
 
 interface Produit { id: string; nom: string; }
-interface Format { id: string; volume: number; unite: string; prix: number; stock: number; }
+interface Format { casier?: number | null; id: string; volume: number; unite: string; prix: number; stock: number; }
 interface ProduitAvecFormats { produit: Produit; formats: Format[]; }
-interface Mouvement {
+interface Mouvement { casier?: number | null;
   id: string; produit_nom: string | null; volume: number | null; unite: string | null;
   type: string; quantite: number; stock_avant: number; stock_apres: number;
   commentaire: string | null; date: string | null;
@@ -120,7 +120,7 @@ export default function AjustementStock() {
           { label: "Produits", valeur: produits.length },
         ]} />
 
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-28 lg:pb-8 [&>*]:w-full [&>*]:max-w-4xl [&>*]:mx-auto flex flex-col gap-4">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-28 lg:pb-8 [&>*]:w-full [&>*]:max-w-4xl [&>*]:mx-auto [&>*]:flex-shrink-0 flex flex-col gap-4">
         {/* Formulaire */}
         <Card className="flex flex-col gap-4">
           <div className="flex items-center gap-2 mb-1">
@@ -157,7 +157,7 @@ export default function AjustementStock() {
                 onChange={e => setSelectedFormatId(e.target.value)}
               >
                 {selectedProduit.formats.map(f => (
-                  <option key={f.id} value={f.id}>{volumeFr(f.volume, f.unite)}</option>
+                  <option key={f.id} value={f.id}>{volumeFr(f.volume, f.unite, f.casier)}</option>
                 ))}
               </select>
             </div>
@@ -272,7 +272,7 @@ export default function AjustementStock() {
                   <div className="sm:col-span-2 flex items-center gap-3">
                     <Avatar nom={m.produit_nom ?? "?"} taille="sm" />
                     <div className="min-w-0">
-                      <div className="font-semibold text-ink-900 truncate">{m.produit_nom} {volumeFr(m.volume, m.unite)}</div>
+                      <div className="font-semibold text-ink-900 truncate">{m.produit_nom} {volumeFr(m.volume, m.unite, m.casier)}</div>
                       {m.commentaire && <div className="text-xs text-gray-400 italic truncate">{m.commentaire}</div>}
                     </div>
                   </div>

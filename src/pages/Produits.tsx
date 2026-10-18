@@ -20,7 +20,7 @@ import { useAuthStore } from "@/stores/authStore";
 import { useTempsReel } from "@/lib/tempsReel";
 import { RAYONS, type Rayon } from "@/lib/familles";
 
-interface Format {
+interface Format { casier?: number | null;
   id: string; produit_id: string; volume: number; unite: string;
   prix: number; stock: number; seuil_alerte: number; emballage_id?: string | null;
 }
@@ -154,10 +154,10 @@ export default function Produits() {
   };
 
   const deleteFormat = async (f: Format) => {
-    if (!confirm("Supprimer ce format ?")) return;
+    if (!confirm("Supprimer ce format ?\n\nS'il a déjà été vendu, il est retiré du catalogue (stock remis à 0) et ses ventes restent dans l'historique.")) return;
     try {
-      await invoke("delete_format", { id: f.id });
-      toast("Format supprimé", "success");
+      const res = await invoke<{ retire: boolean }>("delete_format", { id: f.id });
+      toast(res.retire ? "Format retiré du catalogue : ses ventes restent dans l'historique" : "Format supprimé", "success");
       await load();
     } catch (e) { toast(String(e), "error"); }
   };
@@ -178,7 +178,7 @@ export default function Produits() {
           </div>
         ) : undefined} />
 
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-28 lg:pb-8 [&>*]:w-full [&>*]:max-w-4xl [&>*]:mx-auto flex flex-col gap-3">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-28 lg:pb-8 [&>*]:w-full [&>*]:max-w-4xl [&>*]:mx-auto [&>*]:flex-shrink-0 flex flex-col gap-3">
         <Input placeholder="Rechercher un produit…" value={search} onChange={e => setSearch(e.target.value)}
           icon={<Search size={16} />} />
 
@@ -230,7 +230,7 @@ export default function Produits() {
                       <div key={f.id} className="flex items-center gap-3 pl-11 pr-4 py-3 border-b border-slate-100 last:border-0">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-baseline gap-2">
-                            <span className="text-sm font-semibold text-gray-800">{volumeFr(f.volume, f.unite)}</span>
+                            <span className="text-sm font-semibold text-gray-800">{volumeFr(f.volume, f.unite, f.casier)}</span>
                             <span className="text-sm text-primary-700 font-semibold tabular-nums">{formatPrix(f.prix)}</span>
                           </div>
                           <div className={["text-xs mt-0.5 truncate", f.emballage_id ? "text-gray-400" : "text-orange-600"].join(" ")}>
@@ -292,7 +292,7 @@ export default function Produits() {
           {!editFormat && (
             <div className="flex gap-2">
               <div className="flex-1">
-                <Input label={fUnite === "pack" ? "Bouteilles par pack" : "Volume"} type="number" step="0.01" value={fVolume} placeholder={fUnite === "pack" ? "ex. : 6 (1 = pack)" : "ex. : 0.33"}
+                <Input label={fUnite === "pack" ? "Bouteilles par pack" : fUnite === "canette" ? "Canettes par carton" : "Volume"} type="number" step="0.01" value={fVolume} placeholder={fUnite === "pack" ? "ex. : 6 (1 = pack)" : fUnite === "canette" ? "ex. : 24 (1 = à l'unité)" : "ex. : 0.33"}
                   onChange={e => {
                     setFVolume(e.target.value);
                     // Suggère le casier habituel pour ce volume
@@ -302,14 +302,14 @@ export default function Produits() {
               </div>
               <div className="w-24">
                 <label className="text-[13px] font-medium text-gray-700 block mb-1.5">Unité</label>
-                <select value={fUnite} onChange={e => setFUnite(e.target.value)}
+                <select value={fUnite} onChange={e => { setFUnite(e.target.value); if (e.target.value === "canette") setFEmballage(""); }}
                   className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:border-secondary">
-                  <option>L</option><option>cL</option><option>mL</option><option value="pack">pack</option><option>kg</option><option>g</option>
+                  <option>L</option><option>cL</option><option>mL</option><option value="pack">pack</option><option value="canette">canette</option><option>kg</option><option>g</option>
                 </select>
               </div>
             </div>
           )}
-          <Input label={fUnite === "pack" ? "Prix comptoir du pack" : "Prix comptoir du casier"} type="number" value={fPrix} onChange={e => setFPrix(e.target.value)} placeholder="ex. : 6000" />
+          <Input label={fUnite === "pack" ? "Prix comptoir du pack" : fUnite === "canette" ? (parseFloat(fVolume) > 1 ? "Prix comptoir du carton" : "Prix comptoir de la canette") : "Prix comptoir du casier"} type="number" value={fPrix} onChange={e => setFPrix(e.target.value)} placeholder="ex. : 6000" />
           {!editFormat && (
             <Input label="Stock initial (casiers)" type="number" value={fStock} onChange={e => setFStock(e.target.value)} placeholder="0" />
           )}

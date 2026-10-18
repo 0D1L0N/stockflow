@@ -18,7 +18,7 @@ export interface Fournisseur {
   solde_argent?: number; emballages_dus?: Record<string, number>; date_creation: string | null;
 }
 
-export interface LigneReception {
+export interface LigneReception { casier?: number | null;
   format_id: Id; produit_nom: string; volume: number; unite: string;
   quantite: number; prix_achat: number; sous_total: number;
 }
@@ -33,7 +33,7 @@ export interface Reception {
 }
 
 /** Bon de commande envoyé au fournisseur ; « reçue » quand une réception le reprend. */
-export interface LigneCommandeFournisseur { format_id: Id; quantite: number; produit_nom: string; volume: number; unite: string; }
+export interface LigneCommandeFournisseur { casier?: number | null; format_id: Id; quantite: number; produit_nom: string; volume: number; unite: string; }
 export interface CommandeFournisseur {
   id: Id; numero: string; fournisseur_id: Id; fournisseur_nom: string;
   lignes: LigneCommandeFournisseur[]; note: string | null;
@@ -138,7 +138,7 @@ export const fournisseurs: Record<string, Commande> = {
 
     const lignesFinales: LigneReception[] = [...cumul].map(([id, { quantite, prix }]) => {
       const fm = parId.get(id) as Format;
-      return { format_id: id, produit_nom: noms.get(fm.produit_id) ?? "?", volume: fm.volume, unite: fm.unite,
+      return { format_id: id, produit_nom: noms.get(fm.produit_id) ?? "?", volume: fm.volume, unite: fm.unite, casier: fm.casier ?? null,
         quantite, prix_achat: prix, sous_total: quantite * prix };
     });
     const total = lignesFinales.reduce((t, l) => t + l.sous_total, 0);
@@ -203,7 +203,7 @@ export const fournisseurs: Record<string, Commande> = {
     if (cumul.size === 0) throw new Error("Indiquez au moins une quantité.");
     const lignesFinales: LigneCommandeFournisseur[] = [...cumul].map(([id, quantite]) => {
       const fm = parId.get(id) as Format;
-      return { format_id: id, quantite, produit_nom: noms.get(fm.produit_id) ?? "?", volume: fm.volume, unite: fm.unite };
+      return { format_id: id, quantite, produit_nom: noms.get(fm.produit_id) ?? "?", volume: fm.volume, unite: fm.unite, casier: fm.casier ?? null };
     });
     const ref = doc(col("commandes_fournisseur"));
     const date = maintenant();

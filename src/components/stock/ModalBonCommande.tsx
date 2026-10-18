@@ -11,7 +11,7 @@ import {
   genererBonCommandePDF, texteBonCommande, telechargerBlob, partagerBlob, partageDisponible,
 } from "@/lib/pdf";
 
-interface Format { id: string; volume: number; unite: string; stock: number; seuil_alerte: number; emballage_id?: string | null; }
+interface Format { casier?: number | null; id: string; volume: number; unite: string; stock: number; seuil_alerte: number; emballage_id?: string | null; }
 interface Ligne { formatId: string; produit: string; format: string; emballage: string | null; stock: number; seuil: number; enAlerte: boolean; }
 interface Fournisseur { id: string; nom: string; telephone: string | null; }
 interface CommandeEnregistree { id: string; numero: string; date: string; }
@@ -53,7 +53,7 @@ export default function ModalBonCommande({ isOpen, onClose }: { isOpen: boolean;
       setFid(fs.length === 1 ? fs[0].id : "");
       const details = await Promise.all(produits.map(p => invoke<{ formats: Format[] }>("get_produit", { id: p.id })));
       const toutes: Ligne[] = produits.flatMap((p, i) => details[i].formats.map(f => ({
-        formatId: f.id, produit: p.nom, format: volumeFr(f.volume, f.unite),
+        formatId: f.id, produit: p.nom, format: volumeFr(f.volume, f.unite, f.casier),
         emballage: emballages.find(e => e.id === f.emballage_id)?.nom ?? null,
         stock: f.stock, seuil: f.seuil_alerte, enAlerte: f.stock <= f.seuil_alerte,
       })));

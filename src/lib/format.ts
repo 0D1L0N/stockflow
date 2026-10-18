@@ -1,9 +1,15 @@
-/** Volume à la française : 0.33 + "L" → « 0,33 L ». */
-export function volumeFr(volume: number | null | undefined, unite: string | null | undefined): string {
+/**
+ * Volume à la française : 0.33 + "L" → « 0,33 L ».
+ * casier : bouteilles du casier quand ce n'est pas le casier habituel → « 0,5 L (casier de 12) ».
+ */
+export function volumeFr(volume: number | null | undefined, unite: string | null | undefined, casier?: number | null): string {
   if (volume == null) return "";
   // Packs (eaux, PET) : le volume est le nombre de bouteilles, 1 = « pack » simplement
   if (unite === "pack") return volume > 1 ? `pack de ${volume}` : "pack";
-  return `${volume.toLocaleString("fr-FR")} ${unite ?? ""}`.trim();
+  // Canettes : taille unique ; le volume est le nombre de canettes du carton, 1 = à l'unité
+  if (unite === "canette") return volume > 1 ? `carton de ${volume} canettes` : "canette";
+  const base = `${volume.toLocaleString("fr-FR")} ${unite ?? ""}`.trim();
+  return casier ? `${base} (casier de ${casier})` : base;
 }
 
 /** « 1 casier », « 3 casiers » */

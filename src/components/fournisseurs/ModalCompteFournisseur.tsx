@@ -9,7 +9,7 @@ import Button from "@/components/ui/Button";
 import Skeleton from "@/components/ui/Skeleton";
 import { volumeFr, casiers } from "@/lib/format";
 
-interface Ligne { format_id: string; produit_nom: string; volume: number; unite: string; quantite: number; prix_achat: number; sous_total: number; }
+interface Ligne { casier?: number | null; format_id: string; produit_nom: string; volume: number; unite: string; quantite: number; prix_achat: number; sous_total: number; }
 interface Reception {
   id: string; numero: string; numero_bl: string | null; date: string; total: number; montant_paye: number; reste_du: number;
   lignes: Ligne[]; emballages_livres: Record<string, number>; emballages_rendus: Record<string, number>;
@@ -19,9 +19,9 @@ interface Operation {
   id: string; type: "réception" | "paiement"; montant: number; emballages: Record<string, number>;
   numero: string | null; commentaire: string | null; date: string; utilisateur_nom: string;
 }
-interface CommandeAttente {
+interface CommandeAttente { casier?: number | null;
   id: string; numero: string; date: string; utilisateur_nom: string;
-  lignes: { format_id: string; produit_nom: string; volume: number; unite: string; quantite: number }[];
+  lignes: { format_id: string; produit_nom: string; volume: number; unite: string; quantite: number; casier?: number | null }[];
 }
 interface Compte {
   fournisseur: { id: string; nom: string; telephone: string | null; solde_argent?: number; emballages_dus?: Record<string, number> };
@@ -135,7 +135,7 @@ export default function ModalCompteFournisseur({ fournisseur, onClose, onChange,
                     </div>
                     <div className="flex flex-col gap-0.5">
                       {c.lignes.map(l => (
-                        <div key={l.format_id} className="text-xs text-gray-600">{l.quantite} × {l.produit_nom} {volumeFr(l.volume, l.unite)}</div>
+                        <div key={l.format_id} className="text-xs text-gray-600">{l.quantite} × {l.produit_nom} {volumeFr(l.volume, l.unite, l.casier)}</div>
                       ))}
                     </div>
                     {onReception && (
@@ -203,7 +203,7 @@ export default function ModalCompteFournisseur({ fournisseur, onClose, onChange,
                         <div className="px-3 pb-3 pl-10 flex flex-col gap-1">
                           {r.lignes.map(l => (
                             <div key={l.format_id} className="flex justify-between text-xs text-gray-600">
-                              <span>{l.quantite} × {l.produit_nom} {volumeFr(l.volume, l.unite)}{l.prix_achat ? ` à ${formatPrix(l.prix_achat)}` : ""}</span>
+                              <span>{l.quantite} × {l.produit_nom} {volumeFr(l.volume, l.unite, l.casier)}{l.prix_achat ? ` à ${formatPrix(l.prix_achat)}` : ""}</span>
                               <span className="chiffre font-semibold">{formatPrix(l.sous_total)}</span>
                             </div>
                           ))}

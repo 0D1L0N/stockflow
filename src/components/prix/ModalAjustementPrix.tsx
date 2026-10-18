@@ -8,7 +8,7 @@ import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import { volumeFr } from "@/lib/format";
 
-interface ChangementPrix {
+interface ChangementPrix { casier?: number | null;
   client_id: string | null; client_nom: string | null; format_id: string;
   produit_nom: string; volume: number; unite: string;
   ancien_prix: number; nouveau_prix: number;
@@ -136,7 +136,7 @@ export default function ModalAjustementPrix({ isOpen, onClose, onApplied, client
               {apercu.map(c => (
                 <div key={`${c.client_id ?? "base"}-${c.format_id}`} className="flex items-center gap-3 px-3 py-2 text-sm">
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium text-gray-800 truncate">{c.produit_nom} <span className="text-gray-400">{volumeFr(c.volume, c.unite)}</span></div>
+                    <div className="font-medium text-gray-800 truncate">{c.produit_nom} <span className="text-gray-400">{volumeFr(c.volume, c.unite, c.casier)}</span></div>
                     <div className="text-xs text-gray-400">{c.client_nom ?? "Prix comptoir"}</div>
                   </div>
                   <span className="text-gray-400 line-through text-xs">{formatPrix(c.ancien_prix)}</span>

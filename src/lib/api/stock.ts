@@ -1,9 +1,9 @@
 import { doc, getDoc, increment, limit, orderBy, query, serverTimestamp, where, writeBatch } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
 import { col, ecrire, lister, maintenant, type Commande, type Id } from "./outils";
-import type { Format } from "./catalogue";
+import { avecCasier, type Format } from "./catalogue";
 
-interface Mouvement {
+interface Mouvement { casier?: number | null;
   id: Id; format_id: Id; produit_nom: string | null; volume: number | null; unite: string | null;
   type: string; quantite: number; stock_avant: number; stock_apres: number;
   source: string; commentaire: string | null; date: string | null;
@@ -13,7 +13,7 @@ interface Mouvement {
 async function lireFormat(formatId: Id) {
   const snap = await getDoc(doc(db, "formats", formatId));
   if (!snap.exists()) throw new Error("Format introuvable");
-  const format = { id: snap.id, ...snap.data() } as Format;
+  const [format] = await avecCasier([{ id: snap.id, ...snap.data() } as Format]);
   const produit = await getDoc(doc(db, "produits", format.produit_id));
   return { format, produitNom: (produit.data()?.nom as string) ?? "—" };
 }
@@ -33,6 +33,7 @@ export function ajouterMouvement(
     produit_nom: produitNom,
     volume: format.volume,
     unite: format.unite,
+    casier: format.casier ?? null,
     type: m.type,
     quantite: m.quantite,
     stock_avant: format.stock,

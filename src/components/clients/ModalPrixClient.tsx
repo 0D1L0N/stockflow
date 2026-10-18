@@ -12,7 +12,7 @@ import { volumeFr } from "@/lib/format";
 import Pastilles from "@/components/ui/Pastilles";
 import { grouperParFamille, type CleFamille } from "@/lib/familles";
 
-export interface PrixClient {
+export interface PrixClient { casier?: number | null;
   famille: CleFamille;
   format_id: string; produit_id: string; produit_nom: string;
   volume: number; unite: string; prix_base: number;
@@ -68,7 +68,7 @@ export default function ModalPrixClient({ client, groupe, onClose, onChange }: P
     setSavingId(l.format_id);
     try {
       await invoke(cmd.ecrire, { ...cmd.cle, formatId: l.format_id, prix });
-      toast(`Prix enregistré pour ${l.produit_nom} ${volumeFr(l.volume, l.unite)}`, "success");
+      toast(`Prix enregistré pour ${l.produit_nom} ${volumeFr(l.volume, l.unite, l.casier)}`, "success");
       await load();
     } catch (e) { toast(String(e), "error"); }
     setSavingId(null);
@@ -187,11 +187,11 @@ export default function ModalPrixClient({ client, groupe, onClose, onChange }: P
                         <div key={l.format_id} className="flex items-center gap-2 sm:gap-3 px-3 py-2.5">
                           <div className="flex-1 min-w-0">
                             <div className="text-sm font-semibold text-gray-800 truncate">
-                              {l.produit_nom} <span className="hidden sm:inline text-gray-400 font-normal">{volumeFr(l.volume, l.unite)}</span>
+                              {l.produit_nom} <span className="hidden sm:inline text-gray-400 font-normal">{volumeFr(l.volume, l.unite, l.casier)}</span>
                             </div>
                             <div className="text-xs text-gray-400 mt-0.5 whitespace-nowrap overflow-hidden text-ellipsis">
                               {propre
-                                ? (!estGroupe && l.prix_groupe != null ? <span className="text-amber-700 font-semibold">Hors groupe ({formatPrix(l.prix_groupe)})</span> : volumeFr(l.volume, l.unite))
+                                ? (!estGroupe && l.prix_groupe != null ? <span className="text-amber-700 font-semibold">Hors groupe ({formatPrix(l.prix_groupe)})</span> : volumeFr(l.volume, l.unite, l.casier))
                                 : libelleHerite(l)}
                             </div>
                           </div>

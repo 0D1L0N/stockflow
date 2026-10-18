@@ -2,6 +2,8 @@ import { doc, getDoc, getDocs, limit, query, setDoc, updateDoc, where, writeBatc
 import { db } from "@/lib/firebase";
 import type { Rayon } from "@/lib/familles";
 import { col, ecrire, lister, maintenant, parNom, type Commande, type Id } from "./outils";
+import { ajouterMouvement } from "./stock";
+import { CASIER_PAR_VOLUME } from "./emballages";
 
 export interface Produit { id: Id; nom: string; date_creation: string | null; rayon?: Rayon | null; }
 export interface Format {
@@ -9,17 +11,44 @@ export interface Format {
   prix: number; stock: number; seuil_alerte: number;
   /** Type de casier consigné livré avec ce format (null : pas d'emballage à rendre) */
   emballage_id?: Id | null;
+  /** Retiré du catalogue : déjà vendu, donc gardé pour l'historique mais plus proposé nulle part */
+  archive?: boolean;
+  /** Calculé à la lecture : bouteilles du casier s'il n'est pas l'habituel du volume (0,5 L en casier de 12) */
+  casier?: number | null;
 }
 
-export const parVolume = (a: Format, b: Format) => a.volume - b.volume;
+export const parVolume = (a: Format, b: Format) => a.volume - b.volume || (a.casier ?? 0) - (b.casier ?? 0);
 
 export async function listerProduits(): Promise<Produit[]> {
   return (await lister<Produit>(col("produits"))).sort(parNom);
 }
 
-export async function listerFormats(produitId?: Id): Promise<Format[]> {
+type EmballageNom = { id: Id; nom: string };
+const listerNomsEmballages = () => lister<EmballageNom>(col("emballages")).catch(() => [] as EmballageNom[]);
+
+/**
+ * Bouteilles du casier quand le format n'est pas dans le casier habituel de son volume
+ * (ex. Doppel noir 0,5 L en casier de 12 au lieu de 20), sinon null.
+ */
+function casierInhabituel(f: { volume: number; unite: string; emballage_id?: Id | null }, emballages: EmballageNom[]): number | null {
+  const habituel = CASIER_PAR_VOLUME[f.volume];
+  if (!f.emballage_id || f.unite === "pack" || f.unite === "canette" || !habituel || f.emballage_id === habituel) return null;
+  const nom = emballages.find(e => e.id === f.emballage_id)?.nom ?? f.emballage_id;
+  const n = parseInt(nom.match(/\d+/)?.[0] ?? "", 10);
+  return n > 0 ? n : null;
+}
+
+/** Ajoute le champ casier à des formats lus directement. */
+export async function avecCasier<T extends { volume: number; unite: string; emballage_id?: Id | null }>(formats: T[]): Promise<(T & { casier: number | null })[]> {
+  const emballages = await listerNomsEmballages();
+  return formats.map(f => ({ ...f, casier: casierInhabituel(f, emballages) }));
+}
+
+/** Formats du catalogue ; ceux retirés n'apparaissent qu'avec avecRetires. */
+export async function listerFormats(produitId?: Id, avecRetires = false): Promise<Format[]> {
   const q = produitId ? query(col("formats"), where("produit_id", "==", produitId)) : col("formats");
-  return (await lister<Format>(q)).sort(parVolume);
+  const formats = (await lister<Format>(q)).filter(f => avecRetires || !f.archive);
+  return (await avecCasier(formats)).sort(parVolume);
 }
 
 /** Une vente existe-t-elle pour ce format ? (les ventes listent leurs format_ids) */
@@ -57,7 +86,7 @@ export const catalogue: Record<string, Commande> = {
   },
 
   delete_produit: async ({ id }) => {
-    const formats = await listerFormats(id as Id);
+    const formats = await listerFormats(id as Id, true);
     if (formats.some(f => f.stock > 0)) throw new Error("Impossible de supprimer : ce produit a encore du stock.");
     for (const f of formats) {
       if (await formatVendu(f.id)) throw new Error("Impossible de supprimer : des ventes existent pour ce produit.");
@@ -95,12 +124,33 @@ export const catalogue: Record<string, Commande> = {
     }));
   },
 
+  /**
+   * Jamais vendu : supprimé. Déjà vendu : retiré du catalogue (les ventes et mouvements
+   * gardent leur historique) ; un stock restant est remis à 0 avec un mouvement tracé.
+   */
   delete_format: async ({ id }) => {
-    if (await formatVendu(id as Id)) throw new Error("Impossible de supprimer : ce format a des ventes associées.");
     const batch = writeBatch(db);
     await supprimerPrixClientsDuFormat(id as Id, batch);
-    batch.delete(doc(db, "formats", id as Id));
+    if (!(await formatVendu(id as Id))) {
+      batch.delete(doc(db, "formats", id as Id));
+      await ecrire(batch.commit());
+      return { retire: false };
+    }
+    const snap = await getDoc(doc(db, "formats", id as Id));
+    if (!snap.exists()) throw new Error("Format introuvable.");
+    const format = { id: snap.id, ...snap.data() } as Format;
+    const produit = await getDoc(doc(db, "produits", format.produit_id));
+    const champs: Record<string, unknown> = { archive: true, date_retrait: maintenant() };
+    if (format.stock !== 0) {
+      champs.stock = 0;
+      champs.dernier_mouvement = ajouterMouvement(batch, format, (produit.data()?.nom as string) ?? "—", {
+        type: "ajustement", quantite: Math.abs(format.stock), stock_apres: 0, source: "inventaire",
+        commentaire: "Format retiré du catalogue",
+      });
+    }
+    batch.update(snap.ref, champs);
     await ecrire(batch.commit());
+    return { retire: true };
   },
 
   get_formats_en_alerte: async () => {

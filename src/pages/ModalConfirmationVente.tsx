@@ -76,7 +76,7 @@ export default function ModalConfirmationVente({
     client: { nom: clientNom, telephone: clientTelephone ?? "", adresse: "" },
     items: items.map(i => ({
       nom_produit: i.nom,
-      volume: `${volumeFr(i.volume, i.unite)}`,
+      volume: `${volumeFr(i.volume, i.unite, i.casier)}`,
       quantite: i.quantite,
       prix_unitaire: i.prix,
       sous_total: i.sous_total,
@@ -160,7 +160,7 @@ export default function ModalConfirmationVente({
               {items.map(item => (
                 <div key={item.format_id} className="flex justify-between text-xs">
                   <span className="text-gray-600 truncate max-w-[60%]">
-                    {item.nom} {volumeFr(item.volume, item.unite)} × {item.quantite}
+                    {item.nom} {volumeFr(item.volume, item.unite, item.casier)} × {item.quantite}
                   </span>
                   <span className="font-semibold text-gray-700">{formatPrix(item.sous_total)}</span>
                 </div>

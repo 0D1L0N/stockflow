@@ -62,7 +62,7 @@ export default function Parametres() {
       <Header title="Paramètres" subtitle="Commerce, devise, casiers et sauvegarde" icone={<Settings size={22} />}
         actions={<Button icon={<Save size={15} />} onClick={save} loading={saving}>Enregistrer</Button>} />
 
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-28 lg:pb-8 [&>*]:w-full [&>*]:max-w-4xl [&>*]:mx-auto flex flex-col gap-4">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-28 lg:pb-8 [&>*]:w-full [&>*]:max-w-4xl [&>*]:mx-auto [&>*]:flex-shrink-0 flex flex-col gap-4">
         {loading ? <Skeleton variant="card" count={3} /> : params && (
           <>
             <Card className="flex flex-col gap-4">

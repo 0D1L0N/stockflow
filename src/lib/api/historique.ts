@@ -9,6 +9,7 @@ import { mouvementsVides } from "./casiers";
 
 interface ArticleVente {
   format_id: Id; produit_id: Id; produit_nom: string; volume: number; unite: string;
+  casier?: number | null;
   quantite: number; prix_utilise: number;
 }
 interface VenteDoc {
@@ -67,7 +68,7 @@ export const historique: Record<string, Commande> = {
       vente: resume(v),
       details: v.items.map((a, i) => ({
         id: `${v.id}-${i}`, vente_id: v.id, format_id: a.format_id,
-        produit_nom: a.produit_nom, volume: a.volume, unite: a.unite,
+        produit_nom: a.produit_nom, volume: a.volume, unite: a.unite, casier: a.casier ?? null,
         quantite: a.quantite, prix_utilise: a.prix_utilise,
       })),
     };
@@ -90,7 +91,7 @@ export const historique: Record<string, Commande> = {
       const stockAvant = (formats[i].data()?.stock as number | undefined) ?? 0;
       if (formats[i].exists()) batch.update(formats[i].ref, { stock: increment(a.quantite) });
       batch.set(doc(col("mouvements_stock")), {
-        format_id: a.format_id, produit_nom: a.produit_nom, volume: a.volume, unite: a.unite,
+        format_id: a.format_id, produit_nom: a.produit_nom, volume: a.volume, unite: a.unite, casier: a.casier ?? null,
         type: "entrée", quantite: a.quantite, stock_avant: stockAvant, stock_apres: stockAvant + a.quantite,
         source: "vente", reference_id: v.id, commentaire: "Annulation vente",
         utilisateur_uid: auth.currentUser?.uid, date, cree_le: serverTimestamp(),
@@ -141,7 +142,7 @@ export const historique: Record<string, Commande> = {
       getDoc(doc(db, "stats_jour", jourLocal(0))),
       getDoc(doc(db, "stats_jour", jourLocal(-1))),
       listerProduits(),
-      listerFormats(),
+      listerFormats(undefined, true), // ventes du jour d'un format retiré comprises
       lister<{ id: Id; solde_argent?: number; emballages_dus?: Record<string, number> }>(col("clients")),
       listerEmballages(),
       semaine,

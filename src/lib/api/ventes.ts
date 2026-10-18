@@ -2,7 +2,7 @@ import { doc, getDoc, increment, serverTimestamp, writeBatch } from "firebase/fi
 import { db, auth } from "@/lib/firebase";
 import { useAuthStore } from "@/stores/authStore";
 import { col, ecrire, maintenant, type Commande, type Id } from "./outils";
-import type { Format } from "./catalogue";
+import { avecCasier, type Format } from "./catalogue";
 import { appliquerAuCompte, nouvelleOperation, type SoldesClient } from "./comptes";
 import { mouvementsVides } from "./casiers";
 import { volumeFr } from "@/lib/format";
@@ -46,18 +46,18 @@ export const ventes: Record<string, Commande> = {
     if (!uid) throw new Error("Session expirée : reconnectez-vous.");
 
     // Hors ligne, getDoc lit le cache local : le stock vérifié est le dernier connu.
-    const formats = await Promise.all(lignes.map(async l => {
+    const formats = await avecCasier(await Promise.all(lignes.map(async l => {
       const snap = await getDoc(doc(db, "formats", l.formatId));
       if (!snap.exists()) throw new Error("Un article du panier n'existe plus.");
       return { id: snap.id, ...snap.data() } as Format;
-    }));
+    })));
     const produits = await Promise.all(formats.map(f => getDoc(doc(db, "produits", f.produit_id))));
     const client = await getDoc(doc(db, "clients", clientId as Id));
 
     lignes.forEach((l, i) => {
       const f = formats[i];
       if (f.stock < l.quantite) {
-        throw new Error(`Stock insuffisant pour ${produits[i].data()?.nom ?? "un article"} ${volumeFr(f.volume, f.unite)} (disponible : ${f.stock}, demandé : ${l.quantite})`);
+        throw new Error(`Stock insuffisant pour ${produits[i].data()?.nom ?? "un article"} ${volumeFr(f.volume, f.unite, f.casier)} (disponible : ${f.stock}, demandé : ${l.quantite})`);
       }
     });
 
@@ -116,6 +116,7 @@ export const ventes: Record<string, Commande> = {
       produit_nom: (produits[i].data()?.nom as string) ?? "—",
       volume: formats[i].volume,
       unite: formats[i].unite,
+      casier: formats[i].casier ?? null,
       quantite: l.quantite,
       prix_utilise: l.prixUtilise,
     }));
@@ -150,6 +151,7 @@ export const ventes: Record<string, Commande> = {
         produit_nom: articles[i].produit_nom,
         volume: articles[i].volume,
         unite: articles[i].unite,
+        casier: articles[i].casier,
         type: "sortie",
         quantite: l.quantite,
         stock_avant: formats[i].stock,

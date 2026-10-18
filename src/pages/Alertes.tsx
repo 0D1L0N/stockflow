@@ -57,7 +57,7 @@ export default function Alertes() {
         quantite: qty,
         commentaire: "Réappro depuis alertes",
       });
-      toast(`+${qty} casier${qty > 1 ? "s" : ""} ajouté${qty > 1 ? "s" : ""} pour ${a.produit_nom} ${volumeFr(a.volume, a.unite)}`, "success");
+      toast(`+${qty} casier${qty > 1 ? "s" : ""} ajouté${qty > 1 ? "s" : ""} pour ${a.produit_nom} ${volumeFr(a.volume, a.unite, a.casier)}`, "success");
       await loadAlertes();
     } catch (e) { toast(String(e), "error"); }
     setSaving(prev => ({ ...prev, [a.id]: false }));
@@ -109,7 +109,7 @@ export default function Alertes() {
         }
       />
 
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-28 lg:pb-8 [&>*]:w-full [&>*]:max-w-4xl [&>*]:mx-auto flex flex-col gap-3">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-28 lg:pb-8 [&>*]:w-full [&>*]:max-w-4xl [&>*]:mx-auto [&>*]:flex-shrink-0 flex flex-col gap-3">
         {loading ? (
           <Skeleton variant="card" count={4} />
         ) : alertes.length === 0 ? (
@@ -123,7 +123,7 @@ export default function Alertes() {
                   <Avatar nom={a.produit_nom} taille="lg" />
                   <div className="flex-1 min-w-0">
                     <div className="font-display font-bold text-ink-900 truncate">{a.produit_nom}</div>
-                    <div className="text-xs text-gray-500 mt-0.5">{volumeFr(a.volume, a.unite)} · {formatPrix(a.prix)} le casier</div>
+                    <div className="text-xs text-gray-500 mt-0.5">{volumeFr(a.volume, a.unite, a.casier)} · {formatPrix(a.prix)} le casier</div>
                   </div>
                   <span className={["text-[11px] font-bold px-2 py-1 rounded-md flex-shrink-0", a.stock <= 0 ? "bg-red-600 text-white" : "bg-red-50 text-red-600"].join(" ")}>
                     {a.stock <= 0 ? "RUPTURE" : "ALERTE"}

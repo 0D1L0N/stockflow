@@ -75,7 +75,7 @@ export const casiers: Record<string, Commande> = {
       liste.reduce((t, x) => t + Math.max(0, x.emballages_dus?.[e] ?? 0), 0);
     const pleins = (e: Id | null) => formats
       .filter(f => (f.emballage_id ?? null) === e)
-      .map(f => ({ format_id: f.id, produit_nom: noms.get(f.produit_id) ?? "?", volume: f.volume, unite: f.unite, stock: f.stock }))
+      .map(f => ({ format_id: f.id, produit_nom: noms.get(f.produit_id) ?? "?", volume: f.volume, unite: f.unite, casier: f.casier ?? null, stock: f.stock }))
       .sort((a, b) => a.produit_nom.localeCompare(b.produit_nom, "fr") || a.volume - b.volume);
     return {
       types: types.map((t, i) => ({

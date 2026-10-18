@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { CLIENT_DEFAUT } from "@/lib/api";
 
-export interface VenteItem {
+export interface VenteItem { casier?: number | null;
   format_id: string;
   nom: string;
   volume: number;

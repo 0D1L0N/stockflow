@@ -11,7 +11,7 @@ import EtatVide from "@/components/ui/EtatVide";
 import Pastilles from "@/components/ui/Pastilles";
 import { volumeFr } from "@/lib/format";
 
-interface Mouvement {
+interface Mouvement { casier?: number | null;
   id: string; format_id: string; produit_nom: string | null;
   volume: number | null; unite: string | null;
   type: string; quantite: number; stock_avant: number; stock_apres: number;
@@ -62,7 +62,7 @@ export default function Mouvements() {
           { label: "Casiers sortis", valeur: `−${somme("sortie")}`, ton: "danger" },
           { label: "Ajustements", valeur: mouvements.filter(m => m.type === "ajustement").length },
         ]} />
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-28 lg:pb-8 [&>*]:w-full [&>*]:max-w-4xl [&>*]:mx-auto flex flex-col gap-3">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-28 lg:pb-8 [&>*]:w-full [&>*]:max-w-4xl [&>*]:mx-auto [&>*]:flex-shrink-0 flex flex-col gap-3">
         <Card className="flex flex-wrap gap-3 items-end">
           <div className="flex-1 min-w-28">
             <label className="text-[13px] font-medium text-gray-700 block mb-1.5">Du</label>
@@ -93,7 +93,7 @@ export default function Mouvements() {
                 <Avatar nom={m.produit_nom ?? "?"} taille="md" />
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium text-gray-800 truncate">
-                    {m.produit_nom} {volumeFr(m.volume, m.unite)}
+                    {m.produit_nom} {volumeFr(m.volume, m.unite, m.casier)}
                   </div>
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <Badge variant={typeVariant[m.type] ?? "default"}>{m.type}</Badge>

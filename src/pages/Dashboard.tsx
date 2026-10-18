@@ -328,7 +328,7 @@ export default function Dashboard() {
                         <Avatar nom={a.produit_nom} taille="sm" />
                         <div className="flex-1 min-w-0">
                           <div className="text-[13.5px] font-semibold text-ink-900 truncate group-hover:underline">{a.produit_nom}</div>
-                          <div className="text-xs text-gray-500">{volumeFr(a.volume, a.unite)} · seuil {a.seuil_alerte}</div>
+                          <div className="text-xs text-gray-500">{volumeFr(a.volume, a.unite, a.casier)} · seuil {a.seuil_alerte}</div>
                         </div>
                         <span className={["chiffre text-sm font-bold px-2 py-0.5 rounded-md",
                           a.stock <= 0 ? "bg-red-50 text-red-600" : "bg-amber-50 text-amber-700"].join(" ")}>{a.stock}</span>

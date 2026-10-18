@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { invoke } from "@/lib/db";
 import { nombreFr } from "@/lib/format";
 
-export interface FormatAlerte {
+export interface FormatAlerte { casier?: number | null;
   id: string; produit_id: string; produit_nom: string;
   volume: number; unite: string; prix: number;
   stock: number; seuil_alerte: number; en_alerte: number; quantite_manquante: number;
