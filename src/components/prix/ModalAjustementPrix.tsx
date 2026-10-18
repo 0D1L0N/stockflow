@@ -86,8 +86,8 @@ export default function ModalAjustementPrix({ isOpen, onClose, onApplied, client
             <div>
               <label className={labelCls}>Prix concernés</label>
               <select value={portee} onChange={e => setPortee(e.target.value as Portee)} className={selectCls}>
-                <option value="tous">Prix de base + prix clients</option>
-                <option value="base">Prix de base uniquement</option>
+                <option value="tous">Prix comptoir + prix clients</option>
+                <option value="base">Prix comptoir uniquement</option>
                 <option value="clients">Prix clients uniquement</option>
               </select>
             </div>
@@ -133,7 +133,7 @@ export default function ModalAjustementPrix({ isOpen, onClose, onApplied, client
                 <div key={`${c.client_id ?? "base"}-${c.format_id}`} className="flex items-center gap-3 px-3 py-2 text-sm">
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-gray-800 truncate">{c.produit_nom} <span className="text-gray-400">{volumeFr(c.volume, c.unite)}</span></div>
-                    <div className="text-xs text-gray-400">{c.client_nom ?? "Prix de base"}</div>
+                    <div className="text-xs text-gray-400">{c.client_nom ?? "Prix comptoir"}</div>
                   </div>
                   <span className="text-gray-400 line-through text-xs">{formatPrix(c.ancien_prix)}</span>
                   <ArrowRight size={12} className="text-gray-300" />

@@ -6,7 +6,6 @@ import { useAppStore } from "@/stores/appStore";
 import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
-import Badge from "@/components/ui/Badge";
 import Skeleton from "@/components/ui/Skeleton";
 import ModalAjustementPrix from "@/components/prix/ModalAjustementPrix";
 import { volumeFr } from "@/lib/format";
@@ -64,7 +63,7 @@ export default function ModalPrixClient({ client, onClose }: Props) {
     setSavingId(l.format_id);
     try {
       await invoke("delete_prix_client", { clientId: client!.id, formatId: l.format_id });
-      toast("Prix de base rétabli", "success");
+      toast("Prix comptoir rétabli", "success");
       await load();
     } catch (e) { toast(String(e), "error"); }
     setSavingId(null);
@@ -82,8 +81,8 @@ export default function ModalPrixClient({ client, onClose }: Props) {
         <div className="p-4 sm:p-6 flex flex-col gap-4">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <p className="text-xs text-gray-500">
-              Laissez vide pour appliquer le prix de base.{" "}
-              <span className="font-semibold text-gray-700">{nbSpecifiques} prix spécifique{nbSpecifiques > 1 ? "s" : ""}</span>
+              Les prix de ce client, modifiables à tout moment. Case vide : prix comptoir.{" "}
+              <span className="font-semibold text-gray-700">{nbSpecifiques} prix renseigné{nbSpecifiques > 1 ? "s" : ""}</span>
             </p>
             {nbSpecifiques > 0 && (
               <Button size="sm" variant="secondary" icon={<TrendingUp size={14} />} onClick={() => setShowHausse(true)}>
@@ -115,7 +114,6 @@ export default function ModalPrixClient({ client, onClose }: Props) {
               {g.items.map(l => {
                 const saisie = saisies[l.format_id] ?? "";
                 const modifie = saisie !== (l.prix_client != null ? String(l.prix_client) : "");
-                const ecart = l.prix_client != null ? l.prix_client - l.prix_base : null;
                 return (
                   <div key={l.format_id} className="flex items-center gap-2 sm:gap-3 px-3 py-2.5">
                     <div className="flex-1 min-w-0">
@@ -123,12 +121,7 @@ export default function ModalPrixClient({ client, onClose }: Props) {
                         {l.produit_nom} <span className="hidden sm:inline text-gray-400 font-normal">{volumeFr(l.volume, l.unite)}</span>
                       </div>
                       <div className="flex items-center gap-1.5 mt-0.5 whitespace-nowrap overflow-hidden">
-                        <span className="text-xs text-gray-400">Base {formatPrix(l.prix_base)}</span>
-                        {ecart != null && ecart !== 0 && (
-                          <Badge variant={ecart < 0 ? "success" : "warning"}>
-                            {ecart > 0 ? "+" : "−"}{Math.abs(ecart).toLocaleString("fr-FR").replace(/ /g, " ")}
-                          </Badge>
-                        )}
+                        <span className="text-xs text-gray-400">{l.prix_client == null ? `Prix comptoir ${formatPrix(l.prix_base)}` : volumeFr(l.volume, l.unite)}</span>
                       </div>
                     </div>
                     <input type="number" min="0" placeholder={String(l.prix_base)} value={saisie}
@@ -144,7 +137,7 @@ export default function ModalPrixClient({ client, onClose }: Props) {
                         </button>
                       )}
                       {l.prix_client != null && (
-                        <button onClick={() => reinitialiser(l)} disabled={savingId === l.format_id} title="Revenir au prix de base"
+                        <button onClick={() => reinitialiser(l)} disabled={savingId === l.format_id} title="Revenir au prix comptoir"
                           className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50">
                           <RotateCcw size={14} />
                         </button>

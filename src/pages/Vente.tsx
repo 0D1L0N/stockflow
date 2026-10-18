@@ -12,6 +12,7 @@ import SoldesBandeau from "@/components/clients/SoldesBandeau";
 import { volumeFr, casiers } from "@/lib/format";
 import Avatar from "@/components/ui/Avatar";
 import { useTempsReel } from "@/lib/tempsReel";
+import { useAuthStore } from "@/stores/authStore";
 import Pastilles from "@/components/ui/Pastilles";
 import { familleDe, grouperParFamille, type CleFamille, type Rayon } from "@/lib/familles";
 
@@ -56,6 +57,10 @@ export default function Vente() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [famille, setFamille] = useState<"toutes" | CleFamille>("toutes");
+  const estGerant = useAuthStore((s) => s.profil?.role === "gerant");
+  // Prix modifié dans le panier (gérant) : format en cours d'édition et saisie
+  const [prixEdite, setPrixEdite] = useState<string | null>(null);
+  const [prixSaisi, setPrixSaisi] = useState("");
   const [showClientDrop, setShowClientDrop] = useState(false);
   const [clientSearch, setClientSearch] = useState("");
   const [showCart, setShowCart] = useState(false);
@@ -140,6 +145,21 @@ export default function Vente() {
       return;
     }
     addItem({ format_id: f.id, nom: produitNom, volume: f.volume, unite: f.unite, prix: prixDe(f), stock: f.stock });
+  };
+
+  /** Nouveau prix saisi au panier : appliqué à la vente et retenu dans les prix du client. */
+  const validerPrix = async (item: VenteItem) => {
+    const p = parseFloat(prixSaisi);
+    setPrixEdite(null);
+    if (isNaN(p) || p <= 0 || p === item.prix) return;
+    updatePrix(item.format_id, p);
+    const nomme = selectedClient && selectedClient.est_defaut !== 1;
+    if (!nomme) return;
+    try {
+      await invoke("set_prix_client", { clientId: client_id, formatId: item.format_id, prix: p });
+      setPrixClient(prev => ({ ...prev, [item.format_id]: p }));
+      toast(`Prix de ${selectedClient.nom} mis à jour`, "success");
+    } catch (e) { toast(String(e), "error"); }
   };
 
   const handleUpdateQty = (format_id: string, newQty: number) => {
@@ -294,7 +314,20 @@ export default function Vente() {
                         <Plus size={11} />
                       </button>
                     </div>
-                    <span className="text-xs text-gray-400">× {formatPrix(item.prix)}</span>
+                    {prixEdite === item.format_id ? (
+                      <input type="number" min="0" autoFocus value={prixSaisi} aria-label="Prix du casier"
+                        onChange={e => setPrixSaisi(e.target.value)}
+                        onBlur={() => validerPrix(item)}
+                        onKeyDown={e => { if (e.key === "Enter") validerPrix(item); if (e.key === "Escape") setPrixEdite(null); }}
+                        className="w-24 h-7 rounded-lg border border-secondary-600 px-2 text-xs font-semibold text-right focus:outline-none" />
+                    ) : estGerant ? (
+                      <button onClick={() => { setPrixEdite(item.format_id); setPrixSaisi(String(item.prix)); }}
+                        title="Modifier le prix" className="text-xs text-gray-500 underline decoration-dotted underline-offset-2 hover:text-ink-900">
+                        × {formatPrix(item.prix)}
+                      </button>
+                    ) : (
+                      <span className="text-xs text-gray-400">× {formatPrix(item.prix)}</span>
+                    )}
                   </div>
                 </div>
                 <div className="flex flex-col items-end gap-1">
@@ -705,8 +738,7 @@ function ProduitCard({
         <div className="chiffre text-[17px] font-extrabold text-ink-900 leading-tight">{formatPrix(prixDe(fmt))}</div>
         {prixSpecifique && (
           <div className="text-[11px] text-gray-400">
-            <span className="line-through">{formatPrix(fmt.prix)}</span>
-            <span className="ml-1 font-semibold text-secondary-700">prix client</span>
+            <span className="font-semibold text-secondary-700">prix du client</span>
           </div>
         )}
       </div>

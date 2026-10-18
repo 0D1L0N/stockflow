@@ -309,7 +309,7 @@ export default function Produits() {
               </div>
             </div>
           )}
-          <Input label={fUnite === "pack" ? "Prix du pack" : "Prix du casier"} type="number" value={fPrix} onChange={e => setFPrix(e.target.value)} placeholder="ex. : 6000" />
+          <Input label={fUnite === "pack" ? "Prix comptoir du pack" : "Prix comptoir du casier"} type="number" value={fPrix} onChange={e => setFPrix(e.target.value)} placeholder="ex. : 6000" />
           {!editFormat && (
             <Input label="Stock initial (casiers)" type="number" value={fStock} onChange={e => setFStock(e.target.value)} placeholder="0" />
           )}
