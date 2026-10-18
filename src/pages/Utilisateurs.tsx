@@ -119,16 +119,16 @@ export default function Utilisateurs() {
               </div>
               <div className="flex items-center gap-1 flex-shrink-0">
                 <button onClick={() => envoyerReinitialisation(u)} title="Envoyer un lien de nouveau mot de passe"
-                  className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-primary transition-colors">
+                  className="p-2.5 rounded-xl hover:bg-gray-100 text-gray-400 hover:text-primary transition-colors">
                   <KeyRound size={15} />
                 </button>
                 <button onClick={() => openEdit(u)} title="Modifier le nom ou le rôle"
-                  className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-primary transition-colors">
+                  className="p-2.5 rounded-xl hover:bg-gray-100 text-gray-400 hover:text-primary transition-colors">
                   <Edit2 size={15} />
                 </button>
                 {!soiMeme && (
                   <button onClick={() => basculerActif(u)} title={u.actif ? "Désactiver" : "Réactiver"}
-                    className={["p-1.5 rounded-lg transition-colors text-gray-400",
+                    className={["p-2.5 rounded-xl transition-colors text-gray-400",
                       u.actif ? "hover:bg-red-50 hover:text-danger" : "hover:bg-green-50 hover:text-secondary"].join(" ")}>
                     {u.actif ? <UserX size={15} /> : <UserCheck size={15} />}
                   </button>

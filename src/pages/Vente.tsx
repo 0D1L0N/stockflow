@@ -15,6 +15,7 @@ import { useTempsReel } from "@/lib/tempsReel";
 import { useAuthStore } from "@/stores/authStore";
 import Pastilles from "@/components/ui/Pastilles";
 import { familleDe, grouperParFamille, type CleFamille, type Rayon } from "@/lib/familles";
+import { useRetourFerme } from "@/lib/retour";
 
 interface Format { casier?: number | null; id: string; produit_id: string; volume: number; unite: string; prix: number; stock: number; seuil_alerte: number; emballage_id?: string | null; }
 interface ProduitAvecFormats { produit: { id: string; nom: string; rayon?: Rayon | null }; formats: Format[]; }
@@ -64,6 +65,7 @@ export default function Vente() {
   const [showClientDrop, setShowClientDrop] = useState(false);
   const [clientSearch, setClientSearch] = useState("");
   const [showCart, setShowCart] = useState(false);
+  useRetourFerme(showCart, () => setShowCart(false));
   const [montantRecuStr, setMontantRecuStr] = useState(montant_recu > 0 ? String(montant_recu) : "");
   const [validating, setValidating] = useState(false);
   const [venteResult, setVenteResult] = useState<VenteResult | null>(null);
@@ -305,13 +307,16 @@ export default function Vente() {
                   <div className="flex items-center gap-2 mt-1.5">
                     <div className="flex items-center border border-slate-200 rounded-lg overflow-hidden">
                       <button aria-label="Un casier de moins" onClick={() => handleUpdateQty(item.format_id, item.quantite - 1)}
-                        className="w-7 h-7 bg-slate-50 flex items-center justify-center hover:bg-gray-100 transition-colors">
-                        <Minus size={11} />
+                        className="w-10 h-10 bg-slate-50 flex items-center justify-center hover:bg-gray-100 transition-colors">
+                        <Minus size={14} />
                       </button>
-                      <span className="w-8 text-center text-sm font-semibold text-gray-800">{item.quantite}</span>
+                      <input type="number" inputMode="numeric" min="1" value={item.quantite} aria-label={`Nombre de casiers ${item.nom}`}
+                        onFocus={e => e.target.select()}
+                        onChange={e => { const n = parseInt(e.target.value); if (n >= 1) handleUpdateQty(item.format_id, n); }}
+                        className="w-12 h-10 text-center text-sm font-semibold text-gray-800 focus:outline-none" />
                       <button aria-label="Un casier de plus" onClick={() => handleUpdateQty(item.format_id, item.quantite + 1)}
-                        className="w-7 h-7 bg-slate-50 flex items-center justify-center hover:bg-gray-100 transition-colors">
-                        <Plus size={11} />
+                        className="w-10 h-10 bg-slate-50 flex items-center justify-center hover:bg-gray-100 transition-colors">
+                        <Plus size={14} />
                       </button>
                     </div>
                     {prixEdite === item.format_id ? (
@@ -333,8 +338,8 @@ export default function Vente() {
                 <div className="flex flex-col items-end gap-1">
                   <span className="font-bold text-sm text-gray-800">{formatPrix(item.sous_total)}</span>
                   <button aria-label={`Retirer ${item.nom} du panier`} onClick={() => removeItem(item.format_id)}
-                    className="p-1 rounded hover:bg-red-50 text-gray-300 hover:text-danger transition-colors">
-                    <Trash2 size={13} />
+                    className="p-2.5 -m-1.5 rounded-xl hover:bg-red-50 text-gray-400 hover:text-danger transition-colors">
+                    <Trash2 size={16} />
                   </button>
                 </div>
               </div>
@@ -470,7 +475,7 @@ export default function Vente() {
             <ShoppingCart size={22} />
           </span>
           <div className="flex-1 min-w-0">
-            <h1 className="font-extrabold text-[22px] sm:text-[28px] leading-tight">Nouvelle vente</h1>
+            <h1 className="font-extrabold text-[20px] sm:text-[28px] leading-tight whitespace-nowrap">Nouvelle vente</h1>
             <div className="text-ink-300 text-[13px] mt-0.5 truncate">
               {selectedClient && selectedClient.est_defaut !== 1 ? <>Client : <span className="text-white font-semibold">{selectedClient.nom}</span></> : "Vente au comptoir"}
             </div>
@@ -611,7 +616,7 @@ export default function Vente() {
       {showCart && (
         <>
           <div className="fixed inset-0 z-[45] bg-slate-900/40 backdrop-blur-[2px] animate-fade-in lg:hidden" onClick={() => setShowCart(false)} />
-          <div className="fixed bottom-0 left-0 right-0 z-50 lg:hidden bg-white rounded-t-3xl max-h-[88vh] flex flex-col overflow-hidden shadow-modal animate-slide-up pb-safe">
+          <div className="fixed bottom-0 left-0 right-0 z-50 lg:hidden bg-white rounded-t-3xl max-h-[88dvh] flex flex-col overflow-hidden shadow-modal animate-slide-up pb-safe">
             <div className="flex items-center justify-between px-4 pt-3 pb-1">
               <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto" />
             </div>

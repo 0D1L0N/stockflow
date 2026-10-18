@@ -7,11 +7,13 @@ import {
 import { useAppStore } from "@/stores/appStore";
 import { useAuthStore } from "@/stores/authStore";
 import { peutAcceder, ROLE_LABELS } from "@/lib/roles";
+import { useRetourFerme } from "@/lib/retour";
 
 interface Item { to: string; icon: (taille: number) => React.ReactNode; label: string; badge?: number; }
 
 export default function BottomNav() {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  useRetourFerme(drawerOpen, () => setDrawerOpen(false));
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const nombreAlertes = useAppStore((s) => s.nombreAlertes);

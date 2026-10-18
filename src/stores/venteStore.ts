@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
 import { CLIENT_DEFAUT } from "@/lib/api";
 
 export interface VenteItem { casier?: number | null;
@@ -34,7 +35,9 @@ function sumItems(items: VenteItem[]): number {
   return items.reduce((s, i) => s + i.sous_total, 0);
 }
 
-export const useVenteStore = create<VenteStore>((set, get) => ({
+// Le panier en cours est gardé sur l'appareil : il survit si Android ferme l'application
+// (passage sur WhatsApp, appel…) ou si la page est rechargée.
+export const useVenteStore = create<VenteStore>()(persist((set, get) => ({
   client_id: CLIENT_DEFAUT,
   items: [],
   total: 0,
@@ -111,4 +114,8 @@ export const useVenteStore = create<VenteStore>((set, get) => ({
 
   resetPanier: () =>
     set({ client_id: CLIENT_DEFAUT, items: [], total: 0, montant_recu: 0, monnaie_rendue: 0 }),
+}), {
+  name: "stockflow.panier",
+  storage: createJSONStorage(() => localStorage),
+  partialize: (s) => ({ client_id: s.client_id, items: s.items, total: s.total, montant_recu: s.montant_recu, monnaie_rendue: s.monnaie_rendue }),
 }));

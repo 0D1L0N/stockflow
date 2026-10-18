@@ -214,10 +214,10 @@ export default function Produits() {
                   </div>
                   {hasAlerte && <Badge variant="danger">Alerte</Badge>}
                   {estGerant && <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
-                    <button onClick={() => openEditProduit(produit)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-primary transition-colors">
+                    <button onClick={() => openEditProduit(produit)} className="p-2.5 rounded-xl hover:bg-gray-100 text-gray-400 hover:text-primary transition-colors">
                       <Edit2 size={15} />
                     </button>
-                    <button onClick={() => deleteProduit(produit)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-danger transition-colors">
+                    <button onClick={() => deleteProduit(produit)} className="p-2.5 rounded-xl hover:bg-red-50 text-gray-400 hover:text-danger transition-colors">
                       <Trash2 size={15} />
                     </button>
                   </div>}
@@ -241,11 +241,11 @@ export default function Produits() {
                         {estGerant && (
                           <div className="flex items-center">
                             <button onClick={() => openEditFormat(f)} aria-label="Modifier le format"
-                              className="p-1.5 rounded-lg hover:bg-slate-100 text-gray-400 hover:text-primary transition-colors">
+                              className="p-2.5 rounded-xl hover:bg-slate-100 text-gray-400 hover:text-primary transition-colors">
                               <Edit2 size={14} />
                             </button>
                             <button onClick={() => deleteFormat(f)} aria-label="Supprimer le format"
-                              className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-danger transition-colors">
+                              className="p-2.5 rounded-xl hover:bg-red-50 text-gray-400 hover:text-danger transition-colors">
                               <Trash2 size={14} />
                             </button>
                           </div>

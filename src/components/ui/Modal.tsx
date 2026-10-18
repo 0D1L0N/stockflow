@@ -1,5 +1,6 @@
 import { type ReactNode, useEffect } from "react";
 import { X } from "lucide-react";
+import { useRetourFerme } from "@/lib/retour";
 
 interface ModalProps {
   isOpen: boolean;
@@ -23,6 +24,7 @@ export default function Modal({ isOpen, onClose, title, children, size = "md" }:
     if (isOpen) document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [isOpen, onClose]);
+  useRetourFerme(isOpen, onClose);
 
   if (!isOpen) return null;
 
@@ -31,7 +33,7 @@ export default function Modal({ isOpen, onClose, title, children, size = "md" }:
       <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-[2px] animate-fade-in" onClick={onClose} />
       <div className={[
         "relative w-full bg-white shadow-modal flex flex-col animate-slide-up",
-        "rounded-t-3xl sm:rounded-2xl max-h-[92vh] sm:max-h-[90vh] pb-safe",
+        "rounded-t-3xl sm:rounded-2xl max-h-[92dvh] sm:max-h-[90dvh] pb-safe",
         sizes[size],
       ].join(" ")}>
         {/* Poignée visuelle sur téléphone */}

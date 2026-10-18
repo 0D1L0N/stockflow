@@ -54,7 +54,12 @@ export const useAuthStore = create<AuthStore>((set) => ({
     await signInWithEmailAndPassword(auth, email.trim(), motDePasse);
   },
 
-  deconnexion: async () => { await signOut(auth); },
+  deconnexion: async () => {
+    // Le panier en cours ne passe pas au compte suivant sur le même téléphone
+    try { localStorage.removeItem("stockflow.panier"); } catch { /* stockage indisponible */ }
+    await signOut(auth);
+    location.reload();
+  },
 
   proprietaireExiste: async () => {
     const snap = await getDoc(doc(db, "config", "proprietaire"));
