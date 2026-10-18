@@ -54,15 +54,15 @@ export default function Sidebar({ alertCount = 0 }: SidebarProps) {
   const nom = profil?.nom ?? "";
 
   return (
-    <aside className="w-64 bg-gradient-to-b from-primary-700 to-primary-900 flex flex-col h-full flex-shrink-0">
+    <aside className="w-64 bg-white border-r border-slate-200 flex flex-col h-full flex-shrink-0">
       <div className="px-5 pt-5 pb-4">
-        <Logo sousTitre="Gestion de dépôt" />
+        <Logo clair={false} sousTitre="Gestion de dépôt" />
       </div>
 
       <nav className="flex-1 px-3 pb-3 flex flex-col gap-4 overflow-y-auto scrollbar-fin">
         {visibles.map(section => (
           <div key={section.titre} className="flex flex-col gap-0.5">
-            <div className="px-3 pb-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-white/35">{section.titre}</div>
+            <div className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-400">{section.titre}</div>
             {section.items.map(item => (
               <NavLink
                 key={item.to}
@@ -71,13 +71,13 @@ export default function Sidebar({ alertCount = 0 }: SidebarProps) {
                 className={({ isActive }) => [
                   "group flex items-center gap-3 px-3 py-2 rounded-xl text-sm transition-all duration-150",
                   isActive
-                    ? "bg-white/10 text-white font-semibold shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]"
-                    : "text-white/65 hover:bg-white/[0.06] hover:text-white",
+                    ? "bg-slate-100 text-gray-900 font-semibold"
+                    : "text-gray-600 hover:bg-slate-50 hover:text-gray-900",
                 ].join(" ")}
               >
                 {({ isActive }) => (
                   <>
-                    <span className={isActive ? "text-secondary-400" : "text-white/50 group-hover:text-white/80"}>{item.icon}</span>
+                    <span className={isActive ? "text-secondary-600" : "text-gray-400 group-hover:text-gray-600"}>{item.icon}</span>
                     <span className="flex-1 truncate">{item.label}</span>
                     {item.badgeCount !== undefined && item.badgeCount > 0 && (
                       <span className="bg-danger text-white text-[10px] font-bold min-w-[20px] h-5 px-1.5 rounded-full flex items-center justify-center">
@@ -92,16 +92,16 @@ export default function Sidebar({ alertCount = 0 }: SidebarProps) {
         ))}
       </nav>
 
-      <div className="m-3 p-3 rounded-2xl bg-white/[0.06] flex items-center gap-3">
+      <div className="m-3 p-2.5 rounded-xl border border-slate-200 flex items-center gap-3">
         <div className="w-9 h-9 rounded-full bg-gradient-to-br from-secondary-400 to-secondary-600 flex items-center justify-center flex-shrink-0">
           <span className="text-white font-bold text-sm">{nom.charAt(0).toUpperCase()}</span>
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-white text-sm font-semibold truncate">{nom}</div>
-          <div className="text-white/45 text-[11px]">{profil ? ROLE_LABELS[profil.role] : ""}</div>
+          <div className="text-gray-900 text-sm font-semibold truncate">{nom}</div>
+          <div className="text-gray-500 text-[11px]">{profil ? ROLE_LABELS[profil.role] : ""}</div>
         </div>
         <button onClick={deconnexion} title="Se déconnecter" aria-label="Se déconnecter"
-          className="p-2 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-colors">
+          className="p-2 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-slate-100 transition-colors">
           <LogOut size={16} />
         </button>
       </div>

@@ -145,7 +145,7 @@ export default function ModalConfirmationVente({
         </div>
 
         {/* Récap financier */}
-        <div className="bg-gray-50 rounded-xl p-4 flex flex-col gap-2 text-sm">
+        <div className="bg-slate-50 rounded-xl p-4 flex flex-col gap-2 text-sm">
           <div className="flex justify-between">
             <span className="text-gray-500">N° de facture</span>
             <span className="font-mono font-bold text-primary">{numeroFacture}</span>
@@ -156,7 +156,7 @@ export default function ModalConfirmationVente({
           </div>
 
           {items.length > 0 && (
-            <div className="border-t border-gray-200 pt-2 mt-1 flex flex-col gap-1">
+            <div className="border-t border-slate-200 pt-2 mt-1 flex flex-col gap-1">
               {items.map(item => (
                 <div key={item.format_id} className="flex justify-between text-xs">
                   <span className="text-gray-600 truncate max-w-[60%]">
@@ -168,7 +168,7 @@ export default function ModalConfirmationVente({
             </div>
           )}
 
-          <div className="flex justify-between border-t border-gray-200 pt-2 mt-1">
+          <div className="flex justify-between border-t border-slate-200 pt-2 mt-1">
             <span className="font-bold text-gray-800">{compte ? "Total facture" : "Total encaissé"}</span>
             <span className="font-extrabold text-lg text-primary">{formatPrix(total)}</span>
           </div>
@@ -225,7 +225,7 @@ export default function ModalConfirmationVente({
         </button>
 
         {showApercu && (
-          <div className="border border-gray-200 rounded-xl overflow-y-auto max-h-72">
+          <div className="border border-slate-200 rounded-xl overflow-y-auto max-h-72">
             <FactureHTML data={getFactureData()} />
           </div>
         )}

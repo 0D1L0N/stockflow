@@ -133,7 +133,7 @@ export default function ModalBonCommande({ isOpen, onClose }: { isOpen: boolean;
         {loading ? <Skeleton variant="card" count={3} /> : visibles.length === 0 ? (
           <p className="text-sm text-gray-400 text-center py-6">Aucun produit en alerte. Cochez « Tous les produits ».</p>
         ) : (
-          <div className="flex flex-col divide-y divide-gray-100 border border-gray-100 rounded-xl max-h-80 overflow-y-auto">
+          <div className="flex flex-col divide-y divide-slate-100 border border-slate-200 rounded-xl max-h-80 overflow-y-auto">
             {visibles.map(l => (
               <div key={l.formatId} className="flex items-center gap-3 px-3 py-2">
                 <div className="flex-1 min-w-0">
@@ -153,7 +153,7 @@ export default function ModalBonCommande({ isOpen, onClose }: { isOpen: boolean;
         )}
 
         <div>
-          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Message</label>
+          <label className="text-[13px] font-medium text-gray-700 block mb-1.5">Message</label>
           <textarea value={note} onChange={e => setNote(e.target.value)} rows={2}
             className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:border-secondary" />
         </div>

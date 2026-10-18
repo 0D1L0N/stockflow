@@ -98,41 +98,41 @@ export default function Dashboard() {
     <div className="flex flex-col h-full overflow-hidden">
       <div className="flex-1 overflow-y-auto pb-24 lg:pb-8">
         {/* En-tête : salutation et chiffre du jour */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-primary-600 via-primary-700 to-primary-900 px-4 sm:px-6 pt-[calc(1.25rem+env(safe-area-inset-top))] pb-16">
-          <div className="absolute -top-20 -right-16 w-64 h-64 rounded-full bg-secondary/15 blur-3xl" />
-          <div className="relative max-w-5xl mx-auto">
+        <div className="bg-white border-b border-slate-200 px-4 sm:px-6 pt-[calc(1.25rem+env(safe-area-inset-top))] pb-6 sm:pt-8 sm:pb-8">
+          <div className="max-w-5xl mx-auto">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="text-white/60 text-xs">{today.charAt(0).toUpperCase() + today.slice(1)}</div>
-                <h1 className="text-white text-2xl font-extrabold tracking-tight mt-1">
-                  {salutation}{prenom ? `, ${prenom}` : ""} 👋
+                <div className="text-[13px] text-gray-500">{today.charAt(0).toUpperCase() + today.slice(1)}</div>
+                <h1 className="text-gray-900 text-xl sm:text-2xl font-bold tracking-tight mt-0.5">
+                  {salutation}{prenom ? `, ${prenom}` : ""}
                 </h1>
               </div>
               <button
                 onClick={loadAll}
-                className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors flex-shrink-0"
+                className="h-9 px-3 rounded-lg border border-slate-300 shadow-sm flex items-center gap-2 text-[13px] font-medium text-gray-700 hover:bg-slate-50 transition-colors flex-shrink-0"
                 title={lastRefresh ? `Actualisé à ${lastRefresh.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}` : "Actualiser"}
                 aria-label="Actualiser"
               >
-                <RefreshCw size={16} className={["text-white", loading ? "animate-spin" : ""].join(" ")} />
+                <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+                <span className="hidden sm:inline">Actualiser</span>
               </button>
             </div>
 
-            <div className="mt-5">
-              <div className="text-white/60 text-xs font-semibold uppercase tracking-wider">Chiffre d'affaires du jour</div>
+            <div className="mt-6">
+              <div className="text-[13px] font-medium text-gray-500">Chiffre d'affaires du jour</div>
               {loading ? (
-                <div className="h-10 w-48 mt-2 rounded-lg bg-white/10 animate-pulse" />
+                <div className="h-11 w-56 mt-2 rounded-lg bg-slate-100 animate-pulse" />
               ) : (
-                <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 mt-1">
-                  <span className="text-white text-4xl font-extrabold tracking-tight tabular-nums">{formatPrix(stats?.ca_jour ?? 0)}</span>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-1">
+                  <span className="text-gray-900 text-4xl sm:text-5xl font-bold tracking-tight tabular-nums">{formatPrix(stats?.ca_jour ?? 0)}</span>
                   {diffPct !== null ? (
-                    <span className={["inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full",
-                      diff >= 0 ? "bg-secondary/20 text-secondary-300" : "bg-red-500/20 text-red-300"].join(" ")}>
-                      {diff >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-                      {diff >= 0 ? "+" : ""}{diffPct} % par rapport à hier
+                    <span className={["inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-md",
+                      diff >= 0 ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"].join(" ")}>
+                      {diff >= 0 ? <TrendingUp size={13} /> : <TrendingDown size={13} />}
+                      {diff >= 0 ? "+" : ""}{diffPct} % vs hier
                     </span>
                   ) : (
-                    <span className="text-white/45 text-xs">Aucune vente hier pour comparer</span>
+                    <span className="text-gray-400 text-xs">Pas de vente hier pour comparer</span>
                   )}
                 </div>
               )}
@@ -140,7 +140,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 -mt-10 relative flex flex-col gap-5">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-5 sm:py-6 flex flex-col gap-5">
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-2xl px-4 py-3 flex items-center gap-3">
               <AlertTriangle size={16} className="text-danger flex-shrink-0" />
@@ -179,18 +179,18 @@ export default function Dashboard() {
               </>
             ) : (
               <>
-                <Indicateur titre="Ventes du jour" valeur={stats?.ventes_jour ?? 0}
+                <Indicateur titre="Ventes" valeur={stats?.ventes_jour ?? 0}
                   detail={(stats?.ventes_jour ?? 0) > 1 ? "ventes" : "vente"}
-                  icone={<ShoppingCart size={16} />} teinte="bg-primary-50 text-primary-600"
+                  icone={<ShoppingCart size={14} />} teinte="bg-primary-50 text-primary-600"
                   onClick={() => navigate("/historique")} />
                 <Indicateur titre="Alertes" valeur={enAlerte}
                   detail={enAlerte > 0 ? "en alerte" : "tout est OK"}
-                  icone={<Bell size={16} />}
+                  icone={<Bell size={14} />}
                   teinte={enAlerte > 0 ? "bg-red-50 text-danger" : "bg-secondary-50 text-secondary-600"}
                   valeurClasse={enAlerte > 0 ? "text-danger" : "text-secondary-600"}
                   onClick={() => navigate("/alertes")} />
                 <Indicateur titre="Produits" valeur={stats?.total_produits ?? 0}
-                  detail={(stats?.total_produits ?? 0) > 1 ? "références" : "référence"} icone={<Package size={16} />} teinte="bg-amber-50 text-amber-600"
+                  detail={(stats?.total_produits ?? 0) > 1 ? "références" : "référence"} icone={<Package size={14} />} teinte="bg-amber-50 text-amber-600"
                   onClick={() => navigate("/produits")} />
               </>
             )}
@@ -198,12 +198,12 @@ export default function Dashboard() {
 
           {/* Ce que les clients doivent au dépôt : argent et casiers */}
           {!loading && stats && (stats.total_dettes > 0 || stats.emballages_dehors.length > 0) && (
-            <Card onClick={() => navigate("/clients")} className="flex flex-col gap-3 bg-gradient-to-br from-orange-50 to-white border-orange-100">
+            <Card onClick={() => navigate("/clients")} className="flex flex-col gap-3">
               <div className="flex items-center justify-between">
-                <span className="flex items-center gap-2 text-xs font-bold text-orange-800 uppercase tracking-wide">
-                  <Wallet size={15} /> Ce que les clients doivent
+                <span className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+                  <Wallet size={16} className="text-orange-600" /> Ce que les clients doivent
                 </span>
-                <span className="flex items-center text-xs text-orange-700 font-semibold">Voir <ChevronRight size={14} /></span>
+                <span className="flex items-center text-[13px] text-gray-500 font-medium">Voir <ChevronRight size={14} /></span>
               </div>
               <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
                 {stats.total_dettes > 0 && (
@@ -316,13 +316,15 @@ function Indicateur({ titre, valeur, detail, icone, teinte, valeurClasse = "text
   teinte: string; valeurClasse?: string; onClick?: () => void;
 }) {
   return (
-    <Card onClick={onClick} padding="sm" className="flex flex-col gap-2 sm:p-4">
-      <div className={["w-9 h-9 rounded-xl flex items-center justify-center", teinte].join(" ")}>{icone}</div>
-      <div>
-        <div className={["text-2xl font-extrabold leading-none tabular-nums", valeurClasse].join(" ")}>{valeur}</div>
-        <div className="text-[11px] text-gray-500 mt-1 leading-tight">{detail}</div>
+    <Card onClick={onClick} padding="sm" className="flex flex-col gap-3 sm:p-5">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[12px] sm:text-[13px] font-medium text-gray-500 truncate">{titre}</span>
+        <span className={["hidden sm:flex w-7 h-7 rounded-md items-center justify-center flex-shrink-0", teinte].join(" ")}>{icone}</span>
       </div>
-      <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide hidden sm:block">{titre}</div>
+      <div>
+        <div className={["text-2xl sm:text-3xl font-bold tracking-tight leading-none tabular-nums", valeurClasse].join(" ")}>{valeur}</div>
+        <div className="text-[12px] text-gray-500 mt-1.5 leading-tight">{detail}</div>
+      </div>
     </Card>
   );
 }

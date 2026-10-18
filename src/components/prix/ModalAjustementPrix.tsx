@@ -26,7 +26,7 @@ interface Props {
 }
 
 const selectCls = "w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-secondary/40 focus:border-secondary";
-const labelCls = "text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5";
+const labelCls = "text-[13px] font-medium text-gray-700 block mb-1.5";
 
 export default function ModalAjustementPrix({ isOpen, onClose, onApplied, clientFixe }: Props) {
   const { toast } = useToast();
@@ -123,8 +123,8 @@ export default function ModalAjustementPrix({ isOpen, onClose, onApplied, client
         </div>
 
         {apercu && (
-          <div className="border border-gray-100 rounded-xl overflow-hidden">
-            <div className="px-3 py-2 bg-gray-50 text-xs font-semibold text-gray-600">
+          <div className="border border-slate-200 rounded-xl overflow-hidden">
+            <div className="px-3 py-2 bg-slate-50 text-xs font-semibold text-gray-600">
               Aperçu : {nbModifies} prix modifié{nbModifies > 1 ? "s" : ""} sur {apercu.length}
             </div>
             <div className="max-h-64 overflow-y-auto divide-y divide-gray-50">

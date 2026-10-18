@@ -143,7 +143,7 @@ export default function Reappro() {
         }
       />
 
-      <div className="flex-1 overflow-y-auto p-4 pb-28 lg:pb-6 flex flex-col gap-4">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-28 lg:pb-8 [&>*]:w-full [&>*]:max-w-4xl [&>*]:mx-auto flex flex-col gap-4">
         {/* Formats en alerte */}
         <div className="flex flex-col gap-3">
           {loading ? (
@@ -230,7 +230,7 @@ export default function Reappro() {
       <Modal isOpen={modal} onClose={() => setModal(false)} title="Réapprovisionnement">
         {selectedFormat && (
           <div className="p-6 flex flex-col gap-4">
-            <div className="bg-gray-50 rounded-lg p-3 text-sm">
+            <div className="bg-slate-50 rounded-lg p-3 text-sm">
               <div className="font-semibold">{selectedFormat.produit_nom} {volumeFr(selectedFormat.volume, selectedFormat.unite)}</div>
               <div className="text-gray-500 mt-0.5">Stock actuel : <strong className="text-danger">{selectedFormat.stock}</strong></div>
             </div>
@@ -258,7 +258,7 @@ export default function Reappro() {
       <Modal isOpen={modalAjust} onClose={() => setModalAjust(false)} title="Ajustement de stock">
         {selectedFormat && (
           <div className="p-6 flex flex-col gap-4">
-            <div className="bg-gray-50 rounded-lg p-3 text-sm">
+            <div className="bg-slate-50 rounded-lg p-3 text-sm">
               <div className="font-semibold">{selectedFormat.produit_nom} {volumeFr(selectedFormat.volume, selectedFormat.unite)}</div>
               <div className="text-gray-500 mt-0.5">Stock actuel : <strong>{selectedFormat.stock}</strong></div>
             </div>

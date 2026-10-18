@@ -117,7 +117,7 @@ export default function AjustementStock() {
         subtitle="Correction manuelle des quantités"
       />
 
-      <div className="flex-1 overflow-y-auto p-4 pb-28 lg:pb-6 flex flex-col gap-4">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-28 lg:pb-8 [&>*]:w-full [&>*]:max-w-4xl [&>*]:mx-auto flex flex-col gap-4">
         {/* Formulaire */}
         <Card className="flex flex-col gap-4">
           <div className="flex items-center gap-2 mb-1">
@@ -127,7 +127,7 @@ export default function AjustementStock() {
 
           {/* Sélection produit */}
           <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">
+            <label className="text-[13px] font-medium text-gray-700 block mb-1.5">
               Produit
             </label>
             <select
@@ -145,7 +145,7 @@ export default function AjustementStock() {
           {/* Sélection format */}
           {selectedProduit && selectedProduit.formats.length > 0 && (
             <div>
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">
+              <label className="text-[13px] font-medium text-gray-700 block mb-1.5">
                 Format
               </label>
               <select
@@ -162,7 +162,7 @@ export default function AjustementStock() {
 
           {/* Stock actuel */}
           {selectedFormat && (
-            <div className="bg-gray-50 rounded-xl p-4 text-center">
+            <div className="bg-slate-50 rounded-xl p-4 text-center">
               <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">
                 Stock actuel
               </div>
@@ -177,7 +177,7 @@ export default function AjustementStock() {
           {selectedFormat && (
             <>
               <div>
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-2">
+                <label className="text-[13px] font-medium text-gray-700 block mb-2">
                   Type d'ajustement
                 </label>
                 <div className="grid grid-cols-2 gap-2">
@@ -186,7 +186,7 @@ export default function AjustementStock() {
                       className={["rounded-lg border-2 px-3 py-2.5 text-sm font-medium transition-all",
                         mode === m
                           ? "border-secondary bg-green-50 text-secondary"
-                          : "border-gray-200 text-gray-500 hover:border-gray-300"].join(" ")}>
+                          : "border-slate-200 text-gray-500 hover:border-gray-300"].join(" ")}>
                       {m === "absolu" ? "Nouveau stock" : "Ajuster par différence"}
                     </button>
                   ))}
@@ -194,7 +194,7 @@ export default function AjustementStock() {
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">
+                <label className="text-[13px] font-medium text-gray-700 block mb-1.5">
                   {mode === "absolu" ? "Nouveau stock (valeur absolue)" : "Différence (+/-)"}
                 </label>
                 <input
@@ -223,7 +223,7 @@ export default function AjustementStock() {
 
               {/* Raison */}
               <div>
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">
+                <label className="text-[13px] font-medium text-gray-700 block mb-1.5">
                   Raison <span className="text-danger">*</span>
                 </label>
                 <textarea
@@ -260,7 +260,7 @@ export default function AjustementStock() {
           ) : (
             <Card padding="none">
               {/* En-tête */}
-              <div className="hidden sm:grid grid-cols-5 gap-3 px-4 py-2.5 bg-gray-50 text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-100">
+              <div className="hidden sm:grid grid-cols-5 gap-3 px-4 py-2.5 bg-slate-50 text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-slate-200">
                 <span className="col-span-2">Produit</span>
                 <span>Avant</span>
                 <span>Après</span>

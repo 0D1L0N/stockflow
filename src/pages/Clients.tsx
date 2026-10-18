@@ -94,19 +94,19 @@ export default function Clients() {
       <Header title="Clients" subtitle={`${clients.length} client${clients.length > 1 ? "s" : ""}`}
         actions={<Button icon={<Plus size={16} />} onClick={openNew}>Nouveau client</Button>} />
 
-      <div className="flex-1 overflow-y-auto p-4 pb-28 lg:pb-6 flex flex-col gap-3">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-28 lg:pb-8 [&>*]:w-full [&>*]:max-w-4xl [&>*]:mx-auto flex flex-col gap-3">
         <Input placeholder="Rechercher par nom ou téléphone…" value={search}
           onChange={e => setSearch(e.target.value)} icon={<Search size={16} />} />
 
         <div className="flex gap-2">
           <button onClick={() => setSeulementDebiteurs(false)}
             className={["px-3 py-1.5 rounded-full text-xs font-semibold transition-colors",
-              !seulementDebiteurs ? "bg-primary text-white" : "bg-white text-gray-600 border border-gray-200"].join(" ")}>
+              !seulementDebiteurs ? "bg-primary text-white" : "bg-white text-gray-600 border border-slate-200"].join(" ")}>
             Tous
           </button>
           <button onClick={() => setSeulementDebiteurs(true)}
             className={["px-3 py-1.5 rounded-full text-xs font-semibold transition-colors",
-              seulementDebiteurs ? "bg-orange-600 text-white" : "bg-white text-gray-600 border border-gray-200"].join(" ")}>
+              seulementDebiteurs ? "bg-orange-600 text-white" : "bg-white text-gray-600 border border-slate-200"].join(" ")}>
             Doivent quelque chose ({nbDebiteurs})
           </button>
         </div>

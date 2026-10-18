@@ -36,7 +36,7 @@ export default {
         danger:  '#ef4444',
         warning: '#f59e0b',
         info:    '#3b82f6',
-        background: '#f4f6fa',
+        background: '#f7f8fa',
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
@@ -46,11 +46,11 @@ export default {
       },
       boxShadow: {
         // Ombres douces et superposées : relief discret sur fond clair
-        card: '0 1px 2px rgba(15,23,42,0.04), 0 1px 3px rgba(15,23,42,0.06)',
-        'card-hover': '0 4px 12px rgba(15,23,42,0.08), 0 2px 4px rgba(15,23,42,0.05)',
+        card: '0 1px 2px rgba(15,23,42,0.04)',
+        'card-hover': '0 2px 8px rgba(15,23,42,0.06)',
         modal: '0 24px 48px -12px rgba(15,23,42,0.25), 0 8px 16px -8px rgba(15,23,42,0.15)',
         sticky: '0 -4px 16px rgba(15,23,42,0.06)',
-        glow: '0 6px 20px -4px rgba(16,185,129,0.45)',
+        glow: '0 4px 14px -4px rgba(16,185,129,0.4)',
       },
       keyframes: {
         'fade-in': { from: { opacity: '0' }, to: { opacity: '1' } },

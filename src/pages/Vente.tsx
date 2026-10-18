@@ -260,7 +260,7 @@ export default function Vente() {
         ) : (
           <div className="p-3 flex flex-col gap-2">
             {items.map((item) => (
-              <div key={item.format_id} className="flex gap-3 items-start pb-2 border-b border-gray-50 last:border-0">
+              <div key={item.format_id} className="flex gap-3 items-start pb-2 border-b border-slate-100 last:border-0">
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-semibold text-gray-800 truncate">{item.nom}</div>
                   <div className="text-xs text-gray-400">{volumeFr(item.volume, item.unite)}</div>
@@ -268,14 +268,14 @@ export default function Vente() {
                     <div className="text-[10px] text-danger font-semibold mt-0.5">Stock insuffisant !</div>
                   )}
                   <div className="flex items-center gap-2 mt-1.5">
-                    <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
+                    <div className="flex items-center border border-slate-200 rounded-lg overflow-hidden">
                       <button aria-label="Un casier de moins" onClick={() => handleUpdateQty(item.format_id, item.quantite - 1)}
-                        className="w-7 h-7 bg-gray-50 flex items-center justify-center hover:bg-gray-100 transition-colors">
+                        className="w-7 h-7 bg-slate-50 flex items-center justify-center hover:bg-gray-100 transition-colors">
                         <Minus size={11} />
                       </button>
                       <span className="w-8 text-center text-sm font-semibold text-gray-800">{item.quantite}</span>
                       <button aria-label="Un casier de plus" onClick={() => handleUpdateQty(item.format_id, item.quantite + 1)}
-                        className="w-7 h-7 bg-gray-50 flex items-center justify-center hover:bg-gray-100 transition-colors">
+                        className="w-7 h-7 bg-slate-50 flex items-center justify-center hover:bg-gray-100 transition-colors">
                         <Plus size={11} />
                       </button>
                     </div>
@@ -296,7 +296,7 @@ export default function Vente() {
       </div>
 
       {items.length > 0 && (
-        <div className="border-t border-gray-100 p-4 flex flex-col gap-3">
+        <div className="border-t border-slate-200 p-4 flex flex-col gap-3">
           {/* Casiers consignés : livrés / rendus sur place */}
           {typesCasiers.length > 0 && (
             <div className="flex flex-col gap-1.5">
@@ -348,7 +348,7 @@ export default function Vente() {
 
           {paiementPartiel ? (
             <div>
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">
+              <label className="text-[13px] font-medium text-gray-700 block mb-1.5">
                 Montant payé maintenant
               </label>
               <div className="relative">
@@ -360,9 +360,9 @@ export default function Vente() {
               {ancienSolde > 0 && (
                 <div className="flex gap-2 mt-2">
                   <button type="button" onClick={() => setMontantPayeStr(String(total))}
-                    className="flex-1 text-xs font-semibold py-1.5 rounded-xl border border-slate-200 hover:bg-gray-50">Achat seul</button>
+                    className="flex-1 text-xs font-semibold py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50">Achat seul</button>
                   <button type="button" onClick={() => setMontantPayeStr(String(totalGeneral))}
-                    className="flex-1 text-xs font-semibold py-1.5 rounded-xl border border-slate-200 hover:bg-gray-50">Tout régler</button>
+                    className="flex-1 text-xs font-semibold py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50">Tout régler</button>
                 </div>
               )}
               {ancienSolde + resteDu > 0 ? (
@@ -379,7 +379,7 @@ export default function Vente() {
             </div>
           ) : (
             <div>
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">
+              <label className="text-[13px] font-medium text-gray-700 block mb-1.5">
                 Montant reçu (optionnel)
               </label>
               <div className="relative">
@@ -403,7 +403,7 @@ export default function Vente() {
             </p>
           )}
           <button onClick={() => validerVente()} disabled={validating}
-            className="w-full bg-secondary text-white font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 text-sm shadow-[0_4px_12px_rgba(16,185,129,0.35)] hover:bg-secondary-600 active:scale-[0.98] transition-all disabled:opacity-60">
+            className="w-full h-12 bg-secondary-600 text-white font-semibold rounded-lg flex items-center justify-center gap-2 text-[15px] shadow-sm hover:bg-secondary-700 active:translate-y-px transition-colors disabled:opacity-60">
             <Check size={16} strokeWidth={2.5} />
             {validating ? "Validation…" : "Valider la vente"}
           </button>
@@ -415,13 +415,13 @@ export default function Vente() {
   return (
     <div className="flex flex-col h-full overflow-hidden bg-background">
       {/* Header */}
-      <div className="bg-gradient-to-r from-primary-700 to-primary-600 px-4 sm:px-6 pb-3.5 pt-[calc(0.875rem+env(safe-area-inset-top))] flex items-center gap-3 flex-shrink-0">
+      <div className="bg-white border-b border-slate-200 px-4 sm:px-6 pb-3.5 sm:pb-5 pt-[calc(0.875rem+env(safe-area-inset-top))] sm:pt-[calc(1.25rem+env(safe-area-inset-top))] flex items-center gap-3 flex-shrink-0">
         <div className="flex-1">
-          <div className="text-white font-bold text-base">Nouvelle vente</div>
-          <div className="text-white/50 text-xs">Enregistrer une commande</div>
+          <h1 className="text-gray-900 font-bold text-lg sm:text-[22px] tracking-tight leading-tight">Nouvelle vente</h1>
+          <div className="text-gray-500 text-[13px] mt-0.5">Choisissez le client puis les produits</div>
         </div>
-        <button onClick={() => setShowCart(true)} className="lg:hidden relative w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center">
-          <ShoppingCart size={18} className="text-white" />
+        <button onClick={() => setShowCart(true)} className="lg:hidden relative w-10 h-10 rounded-lg border border-slate-300 shadow-sm flex items-center justify-center" aria-label="Voir le panier">
+          <ShoppingCart size={18} className="text-gray-700" />
           {items.length > 0 && (
             <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 bg-secondary rounded-full text-[10px] font-bold text-white flex items-center justify-center">
               {items.reduce((s, i) => s + i.quantite, 0)}
@@ -435,7 +435,7 @@ export default function Vente() {
         <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3 pb-40 lg:pb-4">
           {/* Sélection client */}
           <div className="relative">
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Client</label>
+            <label className="text-[13px] font-medium text-gray-700 block mb-1.5">Client</label>
             <button onClick={() => setShowClientDrop(!showClientDrop)}
               className={["w-full flex items-center gap-2.5 px-3 py-2.5 bg-white border rounded-xl text-sm transition-colors",
                 showClientDrop ? "border-secondary ring-2 ring-secondary/20" : "border-gray-300"].join(" ")}>
@@ -446,15 +446,15 @@ export default function Vente() {
               <ChevronDown size={14} className={["text-gray-400 transition-transform", showClientDrop ? "rotate-180" : ""].join(" ")} />
             </button>
             {showClientDrop && (
-              <div className="absolute top-full mt-1 left-0 right-0 z-40 bg-white border border-gray-200 rounded-xl shadow-modal overflow-hidden">
-                <div className="p-2 border-b border-gray-100">
+              <div className="absolute top-full mt-1 left-0 right-0 z-40 bg-white border border-slate-200 rounded-xl shadow-modal overflow-hidden">
+                <div className="p-2 border-b border-slate-200">
                   <input autoFocus value={clientSearch} onChange={e => setClientSearch(e.target.value)}
-                    placeholder="Rechercher…" className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-secondary" />
+                    placeholder="Rechercher…" className="w-full px-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-secondary" />
                 </div>
                 <div className="max-h-48 overflow-y-auto">
                   {filteredClients.map(c => (
                     <button key={c.id} onClick={() => { setClient(c.id); setShowClientDrop(false); setClientSearch(""); }}
-                      className={["w-full flex items-center gap-3 px-3 py-2.5 text-left border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors",
+                      className={["w-full flex items-center gap-3 px-3 py-2.5 text-left border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors",
                         client_id === c.id ? "bg-green-50" : ""].join(" ")}>
                       <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
                         <span className="text-white font-bold text-xs">{c.nom[0]}</span>
@@ -516,10 +516,10 @@ export default function Vente() {
       {items.length > 0 && !showCart && (
         <button onClick={() => setShowCart(true)}
           className="lg:hidden fixed left-3 right-3 z-30 bottom-[calc(72px+env(safe-area-inset-bottom))] h-14 px-4 rounded-2xl
-            bg-primary-700 text-white shadow-modal flex items-center gap-3 animate-slide-up active:scale-[0.98] transition-transform">
+            bg-secondary-600 text-white shadow-modal flex items-center gap-3 animate-slide-up active:scale-[0.98] transition-transform">
           <span className="relative">
             <ShoppingCart size={20} />
-            <span className="absolute -top-2 -right-2 min-w-[18px] h-[18px] px-1 bg-secondary rounded-full text-[10px] font-bold flex items-center justify-center">
+            <span className="absolute -top-2 -right-2 min-w-[18px] h-[18px] px-1 bg-white text-secondary-700 rounded-full text-[10px] font-bold flex items-center justify-center">
               {items.reduce((s, i) => s + i.quantite, 0)}
             </span>
           </span>
@@ -612,10 +612,10 @@ function ProduitCard({
   const inCart = cartItems.find(i => i.format_id === fmt.id);
 
   return (
-    <div className={["relative bg-white rounded-2xl p-3 flex flex-col gap-2.5 shadow-card border transition-all",
-      outOfStock ? "border-slate-200/70 opacity-60" : inCart ? "border-secondary ring-2 ring-secondary/15" : "border-slate-200/70 hover:shadow-card-hover"].join(" ")}>
+    <div className={["relative bg-white rounded-xl p-3 sm:p-4 flex flex-col gap-2.5 shadow-card border transition-colors",
+      outOfStock ? "border-slate-200 opacity-60" : inCart ? "border-secondary-600 ring-1 ring-secondary-600" : "border-slate-200 hover:border-slate-300"].join(" ")}>
       {inCart && (
-        <span className="absolute -top-2 -right-2 min-w-[24px] h-6 px-1.5 rounded-full bg-secondary text-white text-xs font-bold flex items-center justify-center shadow-glow">
+        <span className="absolute -top-2 -right-2 min-w-[24px] h-6 px-1.5 rounded-full bg-secondary-600 text-white text-xs font-bold flex items-center justify-center ring-2 ring-white">
           {inCart.quantite}
         </span>
       )}
@@ -634,7 +634,7 @@ function ProduitCard({
           {formats.map((f, i) => (
             <button key={f.id} onClick={() => setFormatIdx(i)}
               className={["px-2 py-1 rounded-lg text-[11px] font-semibold border transition-colors",
-                i === formatIdx ? "bg-primary text-white border-primary" : "bg-white text-gray-600 border-slate-200 hover:border-slate-300"].join(" ")}>
+                i === formatIdx ? "bg-gray-900 text-white border-gray-900" : "bg-white text-gray-600 border-slate-300 hover:border-slate-400"].join(" ")}>
               {volumeFr(f.volume, f.unite)}
             </button>
           ))}
@@ -653,7 +653,7 @@ function ProduitCard({
       )}
 
       <div className="mt-auto">
-        <div className="text-base font-extrabold text-primary-700 tabular-nums leading-tight">{formatPrix(prixDe(fmt))}</div>
+        <div className="text-base font-bold text-gray-900 tabular-nums leading-tight">{formatPrix(prixDe(fmt))}</div>
         {prixSpecifique && (
           <div className="text-[11px] text-gray-400">
             <span className="line-through">{formatPrix(fmt.prix)}</span>
@@ -663,7 +663,7 @@ function ProduitCard({
       </div>
 
       <button onClick={() => !outOfStock && onAdd(fmt, nom)} disabled={outOfStock}
-        className="w-full h-10 flex items-center justify-center gap-1.5 rounded-xl text-sm font-semibold transition-all bg-secondary text-white hover:bg-secondary-600 active:scale-95 disabled:bg-slate-200 disabled:text-gray-400 disabled:cursor-not-allowed">
+        className="w-full h-10 flex items-center justify-center gap-1.5 rounded-lg text-sm font-semibold transition-colors bg-secondary-600 text-white hover:bg-secondary-700 active:translate-y-px disabled:bg-slate-200 disabled:text-gray-400 disabled:cursor-not-allowed">
         <Plus size={15} strokeWidth={2.5} />
         Ajouter
       </button>

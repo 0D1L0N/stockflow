@@ -52,23 +52,21 @@ export default function Connexion() {
   };
 
   return (
-    <div className="relative min-h-[100dvh] overflow-hidden bg-gradient-to-br from-primary-600 via-primary-700 to-primary-900 flex items-center justify-center p-4">
+    <div className="min-h-[100dvh] bg-background flex items-center justify-center p-4">
       {/* Halos décoratifs */}
-      <div className="absolute -top-32 -right-24 w-80 h-80 rounded-full bg-secondary/20 blur-3xl" />
-      <div className="absolute -bottom-40 -left-24 w-96 h-96 rounded-full bg-primary-400/20 blur-3xl" />
 
       <div className="relative w-full max-w-sm animate-slide-up">
         <div className="flex justify-center mb-8">
-          <Logo taille="lg" sousTitre="Ventes, stock et casiers de votre dépôt" />
+          <Logo clair={false} taille="lg" sousTitre="Ventes, stock et casiers de votre dépôt" />
         </div>
 
-        <form onSubmit={soumettre} className="bg-white rounded-3xl shadow-modal p-6 sm:p-7 flex flex-col gap-4">
+        <form onSubmit={soumettre} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8 flex flex-col gap-4">
           <div>
-            <h1 className="font-extrabold text-gray-900 text-xl tracking-tight">
-              {mode === "connexion" ? "Bon retour 👋" : "Première installation"}
+            <h1 className="font-bold text-gray-900 text-xl tracking-tight">
+              {mode === "connexion" ? "Connexion" : "Première installation"}
             </h1>
             <p className="text-sm text-gray-500 mt-1">
-              {mode === "connexion" ? "Connectez-vous pour continuer." : "Ce compte sera le compte gérant, avec tous les droits."}
+              {mode === "connexion" ? "Accédez à votre dépôt avec votre e-mail." : "Ce compte sera le compte gérant, avec tous les droits."}
             </p>
           </div>
 
@@ -119,7 +117,7 @@ export default function Connexion() {
             </button>
           )}
         </form>
-        <p className="text-center text-white/35 text-xs mt-6">Fonctionne aussi hors connexion</p>
+        <p className="text-center text-gray-400 text-xs mt-6">Fonctionne aussi hors connexion</p>
       </div>
     </div>
   );

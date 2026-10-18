@@ -49,9 +49,9 @@ export default function Dropdown({ options, value, onChange, placeholder = "Sél
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-white border border-gray-200 rounded-lg shadow-modal overflow-hidden">
+        <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-white border border-slate-200 rounded-lg shadow-modal overflow-hidden">
           {searchable && (
-            <div className="p-2 border-b border-gray-100">
+            <div className="p-2 border-b border-slate-200">
               <div className="relative">
                 <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
@@ -59,7 +59,7 @@ export default function Dropdown({ options, value, onChange, placeholder = "Sél
                   value={search}
                   onChange={e => setSearch(e.target.value)}
                   placeholder="Rechercher…"
-                  className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:border-secondary"
+                  className="w-full pl-8 pr-3 py-1.5 text-sm border border-slate-200 rounded-md focus:outline-none focus:border-secondary"
                 />
               </div>
             </div>
@@ -70,7 +70,7 @@ export default function Dropdown({ options, value, onChange, placeholder = "Sél
                 key={opt.value}
                 type="button"
                 onClick={() => { onChange(opt.value); setOpen(false); setSearch(""); }}
-                className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-gray-50 transition-colors"
+                className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-slate-50 transition-colors"
               >
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium text-gray-800 truncate">{opt.label}</div>

@@ -29,7 +29,7 @@ export default function Skeleton({ variant = "text", count = 1, className = "" }
     return (
       <>
         {items.map((_, i) => (
-          <div key={i} className={["flex gap-4 items-center py-3 px-4 border-b border-gray-100", className].join(" ")}>
+          <div key={i} className={["flex gap-4 items-center py-3 px-4 border-b border-slate-200", className].join(" ")}>
             <SkeletonLine className="h-4 w-24" />
             <SkeletonLine className="h-4 flex-1" />
             <SkeletonLine className="h-4 w-16" />

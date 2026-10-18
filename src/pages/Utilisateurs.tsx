@@ -91,7 +91,7 @@ export default function Utilisateurs() {
       <Header title="Utilisateurs" subtitle={`${actifs} compte${actifs > 1 ? "s" : ""} actif${actifs > 1 ? "s" : ""}`}
         actions={<Button icon={<Plus size={16} />} onClick={openNew}>Nouvel utilisateur</Button>} />
 
-      <div className="flex-1 overflow-y-auto p-4 pb-28 lg:pb-6 flex flex-col gap-2">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-28 lg:pb-8 [&>*]:w-full [&>*]:max-w-4xl [&>*]:mx-auto flex flex-col gap-2">
         {loading ? (
           <Skeleton variant="card" count={3} />
         ) : liste.map(u => {
@@ -145,7 +145,7 @@ export default function Utilisateurs() {
               placeholder="6 caractères minimum" autoComplete="new-password" />
           )}
           <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1.5">Rôle</label>
+            <label className="text-[13px] font-medium text-gray-700 block mb-1.5">Rôle</label>
             <select value={role} onChange={e => setRole(e.target.value as Role)} className={selectCls}
               disabled={edit?.id === monUid}>
               {/* Un compte magasinier existant garde son rôle affiché tant qu'on ne le change pas */}
@@ -155,7 +155,7 @@ export default function Utilisateurs() {
             <p className="text-xs text-gray-500 mt-1.5">{DESCRIPTIONS[role]}</p>
           </div>
           {!edit && (
-            <p className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2">
+            <p className="text-xs text-gray-500 bg-slate-50 rounded-lg px-3 py-2">
               Communiquez l'e-mail et le mot de passe provisoire à l'employé. Il pourra le changer avec
               « Mot de passe oublié » sur l'écran de connexion.
             </p>

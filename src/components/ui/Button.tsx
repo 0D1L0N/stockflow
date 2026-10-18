@@ -9,16 +9,16 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variants = {
-  primary:   "bg-secondary text-white hover:bg-secondary-600 shadow-sm shadow-secondary/30",
-  secondary: "bg-white text-gray-700 border border-slate-200 hover:bg-slate-50 hover:border-slate-300",
-  danger:    "bg-danger text-white hover:bg-red-600 shadow-sm shadow-red-500/30",
+  primary:   "bg-secondary-600 text-white hover:bg-secondary-700 shadow-sm",
+  secondary: "bg-white text-gray-800 border border-slate-300 hover:bg-slate-50 shadow-sm",
+  danger:    "bg-red-600 text-white hover:bg-red-700 shadow-sm",
   ghost:     "bg-transparent text-gray-600 hover:bg-slate-100",
 };
 
 const sizes = {
   sm: "h-9 px-3 text-xs gap-1.5 rounded-lg",
-  md: "h-11 px-4 text-sm gap-2 rounded-xl",
-  lg: "h-12 px-5 text-base gap-2 rounded-xl",
+  md: "h-11 sm:h-10 px-4 text-sm gap-2 rounded-lg",
+  lg: "h-12 px-5 text-base gap-2 rounded-lg",
 };
 
 export default function Button({
@@ -36,7 +36,7 @@ export default function Button({
       disabled={disabled || loading}
       className={[
         "inline-flex items-center justify-center font-semibold whitespace-nowrap select-none",
-        "transition-all duration-150 active:scale-[0.97]",
+        "transition-colors duration-150 active:translate-y-px",
         "focus:outline-none focus-visible:ring-2 focus-visible:ring-secondary/50 focus-visible:ring-offset-2",
         "disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100",
         variants[variant],

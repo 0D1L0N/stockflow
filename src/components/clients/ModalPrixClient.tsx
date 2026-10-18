@@ -92,7 +92,7 @@ export default function ModalPrixClient({ client, onClose }: Props) {
           ) : filtered.length === 0 ? (
             <p className="text-center text-sm text-gray-400 py-8">Aucun produit</p>
           ) : (
-            <div className="flex flex-col divide-y divide-gray-100 border border-gray-100 rounded-xl">
+            <div className="flex flex-col divide-y divide-slate-100 border border-slate-200 rounded-xl">
               {filtered.map(l => {
                 const saisie = saisies[l.format_id] ?? "";
                 const modifie = saisie !== (l.prix_client != null ? String(l.prix_client) : "");

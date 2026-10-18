@@ -49,8 +49,8 @@ export default function AuthGate({ children }: { children: ReactNode }) {
 
   if (chargement) {
     return (
-      <div className="min-h-[100dvh] bg-gradient-to-br from-primary-600 via-primary-700 to-primary-900 flex items-center justify-center">
-        <div className="animate-pulse"><Logo taille="lg" /></div>
+      <div className="min-h-[100dvh] bg-background flex items-center justify-center">
+        <div className="animate-pulse"><Logo clair={false} taille="lg" /></div>
       </div>
     );
   }

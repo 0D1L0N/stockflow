@@ -11,7 +11,7 @@ export default function Input({ label, error, icon, className = "", id, ...props
   return (
     <div className="flex flex-col gap-1.5">
       {label && (
-        <label htmlFor={inputId} className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+        <label htmlFor={inputId} className="text-[13px] font-medium text-gray-700">
           {label}
         </label>
       )}
@@ -22,11 +22,11 @@ export default function Input({ label, error, icon, className = "", id, ...props
         <input
           id={inputId}
           className={[
-            "w-full h-11 rounded-xl border bg-white px-3.5 text-sm text-gray-800",
+            "w-full h-11 sm:h-10 rounded-lg border bg-white px-3 text-sm text-gray-900 shadow-sm",
             "placeholder:text-gray-400 transition-all duration-150",
-            "focus:outline-none focus:ring-4 focus:ring-secondary/15 focus:border-secondary",
+            "focus:outline-none focus:ring-2 focus:ring-secondary/25 focus:border-secondary-600",
             "disabled:bg-slate-50 disabled:text-gray-500",
-            error ? "border-danger" : "border-slate-300 hover:border-slate-400",
+            error ? "border-danger" : "border-slate-300",
             icon ? "pl-10" : "",
             className,
           ].join(" ")}
