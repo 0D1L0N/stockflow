@@ -13,6 +13,7 @@ import Card from "@/components/ui/Card";
 import ModalPrixClient from "@/components/clients/ModalPrixClient";
 import ModalCompteClient from "@/components/clients/ModalCompteClient";
 import SoldesBandeau from "@/components/clients/SoldesBandeau";
+import { useTempsReel } from "@/lib/tempsReel";
 
 interface Client {
   id: string; nom: string; telephone: string | null;
@@ -38,8 +39,8 @@ export default function Clients() {
   const [nomsEmballages, setNomsEmballages] = useState<Record<string, string>>({});
   const nomEmballage = (id: string) => nomsEmballages[id] ?? "Casier";
 
-  const load = async () => {
-    setLoading(true);
+  const load = async (silencieux = false) => {
+    if (!silencieux) setLoading(true);
     setClients(await invoke<Client[]>("get_clients"));
     setLoading(false);
   };
@@ -48,6 +49,9 @@ export default function Clients() {
     invoke<{ id: string; nom: string }[]>("get_emballages")
       .then(l => setNomsEmballages(Object.fromEntries(l.map(e => [e.id, e.nom])))).catch(() => {});
   }, []);
+
+  // Soldes modifiés depuis un autre appareil (vente, paiement, retour de casiers)
+  useTempsReel(["clients"], () => { load(true); });
 
   const doitQuelqueChose = (c: Client) =>
     (c.solde_argent ?? 0) > 0 || Object.values(c.emballages_dus ?? {}).some(n => n > 0);

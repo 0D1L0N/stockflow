@@ -36,6 +36,6 @@ export const parametres: Record<string, Commande> = {
       notifications_son: Number(a.notificationsSon ?? 1),
       mode_sombre: Number(a.modeSombre ?? 0),
       langue: a.langue ?? "fr",
-    }));
+    }, { merge: true })); // merge : ne pas effacer les autres champs (date de sauvegarde…)
   },
 };

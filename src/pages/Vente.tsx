@@ -10,6 +10,7 @@ import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import SoldesBandeau from "@/components/clients/SoldesBandeau";
 import { volumeFr, casiers } from "@/lib/format";
+import { useTempsReel } from "@/lib/tempsReel";
 
 interface Format { id: string; produit_id: string; volume: number; unite: string; prix: number; stock: number; seuil_alerte: number; emballage_id?: string | null; }
 interface ProduitAvecFormats { produit: { id: string; nom: string }; formats: Format[]; }
@@ -71,17 +72,19 @@ export default function Vente() {
 
   const chargerClients = async () => { setClients(await invoke<Client[]>("get_clients")); };
 
+  const chargerProduits = async () => {
+    const ps = await invoke<{ id: string; nom: string }[]>("get_produits");
+    setProduits(await Promise.all(ps.map(p => invoke<ProduitAvecFormats>("get_produit", { id: p.id }))));
+  };
+
   useEffect(() => {
-    Promise.all([
-      invoke<{ id: string; nom: string }[]>("get_produits"),
-      invoke<Client[]>("get_clients"),
-    ]).then(async ([ps, cs]) => {
-      setClients(cs);
-      const all = await Promise.all(ps.map(p => invoke<ProduitAvecFormats>("get_produit", { id: p.id })));
-      setProduits(all);
-    }).finally(() => setLoading(false));
+    Promise.all([chargerProduits(), chargerClients()]).finally(() => setLoading(false));
     invoke<{ id: string; nom: string }[]>("get_emballages").then(setEmballages).catch(() => {});
   }, []);
+
+  // Stock et soldes clients à jour quand un autre appareil vend
+  useTempsReel(["stock"], () => { chargerProduits().catch(() => {}); });
+  useTempsReel(["clients"], () => { chargerClients().catch(() => {}); });
 
   // Prix spécifiques du client sélectionné (format_id → prix)
   const [prixClient, setPrixClient] = useState<Record<string, number>>({});

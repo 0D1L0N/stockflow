@@ -1,4 +1,4 @@
-import { doc, getDoc, increment, query, where, writeBatch, type DocumentData, type WriteBatch } from "firebase/firestore";
+import { doc, getDoc, increment, query, serverTimestamp, where, writeBatch, type DocumentData, type DocumentReference, type WriteBatch } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
 import { useAuthStore } from "@/stores/authStore";
 import { col, ecrire, lister, maintenant, type Commande, type Id } from "./outils";
@@ -15,11 +15,12 @@ interface Operation {
 /**
  * Ajoute au batch la variation des soldes d'un client (dette d'argent et casiers dus).
  * Toujours par increment : deux appareils hors ligne ne s'écrasent pas.
+ * `operationId` : l'entrée du journal créée dans le même batch (exigée par les règles).
  * Renvoie les soldes estimés après l'opération (d'après la dernière valeur connue).
  */
 export function appliquerAuCompte(
   batch: WriteBatch, clientId: Id, clientData: DocumentData,
-  montant: number, emballages: Record<string, number>,
+  montant: number, emballages: Record<string, number>, operationId: Id,
 ): SoldesClient {
   const variations: Record<string, unknown> = {};
   for (const [e, d] of Object.entries(emballages)) if (d !== 0) variations[e] = increment(d);
@@ -27,6 +28,7 @@ export function appliquerAuCompte(
     batch.set(doc(db, "clients", clientId), {
       ...(montant !== 0 ? { solde_argent: increment(montant) } : {}),
       ...(Object.keys(variations).length ? { emballages_dus: variations } : {}),
+      derniere_operation: operationId,
     }, { merge: true });
   }
   const dus: Record<string, number> = { ...(clientData.emballages_dus ?? {}) };
@@ -41,10 +43,13 @@ async function lireClient(clientId: Id) {
   return snap.data();
 }
 
-function trace(batch: WriteBatch, clientId: Id, clientNom: string, champs: Record<string, unknown>) {
-  batch.set(doc(col("operations_client")), {
+/** Nouvelle entrée du journal (référence créée d'avance pour la lier au solde). */
+export const nouvelleOperation = () => doc(col("operations_client"));
+
+function trace(batch: WriteBatch, ref: DocumentReference, clientId: Id, clientNom: string, champs: Record<string, unknown>) {
+  batch.set(ref, {
     client_id: clientId, client_nom: clientNom, vente_id: null, numero_facture: null,
-    commentaire: null, date: maintenant(),
+    commentaire: null, date: maintenant(), cree_le: serverTimestamp(),
     utilisateur_uid: auth.currentUser?.uid, utilisateur_nom: useAuthStore.getState().profil?.nom ?? "",
     ...champs,
   });
@@ -59,8 +64,9 @@ export const comptes: Record<string, Commande> = {
     const du = (client.solde_argent as number) ?? 0;
     if (m > du) throw new Error(`Le client ne doit que ${nombreFr(du)}.`);
     const batch = writeBatch(db);
-    const soldes = appliquerAuCompte(batch, clientId as Id, client, -m, {});
-    trace(batch, clientId as Id, client.nom, { type: "paiement", montant: -m, emballages: {}, commentaire: commentaire || null });
+    const op = nouvelleOperation();
+    const soldes = appliquerAuCompte(batch, clientId as Id, client, -m, {}, op.id);
+    trace(batch, op, clientId as Id, client.nom, { type: "paiement", montant: -m, emballages: {}, commentaire: commentaire || null });
     await ecrire(batch.commit());
     return soldes;
   },
@@ -78,8 +84,9 @@ export const comptes: Record<string, Commande> = {
     }
     if (Object.keys(retour).length === 0) throw new Error("Indiquez au moins un casier rendu.");
     const batch = writeBatch(db);
-    const soldes = appliquerAuCompte(batch, clientId as Id, client, 0, retour);
-    trace(batch, clientId as Id, client.nom, { type: "retour_emballages", montant: 0, emballages: retour, commentaire: commentaire || null });
+    const op = nouvelleOperation();
+    const soldes = appliquerAuCompte(batch, clientId as Id, client, 0, retour, op.id);
+    trace(batch, op, clientId as Id, client.nom, { type: "retour_emballages", montant: 0, emballages: retour, commentaire: commentaire || null });
     await ecrire(batch.commit());
     return soldes;
   },

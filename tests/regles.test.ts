@@ -1,0 +1,176 @@
+/**
+ * Tests des règles de sécurité Firestore, sur l'émulateur local (aucune donnée réelle).
+ * Lancer : npm run test:regles
+ *
+ * On vérifie que le vendeur peut travailler normalement, mais qu'il ne peut
+ * ni modifier un stock, ni une dette, ni les totaux du jour sans « preuve »
+ * (vente, mouvement ou opération de journal créée dans le même batch).
+ */
+import { readFileSync } from "fs";
+import { afterAll, beforeAll, beforeEach, describe, it } from "vitest";
+import {
+  assertFails, assertSucceeds, initializeTestEnvironment, type RulesTestEnvironment,
+} from "@firebase/rules-unit-testing";
+import {
+  doc, getDoc, increment, serverTimestamp, setDoc, updateDoc, writeBatch, type Firestore,
+} from "firebase/firestore";
+
+let env: RulesTestEnvironment;
+const JOUR = "2026-10-18";
+
+beforeAll(async () => {
+  env = await initializeTestEnvironment({
+    projectId: "demo-stockflow",
+    firestore: { rules: readFileSync("firestore.rules", "utf8"), host: "127.0.0.1", port: 8080 },
+  });
+});
+afterAll(async () => { await env.cleanup(); });
+
+beforeEach(async () => {
+  await env.clearFirestore();
+  await env.withSecurityRulesDisabled(async ctx => {
+    const db = ctx.firestore();
+    await setDoc(doc(db, "users/gerant"), { nom: "G", role: "gerant", actif: true });
+    await setDoc(doc(db, "users/vendeur"), { nom: "V", role: "vendeur", actif: true });
+    await setDoc(doc(db, "users/autre"), { nom: "A", role: "vendeur", actif: true });
+    await setDoc(doc(db, "users/ancien"), { nom: "X", role: "vendeur", actif: false });
+    await setDoc(doc(db, "formats/f1"), { produit_id: "p1", volume: 0.33, unite: "L", prix: 6000, stock: 10, seuil_alerte: 2 });
+    await setDoc(doc(db, "clients/c1"), { nom: "Client", est_defaut: 0, solde_argent: 5000, emballages_dus: { "casier-24": 2 } });
+    await setDoc(doc(db, "clients/c2"), { nom: "Autre client", est_defaut: 0 });
+    await setDoc(doc(db, `stats_jour/${JOUR}`), { ca: 100, nb_ventes: 1 });
+    await setDoc(doc(db, "ventes/v-autre"), { vendeur_uid: "autre", total: 1, statut: "validée", format_ids: [] });
+  });
+});
+
+const en = (uid: string) => env.authenticatedContext(uid).firestore();
+
+/** Vente complète telle que l'application l'écrit (2 casiers, 6 000 payés sur 12 000). */
+function batchVente(db: Firestore, uid: string, opts: { total?: number; ca?: number; formatStock?: number } = {}) {
+  const total = opts.total ?? 12000;
+  const b = writeBatch(db);
+  b.set(doc(db, "ventes/v1"), {
+    vendeur_uid: uid, statut: "validée", total, client_id: "c1",
+    format_ids: ["f1"], items: [], cree_le: serverTimestamp(),
+  });
+  b.update(doc(db, "formats/f1"), { stock: opts.formatStock !== undefined ? opts.formatStock : increment(-2), derniere_vente: "v1" });
+  b.set(doc(db, "mouvements_stock/m1"), { format_id: "f1", utilisateur_uid: uid, type: "sortie", cree_le: serverTimestamp() });
+  b.set(doc(db, `stats_jour/${JOUR}`), {
+    ca: opts.ca !== undefined ? opts.ca : increment(total), nb_ventes: increment(1),
+    quantites: { f1: increment(2) }, derniere_vente: "v1",
+  }, { merge: true });
+  b.set(doc(db, "operations_client/o1"), { client_id: "c1", utilisateur_uid: uid, type: "vente", cree_le: serverTimestamp() });
+  b.set(doc(db, "clients/c1"), { solde_argent: increment(6000), emballages_dus: { "casier-24": increment(2) }, derniere_operation: "o1" }, { merge: true });
+  return b;
+}
+
+describe("vendeur — usage normal", () => {
+  it("enregistre une vente complète (stock, journal, dette, totaux du jour)", async () => {
+    await assertSucceeds(batchVente(en("vendeur"), "vendeur").commit());
+  });
+
+  it("vend 25 produits différents en une fois (limite de vérifications par écriture)", async () => {
+    const ids = Array.from({ length: 25 }, (_, i) => `g${i}`);
+    await env.withSecurityRulesDisabled(async ctx => {
+      for (const id of ids) await setDoc(doc(ctx.firestore(), `formats/${id}`), { produit_id: "p", volume: 1, unite: "L", prix: 1, stock: 10, seuil_alerte: 1 });
+    });
+    const db = en("vendeur");
+    const b = writeBatch(db);
+    b.set(doc(db, "ventes/gros"), { vendeur_uid: "vendeur", statut: "validée", total: 25, format_ids: ids, items: [], cree_le: serverTimestamp() });
+    for (const id of ids) {
+      b.update(doc(db, `formats/${id}`), { stock: increment(-1), derniere_vente: "gros" });
+      b.set(doc(db, `mouvements_stock/m-${id}`), { format_id: id, utilisateur_uid: "vendeur", type: "sortie", cree_le: serverTimestamp() });
+    }
+    b.set(doc(db, `stats_jour/${JOUR}`), { ca: increment(25), nb_ventes: increment(1), derniere_vente: "gros" }, { merge: true });
+    await assertSucceeds(b.commit());
+  });
+
+  it("réapprovisionne avec un mouvement de stock", async () => {
+    const db = en("vendeur");
+    const b = writeBatch(db);
+    b.set(doc(db, "mouvements_stock/m2"), { format_id: "f1", utilisateur_uid: "vendeur", type: "entrée", cree_le: serverTimestamp() });
+    b.update(doc(db, "formats/f1"), { stock: increment(5), dernier_mouvement: "m2" });
+    await assertSucceeds(b.commit());
+  });
+
+  it("encaisse un paiement tracé dans le journal", async () => {
+    const db = en("vendeur");
+    const b = writeBatch(db);
+    b.set(doc(db, "operations_client/o2"), { client_id: "c1", utilisateur_uid: "vendeur", type: "paiement", cree_le: serverTimestamp() });
+    b.set(doc(db, "clients/c1"), { solde_argent: increment(-5000), derniere_operation: "o2" }, { merge: true });
+    await assertSucceeds(b.commit());
+  });
+
+  it("crée une fiche client sans dette", async () => {
+    await assertSucceeds(setDoc(doc(en("vendeur"), "clients/c3"), { nom: "Nouveau", est_defaut: 0 }));
+  });
+});
+
+describe("vendeur — tentatives refusées", () => {
+  it("modifier un stock sans preuve", async () => {
+    await assertFails(updateDoc(doc(en("vendeur"), "formats/f1"), { stock: 999 }));
+  });
+
+  it("augmenter un stock en se faisant passer pour une vente", async () => {
+    await assertFails(batchVente(en("vendeur"), "vendeur", { formatStock: 50 }).commit());
+  });
+
+  it("citer une vente qui n'est pas dans le batch", async () => {
+    await assertFails(updateDoc(doc(en("vendeur"), "formats/f1"), { stock: increment(-1), derniere_vente: "v-autre" }));
+  });
+
+  it("effacer une dette sans entrée de journal", async () => {
+    await assertFails(updateDoc(doc(en("vendeur"), "clients/c1"), { solde_argent: 0 }));
+  });
+
+  it("effacer la dette d'un client avec le journal d'un autre client", async () => {
+    const db = en("vendeur");
+    const b = writeBatch(db);
+    b.set(doc(db, "operations_client/o3"), { client_id: "c2", utilisateur_uid: "vendeur", type: "paiement", cree_le: serverTimestamp() });
+    b.set(doc(db, "clients/c1"), { solde_argent: 0, derniere_operation: "o3" }, { merge: true });
+    await assertFails(b.commit());
+  });
+
+  it("créer un client avec une dette", async () => {
+    await assertFails(setDoc(doc(en("vendeur"), "clients/c4"), { nom: "X", est_defaut: 0, solde_argent: -10000 }));
+  });
+
+  it("gonfler le chiffre du jour au-delà de la vente", async () => {
+    await assertFails(batchVente(en("vendeur"), "vendeur", { ca: 999999 }).commit());
+  });
+
+  it("antidater une vente (date fournie par le téléphone)", async () => {
+    await assertFails(setDoc(doc(en("vendeur"), "ventes/v9"), {
+      vendeur_uid: "vendeur", statut: "validée", total: 1, format_ids: [], cree_le: new Date(2020, 0, 1),
+    }));
+  });
+
+  it("enregistrer une vente au nom d'un autre vendeur", async () => {
+    await assertFails(batchVente(en("vendeur"), "autre").commit());
+  });
+
+  it("annuler une vente", async () => {
+    await assertFails(updateDoc(doc(en("vendeur"), "ventes/v-autre"), { statut: "annulée" }));
+  });
+
+  it("lire les ventes d'un autre vendeur", async () => {
+    await assertFails(getDoc(doc(en("vendeur"), "ventes/v-autre")));
+  });
+
+  it("changer la version minimale de l'application", async () => {
+    await assertFails(setDoc(doc(en("vendeur"), "config/app"), { version_min: "0.0.1" }));
+  });
+});
+
+describe("comptes désactivés et gérant", () => {
+  it("un compte désactivé ne peut plus vendre", async () => {
+    await assertFails(batchVente(en("ancien"), "ancien").commit());
+  });
+
+  it("le gérant corrige un stock directement", async () => {
+    await assertSucceeds(updateDoc(doc(en("gerant"), "formats/f1"), { stock: 7 }));
+  });
+
+  it("le gérant fixe la version minimale", async () => {
+    await assertSucceeds(setDoc(doc(en("gerant"), "config/app"), { version_min: "1.2.0" }));
+  });
+});

@@ -1,4 +1,4 @@
-import { doc, getDoc, increment, limit, orderBy, query, where, writeBatch } from "firebase/firestore";
+import { doc, getDoc, increment, limit, orderBy, query, serverTimestamp, where, writeBatch } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
 import { col, ecrire, lister, maintenant, type Commande, type Id } from "./outils";
 import type { Format } from "./catalogue";
@@ -18,13 +18,17 @@ async function lireFormat(formatId: Id) {
   return { format, produitNom: (produit.data()?.nom as string) ?? "—" };
 }
 
-/** Enregistre un mouvement de stock dans le même batch que la mise à jour du format. */
+/**
+ * Enregistre un mouvement de stock dans le même batch que la mise à jour du format.
+ * Renvoie son identifiant : le format doit le citer (exigé par les règles).
+ */
 function ajouterMouvement(
   batch: ReturnType<typeof writeBatch>,
   format: Format, produitNom: string,
   m: { type: string; quantite: number; stock_apres: number; source: string; commentaire: unknown },
-) {
-  batch.set(doc(col("mouvements_stock")), {
+): Id {
+  const ref = doc(col("mouvements_stock"));
+  batch.set(ref, {
     format_id: format.id,
     produit_nom: produitNom,
     volume: format.volume,
@@ -38,7 +42,9 @@ function ajouterMouvement(
     commentaire: (m.commentaire as string | null) ?? null,
     utilisateur_uid: auth.currentUser?.uid,
     date: maintenant(),
+    cree_le: serverTimestamp(),
   });
+  return ref.id;
 }
 
 export const stock: Record<string, Commande> = {
@@ -48,10 +54,10 @@ export const stock: Record<string, Commande> = {
     const { format, produitNom } = await lireFormat(formatId as Id);
     const batch = writeBatch(db);
     // increment : ne perd pas une vente faite au même moment sur un autre appareil
-    batch.update(doc(db, "formats", format.id), { stock: increment(q) });
-    ajouterMouvement(batch, format, produitNom, {
+    const mouvement = ajouterMouvement(batch, format, produitNom, {
       type: "entrée", quantite: q, stock_apres: format.stock + q, source: "réapprovisionnement", commentaire,
     });
+    batch.update(doc(db, "formats", format.id), { stock: increment(q), dernier_mouvement: mouvement });
     await ecrire(batch.commit());
   },
 
@@ -61,10 +67,10 @@ export const stock: Record<string, Commande> = {
     if (!(ns >= 0)) throw new Error("Le stock ne peut pas être négatif.");
     const { format, produitNom } = await lireFormat(formatId as Id);
     const batch = writeBatch(db);
-    batch.update(doc(db, "formats", format.id), { stock: ns });
-    ajouterMouvement(batch, format, produitNom, {
+    const mouvement = ajouterMouvement(batch, format, produitNom, {
       type: "ajustement", quantite: Math.abs(ns - format.stock), stock_apres: ns, source: "inventaire", commentaire,
     });
+    batch.update(doc(db, "formats", format.id), { stock: ns, dernier_mouvement: mouvement });
     await ecrire(batch.commit());
   },
 

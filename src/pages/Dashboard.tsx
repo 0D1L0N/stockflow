@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  ShoppingCart, Bell, Package, Wallet, ChevronRight, CheckCircle2, Trophy,
+  ShoppingCart, Bell, Package, Wallet, ChevronRight, CheckCircle2, Trophy, DatabaseBackup,
   TrendingUp, TrendingDown, RefreshCw, AlertTriangle,
 } from "lucide-react";
 import { invoke } from "@/lib/db";
 import Card from "@/components/ui/Card";
 import Skeleton from "@/components/ui/Skeleton";
+import { joursDepuis } from "@/components/sauvegarde/CarteSauvegarde";
+import { useTempsReel } from "@/lib/tempsReel";
 import { useAppStore } from "@/stores/appStore";
 import { useAuthStore } from "@/stores/authStore";
 import { volumeFr } from "@/lib/format";
@@ -49,9 +51,21 @@ export default function Dashboard() {
     }
   };
 
+  // Rappel de sauvegarde : l'offre gratuite de Firebase n'en fait pas automatiquement
+  const [joursSansSauvegarde, setJoursSansSauvegarde] = useState<number | null>(null);
+  // Ventes, stock et dettes modifiés sur un autre appareil : chiffres rafraîchis en direct
+  useTempsReel(["stock", "clients", "ventes_du_jour"], () => { loadStats(); });
+
+
   const loadAll = async () => {
     setLoading(true);
-    await Promise.all([loadStats(), loadAlertes()]);
+    await Promise.all([
+      loadStats(),
+      loadAlertes(),
+      invoke<{ derniere_sauvegarde?: string | null }>("get_parametres")
+        .then(p => setJoursSansSauvegarde(joursDepuis(p.derniere_sauvegarde) ?? 999))
+        .catch(() => {}),
+    ]);
     setLoading(false);
   };
 
@@ -138,6 +152,21 @@ export default function Dashboard() {
                 Réessayer
               </button>
             </div>
+          )}
+
+          {joursSansSauvegarde !== null && joursSansSauvegarde >= 7 && (
+            <Card onClick={() => navigate("/parametres")} padding="sm" className="flex items-center gap-3 bg-amber-50 border-amber-200">
+              <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center flex-shrink-0">
+                <DatabaseBackup size={17} />
+              </div>
+              <div className="flex-1 min-w-0 text-sm">
+                <div className="font-semibold text-amber-900">Pensez à sauvegarder vos données</div>
+                <div className="text-xs text-amber-800">
+                  {joursSansSauvegarde >= 999 ? "Aucune sauvegarde pour l'instant." : `Dernière sauvegarde il y a ${joursSansSauvegarde} jours.`}
+                </div>
+              </div>
+              <ChevronRight size={16} className="text-amber-700 flex-shrink-0" />
+            </Card>
           )}
 
           {/* Indicateurs */}

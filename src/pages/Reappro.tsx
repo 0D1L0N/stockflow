@@ -12,6 +12,7 @@ import Modal from "@/components/ui/Modal";
 import Skeleton from "@/components/ui/Skeleton";
 import Badge from "@/components/ui/Badge";
 import { volumeFr } from "@/lib/format";
+import { useTempsReel } from "@/lib/tempsReel";
 
 interface FormatAlerte {
   id: string; produit_id: string; produit_nom: string;
@@ -49,9 +50,9 @@ export default function Reappro() {
   const [modalAjust, setModalAjust] = useState(false);
   const [nouvStock, setNouvStock] = useState("");
 
-  const load = async () => {
+  const load = async (silencieux = false) => {
     try {
-      setLoading(true);
+      if (!silencieux) setLoading(true);
       const [a, h] = await Promise.all([
         invoke<FormatAlerte[]>("get_formats_en_alerte"),
         invoke<Mouvement[]>("get_mouvements_stock", {
@@ -71,6 +72,7 @@ export default function Reappro() {
   };
 
   useEffect(() => { load(); }, []);
+  useTempsReel(["stock"], () => { load(true); });
 
   const openReappro = (f: FormatAlerte) => {
     setSelectedFormat(f);
@@ -134,7 +136,7 @@ export default function Reappro() {
         actions={
           <div className="flex gap-2">
             <Button size="sm" icon={<Send size={14} />} onClick={() => setBonCommande(true)}>Bon de commande</Button>
-            <Button variant="secondary" icon={<RefreshCw size={15} />} onClick={load} size="sm">
+            <Button variant="secondary" icon={<RefreshCw size={15} />} onClick={() => load()} size="sm">
               Actualiser
             </Button>
           </div>

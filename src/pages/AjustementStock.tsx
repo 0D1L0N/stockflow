@@ -8,6 +8,7 @@ import Button from "@/components/ui/Button";
 import Skeleton from "@/components/ui/Skeleton";
 import { SlidersHorizontal } from "lucide-react";
 import { volumeFr } from "@/lib/format";
+import { useTempsReel } from "@/lib/tempsReel";
 
 interface Produit { id: string; nom: string; }
 interface Format { id: string; volume: number; unite: string; prix: number; stock: number; }
@@ -61,6 +62,12 @@ export default function AjustementStock() {
     setSelectedProduit(data);
     if (data.formats.length > 0) setSelectedFormatId(data.formats[0].id);
   };
+
+  // Stock du produit affiché mis à jour si quelqu'un vend ou réapprovisionne entre-temps
+  useTempsReel(["stock"], () => {
+    loadHistorique();
+    if (selectedProduit) invoke<ProduitAvecFormats>("get_produit", { id: selectedProduit.produit.id }).then(setSelectedProduit).catch(() => {});
+  });
 
   const selectedFormat = selectedProduit?.formats.find(f => f.id === selectedFormatId) ?? null;
 

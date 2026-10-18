@@ -14,6 +14,7 @@ import { FactureHTML } from "@/components/facture/FactureHTML";
 import { type FactureData } from "@/components/facture/FacturePDF";
 import { prepareVenteData, downloadFacture, printFacture, type ParametresRaw } from "@/lib/pdf";
 import { volumeFr } from "@/lib/format";
+import { useTempsReel } from "@/lib/tempsReel";
 
 interface Vente {
   id: string; numero_facture: string; date: string | null;
@@ -60,9 +61,9 @@ export default function HistoriqueVentes() {
   const [modalFacture, setModalFacture] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
 
-  const load = async (dd = dateDebut, df = dateFin) => {
+  const load = async (dd = dateDebut, df = dateFin, silencieux = false) => {
     try {
-      setLoading(true);
+      if (!silencieux) setLoading(true);
       const data = await invoke<Vente[]>("get_ventes", {
         dateDebut: dd || null, dateFin: df || null, clientId: null,
       });
@@ -81,6 +82,9 @@ export default function HistoriqueVentes() {
     invoke<{ id: string; nom: string }[]>("get_emballages")
       .then(l => setNomsEmballages(Object.fromEntries(l.map(e => [e.id, e.nom])))).catch(() => {});
   }, []);
+
+  // Vente ou annulation faite sur un autre appareil
+  useTempsReel(["ventes_du_jour"], () => { load(dateDebut, dateFin, true); });
 
   const openDetail = async (v: Vente) => {
     const data = await invoke<{ vente: Vente; details: DetailVente[] }>("get_vente_details", { venteId: v.id });

@@ -6,6 +6,8 @@ import BottomNav from "./BottomNav";
 import { useAppStore } from "@/stores/appStore";
 import { useAuthStore } from "@/stores/authStore";
 import { peutAcceder } from "@/lib/roles";
+import { useTempsReel } from "@/lib/tempsReel";
+import IndicateurConnexion from "./IndicateurConnexion";
 
 interface LayoutProps {
   children: ReactNode;
@@ -18,7 +20,11 @@ export default function Layout({ children }: LayoutProps) {
   const role = useAuthStore((s) => s.profil?.role);
   // Raccourci « nouvelle vente » seulement sur les pages de consultation :
   // ailleurs (formulaires, paramètres) il masquerait des champs
-  const showFab = ["/", "/clients", "/historique", "/produits"].includes(pathname) && peutAcceder(role, "/vente");
+  // Badge d'alertes à jour quand un autre appareil vend ou réapprovisionne
+  const loadAlertes = useAppStore((s) => s.loadAlertes);
+  useTempsReel(["stock"], () => { loadAlertes().catch(() => {}); });
+
+  const showFab =["/", "/clients", "/historique", "/produits"].includes(pathname) && peutAcceder(role, "/vente");
 
   return (
     // 100dvh : la hauteur réelle visible sur mobile (barres du navigateur exclues)
@@ -28,6 +34,7 @@ export default function Layout({ children }: LayoutProps) {
       </div>
 
       <main className="flex-1 flex flex-col overflow-hidden min-w-0">
+        <IndicateurConnexion />
         {children}
       </main>
 

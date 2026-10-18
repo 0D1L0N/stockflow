@@ -1,9 +1,9 @@
-import { doc, getDoc, increment, orderBy, query, where, writeBatch } from "firebase/firestore";
+import { doc, getDoc, increment, orderBy, query, serverTimestamp, where, writeBatch } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
 import { useAuthStore } from "@/stores/authStore";
 import { col, ecrire, lister, maintenant, type Commande, type Id } from "./outils";
 import { listerFormats, listerProduits } from "./catalogue";
-import { appliquerAuCompte } from "./comptes";
+import { appliquerAuCompte, nouvelleOperation } from "./comptes";
 import { listerEmballages } from "./emballages";
 
 interface ArticleVente {
@@ -92,7 +92,7 @@ export const historique: Record<string, Commande> = {
         format_id: a.format_id, produit_nom: a.produit_nom, volume: a.volume, unite: a.unite,
         type: "entrée", quantite: a.quantite, stock_avant: stockAvant, stock_apres: stockAvant + a.quantite,
         source: "vente", reference_id: v.id, commentaire: "Annulation vente",
-        utilisateur_uid: auth.currentUser?.uid, date,
+        utilisateur_uid: auth.currentUser?.uid, date, cree_le: serverTimestamp(),
       });
       quantites[a.format_id] = increment(-a.quantite);
     });
@@ -112,8 +112,10 @@ export const historique: Record<string, Commande> = {
     }
     const client = await getDoc(doc(db, "clients", v.client_id));
     if (client.exists() && client.data().est_defaut !== 1 && (resteDu !== 0 || Object.keys(casiers).length)) {
-      appliquerAuCompte(batch, v.client_id, client.data(), -resteDu, casiers);
-      batch.set(doc(col("operations_client")), {
+      const op = nouvelleOperation();
+      appliquerAuCompte(batch, v.client_id, client.data(), -resteDu, casiers, op.id);
+      batch.set(op, {
+        cree_le: serverTimestamp(),
         client_id: v.client_id, client_nom: v.client_nom, type: "annulation",
         vente_id: v.id, numero_facture: v.numero_facture, montant: -resteDu, emballages: casiers,
         commentaire: "Annulation de la vente", date,

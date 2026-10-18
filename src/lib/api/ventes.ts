@@ -1,9 +1,9 @@
-import { doc, getDoc, increment, writeBatch } from "firebase/firestore";
+import { doc, getDoc, increment, serverTimestamp, writeBatch } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
 import { useAuthStore } from "@/stores/authStore";
 import { col, ecrire, maintenant, type Commande, type Id } from "./outils";
 import type { Format } from "./catalogue";
-import { appliquerAuCompte, type SoldesClient } from "./comptes";
+import { appliquerAuCompte, nouvelleOperation, type SoldesClient } from "./comptes";
 import { volumeFr } from "@/lib/format";
 
 interface VenteItemArg { formatId: Id; quantite: number; prixUtilise: number; }
@@ -133,6 +133,7 @@ export const ventes: Record<string, Commande> = {
       emballages_rendus: rendus,
       // Soldes du client juste avant cette vente (pour l'addition sur la facture)
       solde_avant: soldeAvant,
+      cree_le: serverTimestamp(),
       statut: "validée",
       vendeur_uid: uid,
       vendeur_nom: profil?.nom ?? "",
@@ -142,7 +143,7 @@ export const ventes: Record<string, Commande> = {
 
     lignes.forEach((l, i) => {
       // increment : deux ventes simultanées sur deux appareils s'additionnent sans se perdre
-      batch.update(doc(db, "formats", l.formatId), { stock: increment(-l.quantite) });
+      batch.update(doc(db, "formats", l.formatId), { stock: increment(-l.quantite), derniere_vente: venteRef.id });
       batch.set(doc(col("mouvements_stock")), {
         format_id: l.formatId,
         produit_nom: articles[i].produit_nom,
@@ -157,6 +158,7 @@ export const ventes: Record<string, Commande> = {
         commentaire: null,
         utilisateur_uid: uid,
         date,
+        cree_le: serverTimestamp(),
       });
     });
 
@@ -164,14 +166,16 @@ export const ventes: Record<string, Commande> = {
     const quantites: Record<string, unknown> = {};
     for (const l of lignes) quantites[l.formatId] = increment(l.quantite);
     batch.set(doc(db, "stats_jour", jour), {
-      ca: increment(total), nb_ventes: increment(1), quantites,
+      ca: increment(total), nb_ventes: increment(1), quantites, derniere_vente: venteRef.id,
     }, { merge: true });
 
     // Comptes du client : dette d'argent et casiers à rendre, plus la trace dans le journal
     let soldes: SoldesClient | null = null;
     if (clientNomme) {
-      soldes = appliquerAuCompte(batch, clientId as Id, clientData, resteDu, ecartEmballages);
-      batch.set(doc(col("operations_client")), {
+      const op = nouvelleOperation();
+      soldes = appliquerAuCompte(batch, clientId as Id, clientData, resteDu, ecartEmballages, op.id);
+      batch.set(op, {
+        cree_le: serverTimestamp(),
         client_id: clientId, client_nom: clientData.nom ?? "Client",
         type: "vente", vente_id: venteRef.id, numero_facture: numeroFacture,
         montant_total: total, montant_paye: paye, montant: resteDu,

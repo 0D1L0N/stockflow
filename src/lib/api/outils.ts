@@ -1,5 +1,6 @@
 import { collection, getDocs, type DocumentData, type Query, type QueryDocumentSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { suivreEcriture } from "@/lib/tempsReel";
 
 /** Identifiant de document Firestore. */
 export type Id = string;
@@ -35,6 +36,7 @@ export const parNom = <T extends { nom: string }>(a: T, b: T) =>
  */
 export async function ecrire<T>(promesse: Promise<T>, delaiMs = 4000): Promise<void> {
   promesse.catch(e => console.error("Écriture Firestore refusée :", e));
+  suivreEcriture(promesse);
   if (!navigator.onLine) return;
   await Promise.race([promesse, new Promise(r => setTimeout(r, delaiMs))]);
 }

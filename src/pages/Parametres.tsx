@@ -9,12 +9,14 @@ import Button from "@/components/ui/Button";
 import Skeleton from "@/components/ui/Skeleton";
 import { Save } from "lucide-react";
 import GestionEmballages from "@/components/emballages/GestionEmballages";
+import CarteSauvegarde from "@/components/sauvegarde/CarteSauvegarde";
 
 interface Parametres {
   id: number; nom_commerce: string; adresse_commerce: string | null;
   telephone_commerce: string | null; email_commerce: string | null;
   devise: string; symbole_devise: string; symbole_position: string;
   notifications_son: number; mode_sombre: number; langue: string;
+  derniere_sauvegarde?: string | null;
 }
 
 export default function Parametres() {
@@ -104,6 +106,9 @@ export default function Parametres() {
 
             {/* Enregistrés à part : chaque modification est immédiate */}
             <GestionEmballages />
+
+            <CarteSauvegarde derniere={params.derniere_sauvegarde ?? null}
+              onFaite={date => setParams(p => p && { ...p, derniere_sauvegarde: date })} />
           </>
         )}
       </div>

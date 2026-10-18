@@ -14,6 +14,7 @@ import ModalAjustementPrix from "@/components/prix/ModalAjustementPrix";
 import { CASIER_PAR_VOLUME } from "@/lib/api/emballages";
 import { volumeFr, casiers } from "@/lib/format";
 import { useAuthStore } from "@/stores/authStore";
+import { useTempsReel } from "@/lib/tempsReel";
 
 interface Format {
   id: string; produit_id: string; volume: number; unite: string;
@@ -57,8 +58,8 @@ export default function Produits() {
   const [fEmballage, setFEmballage] = useState("");
   const [emballages, setEmballages] = useState<{ id: string; nom: string }[]>([]);
 
-  const load = async () => {
-    setLoading(true);
+  const load = async (silencieux = false) => {
+    if (!silencieux) setLoading(true);
     const produits = await invoke<Produit[]>("get_produits");
     const all = await Promise.all(produits.map(p => invoke<ProduitAvecFormats>("get_produit", { id: p.id })));
     setData(all);
@@ -69,6 +70,9 @@ export default function Produits() {
     load();
     invoke<{ id: string; nom: string }[]>("get_emballages").then(setEmballages).catch(() => {});
   }, []);
+
+  // Stock modifié depuis un autre appareil : liste rafraîchie sans clignotement
+  useTempsReel(["stock"], () => { load(true); });
 
   const filtered = data.filter(d => d.produit.nom.toLowerCase().includes(search.toLowerCase()));
 
