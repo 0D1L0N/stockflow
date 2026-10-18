@@ -1,4 +1,6 @@
 import { Document, Page, View, Text, StyleSheet, Font } from "@react-pdf/renderer";
+import { modePaiement, sommeEnLettres, totalCasiers } from "./texteFacture";
+import { telephoneFr } from "@/lib/format";
 
 Font.register({
   family: "Inter",
@@ -27,6 +29,8 @@ export interface FactureData {
   monnaie_rendue: number | null;
   commerce: { nom: string; adresse: string; telephone: string; email: string };
   devise: { symbole: string; position: string };
+  /** Nom de la personne qui a fait la vente */
+  vendeur?: string;
   /** Paiement partiel, casiers et soldes du client (absent pour un client de comptoir) */
   compte?: FactureCompte | null;
 }
@@ -66,7 +70,7 @@ const C = {
 };
 
 const s = StyleSheet.create({
-  page: { fontFamily: "Inter", fontSize: 10, color: C.text, paddingTop: 35, paddingBottom: 30, paddingHorizontal: 40 },
+  page: { fontFamily: "Inter", fontSize: 10, color: C.text, paddingTop: 35, paddingBottom: 40, paddingHorizontal: 40 },
   // Header
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 },
   logoBox: { width: 44, height: 44, backgroundColor: C.primary, borderRadius: 8, justifyContent: "center", alignItems: "center", marginBottom: 6 },
@@ -130,6 +134,7 @@ export function FacturePDF({ data }: { data: FactureData }) {
   const { numero_facture, date, client, items, total, montant_recu, monnaie_rendue, commerce, devise, compte } = data;
   const acquittee = !compte?.argent || compte.argent.nouveau <= 0;
   const logoInitials = initials(commerce.nom);
+  const telClient = telephoneFr(client.telephone) ?? "";
 
   return (
     <Document title={numero_facture} author={commerce.nom}>
@@ -143,7 +148,7 @@ export function FacturePDF({ data }: { data: FactureData }) {
             </View>
             <Text style={s.companyName}>{commerce.nom}</Text>
             <Text style={s.companyMeta}>
-              {[commerce.adresse, commerce.telephone, commerce.email].filter(Boolean).join("\n")}
+              {[commerce.adresse, telephoneFr(commerce.telephone), commerce.email].filter(Boolean).join("\n")}
             </Text>
           </View>
           <View style={s.titleBlock}>
@@ -153,7 +158,7 @@ export function FacturePDF({ data }: { data: FactureData }) {
               Date : <Text style={s.invoiceMetaBold}>{date}</Text>
             </Text>
             <View style={acquittee ? s.badge : [s.badge, { backgroundColor: "#ffedd5" }]}>
-              <Text style={acquittee ? s.badgeText : [s.badgeText, { color: "#9a3412" }]}>● {acquittee ? "Facture acquittée" : "Reste à payer"}</Text>
+              <Text style={acquittee ? s.badgeText : [s.badgeText, { color: "#9a3412" }]}>{acquittee ? "Facture acquittée" : "Reste à payer"}</Text>
             </View>
           </View>
         </View>
@@ -170,20 +175,22 @@ export function FacturePDF({ data }: { data: FactureData }) {
             <Text style={s.clientLabel}>Facturer à :</Text>
             <Text style={s.clientName}>{client.nom}</Text>
             <Text style={s.clientDetail}>
-              {[client.telephone, client.adresse].filter(Boolean).join("\n") || "—"}
+              {[telClient, client.adresse].filter(Boolean).join("\n") || "—"}
             </Text>
           </View>
           <View style={s.infoRight}>
             <Text style={s.clientLabel}>Mode de paiement</Text>
-            <Text style={{ fontSize: 9, fontFamily: "Inter", fontWeight: 700, color: C.text, marginBottom: 6 }}>Espèces</Text>
-            <Text style={s.clientLabel}>Référence</Text>
-            <Text style={{ fontSize: 8.5, fontFamily: "Inter", fontWeight: 700, color: C.text }}>{numero_facture}</Text>
+            <Text style={{ fontSize: 9, fontFamily: "Inter", fontWeight: 700, color: C.text, marginBottom: 6 }}>{modePaiement(data)}</Text>
+            {data.vendeur ? <>
+              <Text style={s.clientLabel}>Vendeur</Text>
+              <Text style={{ fontSize: 8.5, fontFamily: "Inter", fontWeight: 700, color: C.text }}>{data.vendeur}</Text>
+            </> : null}
           </View>
         </View>
 
         {/* TABLE HEADER */}
         <View style={s.tableHeader}>
-          <Text style={[s.tableHeaderText, s.colNum]}>N°</Text>
+          <Text style={[s.tableHeaderText, s.colNum, { color: "#fff" }]}>N°</Text>
           <Text style={[s.tableHeaderText, s.colDesig]}>Désignation</Text>
           <Text style={[s.tableHeaderText, s.colQty]}>Qté</Text>
           <Text style={[s.tableHeaderText, s.colPrice]}>Prix unit.</Text>
@@ -192,7 +199,7 @@ export function FacturePDF({ data }: { data: FactureData }) {
 
         {/* TABLE ROWS */}
         {items.map((item, i) => (
-          <View key={i} style={[s.tableRow, { backgroundColor: i % 2 === 0 ? "#fff" : C.bgAlt }]}>
+          <View key={i} wrap={false} style={[s.tableRow, { backgroundColor: i % 2 === 0 ? "#fff" : C.bgAlt }]}>
             <Text style={[s.tableCellText, s.colNum]}>{i + 1}</Text>
             <View style={s.colDesig}>
               <Text style={s.prodName}>{item.nom_produit}</Text>
@@ -207,6 +214,10 @@ export function FacturePDF({ data }: { data: FactureData }) {
         {/* TOTALS */}
         <View style={s.totalsSection}>
           <View style={s.totalsBox}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 6, paddingHorizontal: 14 }}>
+              <Text style={[s.tableCellText, { color: C.muted }]}>Nombre de casiers</Text>
+              <Text style={s.totalsVal}>{totalCasiers(data)}</Text>
+            </View>
             <View style={s.grandRow}>
               <Text style={s.grandLabel}>TOTAL</Text>
               <Text style={s.grandVal}>{formatMontant(total, devise)}</Text>
@@ -214,8 +225,10 @@ export function FacturePDF({ data }: { data: FactureData }) {
           </View>
         </View>
 
+        <Text style={{ fontSize: 8.5, color: C.text, marginBottom: 12 }}>{sommeEnLettres(total, devise.symbole)}</Text>
+
         {/* PAYMENT CARDS */}
-        {(montant_recu !== null || monnaie_rendue !== null) && (
+        {montant_recu !== null && (
           <View style={s.paySection}>
             {montant_recu !== null && (
               <View style={[s.payCard, s.payCardBlue]}>
@@ -234,7 +247,7 @@ export function FacturePDF({ data }: { data: FactureData }) {
 
         {/* COMPTE CLIENT : ancien solde + cette facture − réglé = nouveau solde */}
         {compte && (
-          <View style={{ borderWidth: 1, borderColor: "#fed7aa", backgroundColor: "#fff7ed", borderRadius: 7, padding: 10, marginBottom: 14 }}>
+          <View wrap={false} style={{ borderWidth: 1, borderColor: "#fed7aa", backgroundColor: "#fff7ed", borderRadius: 7, padding: 10, marginBottom: 14 }}>
             <Text style={[s.clientLabel, { color: "#9a3412" }]}>Compte client</Text>
             {compte.argent && (
               <View style={{ marginBottom: compte.casiers.length ? 8 : 0 }}>
@@ -277,14 +290,14 @@ export function FacturePDF({ data }: { data: FactureData }) {
         )}
 
         {/* FOOTER */}
-        <View style={s.footer}>
-          <Text style={s.thankYou}>✦ Merci pour votre confiance ! ✦</Text>
+        <View style={s.footer} wrap={false}>
+          <Text style={s.thankYou}>Merci pour votre confiance !</Text>
           <View style={s.footerGrid}>
             <View style={{ flex: 1 }}>
               <Text style={s.legalTitle}>Conditions & mentions légales</Text>
               <Text style={s.legalText}>
                 {acquittee
-                  ? `Facture acquittée — réglée en espèces le ${date.split(" à")[0]}.`
+                  ? `Facture acquittée, réglée en espèces le ${date.split(" à")[0]}.`
                   : `Reste dû par le client : ${formatMontant(compte!.argent!.nouveau, devise)}.`}{"\n"}
                 Aucun échange ni remboursement après validation de la vente.{"\n"}
                 Tout litige doit être signalé dans les 24h suivant la livraison.{"\n"}
@@ -292,9 +305,12 @@ export function FacturePDF({ data }: { data: FactureData }) {
               </Text>
             </View>
           </View>
-          <Text style={s.pageNum}>Page 1 / 1 · {numero_facture} · {commerce.nom}</Text>
+          <Text style={s.pageNum}>{numero_facture} · {commerce.nom}</Text>
         </View>
 
+        {/* Numéro de page en bas de chaque page, à l'écart du contenu */}
+        <Text style={{ position: "absolute", bottom: 14, left: 0, right: 0, textAlign: "center", fontSize: 7, color: C.muted }}
+          render={({ pageNumber, totalPages }) => totalPages > 1 ? `Page ${pageNumber} / ${totalPages}` : ""} fixed />
       </Page>
     </Document>
   );

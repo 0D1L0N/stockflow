@@ -1,6 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
+import { surveillerMisesAJour } from "@/lib/miseAJour";
 // @ts-ignore
 import "@fontsource/inter/400.css";
 // @ts-ignore
@@ -19,3 +20,5 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
     <App />
   </React.StrictMode>,
 );
+
+surveillerMisesAJour();

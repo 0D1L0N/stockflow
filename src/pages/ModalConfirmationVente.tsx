@@ -55,6 +55,7 @@ export default function ModalConfirmationVente({
   const soldeOk = !!compte && resteDu <= 0 && compte.casiers.every(c => c.apres <= 0);
   const navigate = useNavigate();
   const role = useAuthStore((s) => s.profil?.role);
+  const profilNom = useAuthStore((s) => s.profil?.nom);
   const { symbole, position, formatMontant: formatPrix } = useAppStore();
   const [parametres, setParametres] = useState<Parametres | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
@@ -92,6 +93,7 @@ export default function ModalConfirmationVente({
     },
     devise: { symbole, position },
     compte,
+    vendeur: profilNom || undefined,
   });
 
   const handleImprimer = async () => {

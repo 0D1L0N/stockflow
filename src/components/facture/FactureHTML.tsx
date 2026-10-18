@@ -1,4 +1,6 @@
 import { type FactureData } from "./FacturePDF";
+import { modePaiement, sommeEnLettres, totalCasiers } from "./texteFacture";
+import { telephoneFr } from "@/lib/format";
 
 function fmt(valeur: number, devise: FactureData["devise"]): string {
   if (devise.position === "after") {
@@ -15,6 +17,7 @@ function initials(nom: string): string {
 export function FactureHTML({ data, apercu = false }: { data: FactureData; apercu?: boolean }) {
   const { numero_facture, date, client, items, total, montant_recu, monnaie_rendue, commerce, devise, compte } = data;
   const acquittee = !compte?.argent || compte.argent.nouveau <= 0;
+  const telClient = telephoneFr(client.telephone) ?? "";
 
   return (
     <div style={{ fontFamily: "Inter, Arial, sans-serif", fontSize: 11, color: "#1f2937", background: "#fff", padding: "20px 22px", lineHeight: 1.5 }}>
@@ -27,7 +30,7 @@ export function FactureHTML({ data, apercu = false }: { data: FactureData; aperc
           </div>
           <div style={{ fontWeight: 800, fontSize: 12, color: "#1e3a5f", textTransform: "uppercase", letterSpacing: "0.02em" }}>{commerce.nom}</div>
           <div style={{ fontSize: 8.5, color: "#6b7280", marginTop: 4, lineHeight: 1.7 }}>
-            {[commerce.adresse, commerce.telephone, commerce.email].filter(Boolean).map((l, i) => <div key={i}>{l}</div>)}
+            {[commerce.adresse, telephoneFr(commerce.telephone), commerce.email].filter(Boolean).map((l, i) => <div key={i}>{l}</div>)}
           </div>
         </div>
         <div style={{ textAlign: "right" }}>
@@ -37,7 +40,7 @@ export function FactureHTML({ data, apercu = false }: { data: FactureData; aperc
             <div>Date : <strong style={{ color: "#1f2937" }}>{date}</strong></div>
           </div>
           <div style={{ display: "inline-flex", alignItems: "center", gap: 4, background: apercu ? "#fef3c7" : acquittee ? "#d1fae5" : "#ffedd5", color: apercu ? "#92400e" : acquittee ? "#065f46" : "#9a3412", fontSize: 7.5, fontWeight: 800, padding: "2px 8px", borderRadius: 20, marginTop: 4, textTransform: "uppercase" }}>
-            ● {apercu ? "Aperçu — non enregistrée" : acquittee ? "Facture acquittée" : "Reste à payer"}
+            {apercu ? "Aperçu — non enregistrée" : acquittee ? "Facture acquittée" : "Reste à payer"}
           </div>
         </div>
       </div>
@@ -51,14 +54,16 @@ export function FactureHTML({ data, apercu = false }: { data: FactureData; aperc
           <div style={{ fontSize: 7.5, fontWeight: 800, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 3 }}>Facturer à :</div>
           <div style={{ fontSize: 13, fontWeight: 800, color: "#1e3a5f", marginBottom: 2 }}>{client.nom}</div>
           <div style={{ fontSize: 9, color: "#6b7280", lineHeight: 1.7 }}>
-            {[client.telephone, client.adresse].filter(Boolean).map((l, i) => <div key={i}>{l}</div>)}
+            {[telClient, client.adresse].filter(Boolean).map((l, i) => <div key={i}>{l}</div>)}
           </div>
         </div>
         <div style={{ textAlign: "right" }}>
           <div style={{ fontSize: 7.5, fontWeight: 800, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 3 }}>Mode paiement</div>
-          <div style={{ fontSize: 10, fontWeight: 700, color: "#1f2937", marginBottom: 6 }}>Espèces</div>
-          <div style={{ fontSize: 7.5, fontWeight: 800, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 3 }}>Référence</div>
-          <div style={{ fontSize: 9, fontWeight: 600, color: "#1f2937" }}>{numero_facture}</div>
+          <div style={{ fontSize: 10, fontWeight: 700, color: "#1f2937", marginBottom: 6 }}>{modePaiement(data)}</div>
+          {data.vendeur && <>
+            <div style={{ fontSize: 7.5, fontWeight: 800, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 3 }}>Vendeur</div>
+            <div style={{ fontSize: 9, fontWeight: 600, color: "#1f2937" }}>{data.vendeur}</div>
+          </>}
         </div>
       </div>
 
@@ -95,12 +100,17 @@ export function FactureHTML({ data, apercu = false }: { data: FactureData; aperc
       {/* TOTALS */}
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
         <div style={{ minWidth: 220, borderRadius: 8, border: "1px solid #e5e7eb", overflow: "hidden" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 14px", fontSize: 9.5 }}>
+            <span style={{ color: "#6b7280" }}>Nombre de casiers</span><strong>{totalCasiers(data)}</strong>
+          </div>
           <div style={{ display: "flex", justifyContent: "space-between", padding: "9px 14px", background: "#1e3a5f" }}>
             <span style={{ color: "#fff", fontWeight: 800, fontSize: 12 }}>TOTAL</span>
             <span style={{ color: "#10b981", fontWeight: 800, fontSize: 14 }}>{fmt(total, devise)}</span>
           </div>
         </div>
       </div>
+
+      <div style={{ fontSize: 9, color: "#1f2937", marginBottom: 12 }}>{sommeEnLettres(total, devise.symbole)}</div>
 
       {/* PAYMENT */}
       {(montant_recu !== null || (monnaie_rendue !== null && monnaie_rendue > 0)) && (
@@ -171,7 +181,7 @@ export function FactureHTML({ data, apercu = false }: { data: FactureData; aperc
       {/* FOOTER */}
       <div style={{ borderTop: "1px dashed #e5e7eb", paddingTop: 10, marginTop: 4 }}>
         <div style={{ textAlign: "center", fontSize: 12, fontWeight: 700, color: "#1e3a5f", marginBottom: 8, letterSpacing: "0.02em" }}>
-          ✦ Merci pour votre confiance ! ✦
+          Merci pour votre confiance !
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
           <div style={{ flex: 1 }}>
@@ -180,7 +190,7 @@ export function FactureHTML({ data, apercu = false }: { data: FactureData; aperc
               {apercu
                 ? (acquittee ? "Aperçu : à régler en entier à la validation de la vente." : `Aperçu : resterait dû par le client ${fmt(compte!.argent!.nouveau, devise)}.`)
                 : acquittee
-                ? `Facture acquittée — réglée en espèces le ${date.split(" à")[0]}.`
+                ? `Facture acquittée, réglée en espèces le ${date.split(" à")[0]}.`
                 : `Reste dû par le client : ${fmt(compte!.argent!.nouveau, devise)}.`}<br />
               Aucun échange ni remboursement après validation de la vente.<br />
               Tout litige doit être signalé dans les 24h suivant la livraison.<br />
@@ -189,7 +199,7 @@ export function FactureHTML({ data, apercu = false }: { data: FactureData; aperc
           </div>
         </div>
         <div style={{ fontSize: 7.5, color: "#6b7280", textAlign: "center", marginTop: 8 }}>
-          Page 1 / 1 · {numero_facture} · {commerce.nom}
+          {numero_facture} · {commerce.nom}
         </div>
       </div>
     </div>

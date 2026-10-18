@@ -10,7 +10,18 @@ import { db } from "@/lib/firebase";
  * ventes coûterait de plus en plus de lectures. Les totaux du jour changent à
  * chaque vente ou annulation, c'est un signal léger.
  */
-export type Signal = "stock" | "clients" | "ventes_du_jour";
+export type Signal = "stock" | "clients" | "prix" | "ventes_du_jour";
+
+/**
+ * Collections écoutées pour chaque signal. « stock » couvre tout le catalogue
+ * (produits, formats, types de casiers) : un produit ajouté ou renommé sur un
+ * téléphone apparaît sur les autres sans recharger.
+ */
+const COLLECTIONS: Record<Exclude<Signal, "ventes_du_jour">, string[]> = {
+  stock: ["formats", "produits", "emballages"],
+  clients: ["clients"],
+  prix: ["prix_clients", "prix_groupes", "groupes_prix"],
+};
 
 function jourLocal(): string {
   const d = new Date();
@@ -33,14 +44,15 @@ export function useTempsReel(signaux: Signal[], recharger: () => void) {
       clearTimeout(minuterie);
       minuterie = setTimeout(() => rappel.current(), 400);
     };
-    const arrets = signaux.map(s => {
+    // Une erreur (droits insuffisants pour ce rôle, réseau) ne doit rien casser
+    const surErreur = () => {};
+    const ecouter = (abonner: (suivant: () => void) => () => void) => {
       let premier = true;
-      const surChangement = () => { if (premier) { premier = false; return; } declencher(); };
-      // Une erreur (droits insuffisants pour ce rôle, réseau) ne doit rien casser
-      const surErreur = () => {};
-      if (s === "ventes_du_jour") return onSnapshot(doc(db, "stats_jour", jourLocal()), surChangement, surErreur);
-      return onSnapshot(collection(db, s === "stock" ? "formats" : "clients"), surChangement, surErreur);
-    });
+      return abonner(() => { if (premier) { premier = false; return; } declencher(); });
+    };
+    const arrets = signaux.flatMap(s => s === "ventes_du_jour"
+      ? [ecouter(suivant => onSnapshot(doc(db, "stats_jour", jourLocal()), suivant, surErreur))]
+      : COLLECTIONS[s].map(nom => ecouter(suivant => onSnapshot(collection(db, nom), suivant, surErreur))));
     return () => { clearTimeout(minuterie); arrets.forEach(a => a()); };
   }, [signaux.join("|")]);
 }

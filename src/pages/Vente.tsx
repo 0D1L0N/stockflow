@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Search, ShoppingCart, Plus, Minus, Trash2, Check, User, ChevronDown, X, FileText } from "lucide-react";
 import { invoke } from "@/lib/db";
 import { useToast } from "@/components/ui/Toast";
@@ -99,10 +99,17 @@ export default function Vente() {
   // Stock et soldes clients à jour quand un autre appareil vend
   useTempsReel(["stock"], () => { chargerProduits().catch(() => {}); });
   useTempsReel(["clients"], () => { chargerClients().catch(() => {}); });
+  // Prix par client ou par groupe modifiés par le gérant sur un autre appareil
+  useTempsReel(["prix"], () => { setVersionPrix(v => v + 1); chargerClients().catch(() => {}); });
 
   // Prix du client sélectionné : propre, sinon celui de son groupe (format_id → prix)
   const [prixClient, setPrixClient] = useState<Record<string, number>>({});
+  // Incrémenté quand les prix changent sur un autre appareil (relit les prix sans toucher au panier)
+  const [versionPrix, setVersionPrix] = useState(0);
+  const dernierClientPrix = useRef<string | null>(null); // null : premier chargement, on réaligne aussi
   useEffect(() => {
+    const changementDeClient = dernierClientPrix.current !== client_id;
+    dernierClientPrix.current = client_id;
     let annule = false;
     invoke<PrixClient[]>("get_prix_client", { clientId: client_id })
       .then(rows => {
@@ -110,7 +117,8 @@ export default function Vente() {
         setPrixClient(Object.fromEntries(
           rows.filter(r => (r.prix_client ?? r.prix_groupe) != null).map(r => [r.format_id, (r.prix_client ?? r.prix_groupe) as number])
         ));
-        // Réaligner les prix du panier sur le nouveau client
+        // Réaligner les prix du panier sur le nouveau client (pas lors d'une simple mise à jour des prix)
+        if (!changementDeClient) return;
         const panier = useVenteStore.getState().items;
         for (const r of rows) {
           const item = panier.find(i => i.format_id === r.format_id);
@@ -120,7 +128,7 @@ export default function Vente() {
       })
       .catch(() => { if (!annule) setPrixClient({}); });
     return () => { annule = true; };
-  }, [client_id]);
+  }, [client_id, versionPrix]);
   const prixDe = (f: Format) => prixClient[f.id] ?? f.prix;
 
   const filtered = produits.filter(p =>
@@ -227,6 +235,7 @@ export default function Vente() {
       montant_recu: recu,
       monnaie_rendue: recu === null ? null : Math.max(0, recu - total),
       devise: { symbole, position },
+      vendeur: useAuthStore.getState().profil?.nom || undefined,
       compte: construireCompte({
         total, montant_paye: montantPaye, emballages_livres: livres,
         emballages_rendus: Object.fromEntries(Object.entries(rendus).filter(([, n]) => n > 0)),

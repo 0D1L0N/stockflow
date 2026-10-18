@@ -115,12 +115,16 @@ export const catalogue: Record<string, Commande> = {
     return ref.id;
   },
 
-  update_format: async ({ id, prix, seuilAlerte, emballageId }) => {
+  /** Le volume peut être corrigé (ex. Chap 0,66 L → 0,5 L) : les ventes passées gardent le leur. */
+  update_format: async ({ id, volume, unite, prix, seuilAlerte, emballageId }) => {
     const p = Number(prix), seuil = Number(seuilAlerte);
     if (!(p > 0)) throw new Error("Le prix doit être supérieur à 0.");
     if (!(seuil >= 0)) throw new Error("Le seuil doit être positif.");
+    const v = volume === undefined ? undefined : Number(volume);
+    if (v !== undefined && !(v > 0)) throw new Error("Le volume doit être supérieur à 0.");
     await ecrire(updateDoc(doc(db, "formats", id as Id), {
       prix: p, seuil_alerte: Math.trunc(seuil), emballage_id: emballageId || null,
+      ...(v !== undefined ? { volume: v, unite: String(unite ?? "L") } : {}),
     }));
   },
 

@@ -12,6 +12,7 @@ export interface VenteRaw {
   montant_paye?: number; reste_du?: number;
   emballages_livres?: Record<string, number>; emballages_rendus?: Record<string, number>;
   solde_avant?: { argent: number; emballages: Record<string, number> } | null;
+  vendeur_nom?: string;
 }
 
 export interface DetailRaw { casier?: number | null;
@@ -41,7 +42,7 @@ export function prepareVenteData(
   nomEmballage: (id: string) => string = () => "Casier",
 ): FactureData {
   const dateFormatted = vente.date
-    ? new Date(vente.date).toLocaleString("fr-FR", {
+    ? new Date(vente.date.replace(" ", "T")).toLocaleString("fr-FR", {
         day: "numeric", month: "long", year: "numeric",
         hour: "2-digit", minute: "2-digit",
       })
@@ -77,6 +78,7 @@ export function prepareVenteData(
       email: commerce.email_commerce ?? "",
     },
     devise,
+    vendeur: vente.vendeur_nom || undefined,
     // Réimpression : la vente garde les soldes du client tels qu'ils étaient avant elle
     compte: construireCompte({
       total: vente.total, montant_paye: vente.montant_paye ?? vente.total,

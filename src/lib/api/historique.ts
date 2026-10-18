@@ -29,6 +29,7 @@ const resume = (v: VenteDoc) => ({
   montant_paye: v.montant_paye ?? v.total, reste_du: v.reste_du ?? 0,
   emballages_livres: v.emballages_livres ?? {}, emballages_rendus: v.emballages_rendus ?? {},
   solde_avant: v.solde_avant ?? null,
+  vendeur_nom: (v as { vendeur_nom?: string }).vendeur_nom ?? "",
 });
 
 /** Date locale "AAAA-MM-JJ" décalée de n jours. */
