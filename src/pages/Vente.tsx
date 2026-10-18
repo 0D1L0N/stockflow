@@ -415,31 +415,48 @@ export default function Vente() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden bg-background">
-      {/* Header */}
-      <div className="bg-white border-b border-slate-200 px-4 sm:px-6 pb-3.5 sm:pb-5 pt-[calc(0.875rem+env(safe-area-inset-top))] sm:pt-[calc(1.25rem+env(safe-area-inset-top))] flex items-center gap-3 flex-shrink-0">
-        <div className="flex-1">
-          <h1 className="text-gray-900 font-bold text-lg sm:text-[22px] tracking-tight leading-tight">Nouvelle vente</h1>
-          <div className="text-gray-500 text-[13px] mt-0.5">Choisissez le client puis les produits</div>
+      {/* Bandeau caisse : titre, client et total en direct */}
+      <div className="relative overflow-hidden bg-ink-900 text-white flex-shrink-0 px-4 sm:px-6 pb-4 sm:pb-5 pt-[calc(1rem+env(safe-area-inset-top))] sm:pt-[calc(1.5rem+env(safe-area-inset-top))]">
+        <div className="pointer-events-none absolute -top-24 right-10 w-72 h-72 rounded-full bg-secondary-500/15 blur-3xl" />
+        <div className="relative flex items-center gap-3 sm:gap-4">
+          <span className="hidden sm:flex w-12 h-12 rounded-2xl bg-white/[0.07] text-secondary-400 items-center justify-center flex-shrink-0">
+            <ShoppingCart size={22} />
+          </span>
+          <div className="flex-1 min-w-0">
+            <h1 className="font-extrabold text-[22px] sm:text-[28px] leading-tight">Nouvelle vente</h1>
+            <div className="text-ink-300 text-[13px] mt-0.5 truncate">
+              {selectedClient && selectedClient.est_defaut !== 1 ? <>Client : <span className="text-white font-semibold">{selectedClient.nom}</span></> : "Vente au comptoir"}
+            </div>
+          </div>
+          {/* Afficheur de caisse */}
+          <div className="text-right flex-shrink-0">
+            <div className="text-[11px] uppercase tracking-[0.14em] text-ink-400">Total</div>
+            <div className={["chiffre font-extrabold leading-none mt-1 text-[24px] sm:text-[34px]", items.length ? "text-secondary-400" : "text-white/40"].join(" ")}>
+              {formatPrix(total)}
+            </div>
+            <div className="text-[11px] text-ink-400 mt-1">{casiers(items.reduce((t, i) => t + i.quantite, 0))}</div>
+          </div>
+          <button onClick={() => setShowCart(true)} aria-label="Voir le panier"
+            className="lg:hidden relative w-11 h-11 rounded-xl bg-white/[0.08] hover:bg-white/15 flex items-center justify-center flex-shrink-0">
+            <ShoppingCart size={19} />
+            {items.length > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 bg-secondary-500 rounded-full text-[10px] font-bold flex items-center justify-center ring-2 ring-ink-900">
+                {items.reduce((t, i) => t + i.quantite, 0)}
+              </span>
+            )}
+          </button>
         </div>
-        <button onClick={() => setShowCart(true)} className="lg:hidden relative w-10 h-10 rounded-lg border border-slate-300 shadow-sm flex items-center justify-center" aria-label="Voir le panier">
-          <ShoppingCart size={18} className="text-gray-700" />
-          {items.length > 0 && (
-            <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 bg-secondary rounded-full text-[10px] font-bold text-white flex items-center justify-center">
-              {items.reduce((s, i) => s + i.quantite, 0)}
-            </span>
-          )}
-        </button>
       </div>
 
       <div className="flex flex-1 overflow-hidden">
         {/* Produits */}
-        <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3 pb-40 lg:pb-4">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col gap-4 pb-40 lg:pb-6">
           {/* Sélection client */}
           <div className="relative">
             <label className="text-[13px] font-medium text-gray-700 block mb-1.5">Client</label>
             <button onClick={() => setShowClientDrop(!showClientDrop)}
-              className={["w-full flex items-center gap-2.5 px-3 py-2.5 bg-white border rounded-xl text-sm transition-colors",
-                showClientDrop ? "border-secondary ring-2 ring-secondary/20" : "border-gray-300"].join(" ")}>
+              className={["w-full flex items-center gap-2.5 px-3.5 h-12 bg-white border rounded-xl text-[15px] shadow-sm transition-colors",
+                showClientDrop ? "border-secondary-600 ring-2 ring-secondary/20" : "border-slate-300 hover:border-slate-400"].join(" ")}>
               <User size={15} className="text-gray-400 flex-shrink-0" />
               <span className="flex-1 text-left font-medium text-gray-800 truncate">
                 {selectedClient?.nom ?? "Sélectionner un client"}
@@ -481,7 +498,7 @@ export default function Vente() {
 
           {/* Grille produits */}
           {loading ? (
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
               {[...Array(6)].map((_, i) => (
                 <div key={i} className="bg-white rounded-xl p-3 h-36 animate-pulse">
                   <div className="h-3 bg-gray-200 rounded w-3/4 mb-2" />
@@ -491,7 +508,7 @@ export default function Vente() {
               ))}
             </div>
           ) : (
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
               {filtered.map(({ produit, formats }) => (
                 <ProduitCard key={produit.id} nom={produit.nom} formats={formats}
                   cartItems={items} onAdd={handleAddToCart} prixClient={prixClient} />

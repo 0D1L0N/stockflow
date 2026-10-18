@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Plus, Edit2, Mail, KeyRound, UserX, UserCheck } from "lucide-react";
+import { Plus, Edit2, Mail, KeyRound, UserX, UserCheck, UserCog } from "lucide-react";
+import Avatar from "@/components/ui/Avatar";
 import { invoke } from "@/lib/db";
 import { useToast } from "@/components/ui/Toast";
 import { useAuthStore } from "@/stores/authStore";
@@ -88,7 +89,13 @@ export default function Utilisateurs() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <Header title="Utilisateurs" subtitle={`${actifs} compte${actifs > 1 ? "s" : ""} actif${actifs > 1 ? "s" : ""}`}
+      <Header title="Utilisateurs" subtitle="Comptes et droits d'accès" icone={<UserCog size={22} />}
+        chiffres={loading ? undefined : [
+          { label: "Comptes actifs", valeur: actifs, ton: "succes" },
+          { label: "Gérants", valeur: liste.filter(u => u.actif && u.role === "gerant").length },
+          { label: "Vendeurs", valeur: liste.filter(u => u.actif && u.role !== "gerant").length },
+          { label: "Désactivés", valeur: liste.length - actifs, ton: liste.length - actifs > 0 ? "alerte" : "neutre" },
+        ]}
         actions={<Button icon={<Plus size={16} />} onClick={openNew}>Nouvel utilisateur</Button>} />
 
       <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-28 lg:pb-8 [&>*]:w-full [&>*]:max-w-4xl [&>*]:mx-auto flex flex-col gap-2">
@@ -98,10 +105,7 @@ export default function Utilisateurs() {
           const soiMeme = u.id === monUid;
           return (
             <Card key={u.id} className={["flex items-center gap-3", u.actif ? "" : "opacity-60"].join(" ")}>
-              <div className={["w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0",
-                u.actif ? "bg-primary" : "bg-gray-300"].join(" ")}>
-                <span className="text-white font-bold text-sm">{u.nom.charAt(0).toUpperCase()}</span>
-              </div>
+              <Avatar nom={u.nom} taille="lg" rond className={u.actif ? "" : "grayscale opacity-60"} />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-semibold text-gray-800 text-sm truncate">{u.nom}</span>

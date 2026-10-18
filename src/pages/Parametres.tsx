@@ -7,7 +7,7 @@ import Card from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import Skeleton from "@/components/ui/Skeleton";
-import { Save } from "lucide-react";
+import { Save, Settings } from "lucide-react";
 import GestionEmballages from "@/components/emballages/GestionEmballages";
 import CarteSauvegarde from "@/components/sauvegarde/CarteSauvegarde";
 
@@ -59,10 +59,10 @@ export default function Parametres() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <Header title="Paramètres" subtitle="Configuration de l'application"
+      <Header title="Paramètres" subtitle="Commerce, devise, casiers et sauvegarde" icone={<Settings size={22} />}
         actions={<Button icon={<Save size={15} />} onClick={save} loading={saving}>Enregistrer</Button>} />
 
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-28 lg:pb-8 [&>*]:w-full [&>*]:max-w-4xl [&>*]:mx-auto flex flex-col gap-4 max-w-2xl">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-28 lg:pb-8 [&>*]:w-full [&>*]:max-w-4xl [&>*]:mx-auto flex flex-col gap-4">
         {loading ? <Skeleton variant="card" count={3} /> : params && (
           <>
             <Card className="flex flex-col gap-4">

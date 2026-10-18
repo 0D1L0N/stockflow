@@ -6,7 +6,9 @@ import Header from "@/components/layout/Header";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Skeleton from "@/components/ui/Skeleton";
-import { SlidersHorizontal } from "lucide-react";
+import { SlidersHorizontal, ClipboardList } from "lucide-react";
+import Avatar from "@/components/ui/Avatar";
+import EtatVide from "@/components/ui/EtatVide";
 import { volumeFr } from "@/lib/format";
 import { useTempsReel } from "@/lib/tempsReel";
 
@@ -112,10 +114,11 @@ export default function AjustementStock() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <Header
-        title="Ajustement de stock"
-        subtitle="Correction manuelle des quantités"
-      />
+      <Header title="Ajustement de stock" subtitle="Inventaire, casse, correction manuelle" icone={<SlidersHorizontal size={22} />}
+        chiffres={loadingHist ? undefined : [
+          { label: "Ajustements récents", valeur: historique.length },
+          { label: "Produits", valeur: produits.length },
+        ]} />
 
       <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-28 lg:pb-8 [&>*]:w-full [&>*]:max-w-4xl [&>*]:mx-auto flex flex-col gap-4">
         {/* Formulaire */}
@@ -250,13 +253,11 @@ export default function AjustementStock() {
 
         {/* Historique des 10 derniers ajustements */}
         <div>
-          <h3 className="text-sm font-semibold text-gray-600 mb-3 px-1">10 derniers ajustements</h3>
+          <h2 className="text-[15px] font-bold text-ink-900 mb-3 px-1">10 derniers ajustements</h2>
           {loadingHist ? (
             <Skeleton variant="table-row" count={5} />
           ) : historique.length === 0 ? (
-            <Card className="text-center py-8">
-              <p className="text-gray-400 text-sm">Aucun ajustement effectué</p>
-            </Card>
+            <EtatVide icone={<ClipboardList size={26} />} titre="Aucun ajustement" texte="Les corrections d'inventaire apparaîtront ici." />
           ) : (
             <Card padding="none">
               {/* En-tête */}
@@ -268,9 +269,12 @@ export default function AjustementStock() {
               </div>
               {historique.map(m => (
                 <div key={m.id} className="grid grid-cols-1 sm:grid-cols-5 gap-1 sm:gap-3 px-4 py-3 border-b border-gray-50 last:border-0 text-sm">
-                  <div className="sm:col-span-2">
-                    <div className="font-medium text-gray-800">{m.produit_nom} {volumeFr(m.volume, m.unite)}</div>
-                    {m.commentaire && <div className="text-xs text-gray-400 italic truncate">{m.commentaire}</div>}
+                  <div className="sm:col-span-2 flex items-center gap-3">
+                    <Avatar nom={m.produit_nom ?? "?"} taille="sm" />
+                    <div className="min-w-0">
+                      <div className="font-semibold text-ink-900 truncate">{m.produit_nom} {volumeFr(m.volume, m.unite)}</div>
+                      {m.commentaire && <div className="text-xs text-gray-400 italic truncate">{m.commentaire}</div>}
+                    </div>
                   </div>
                   <div className="text-gray-600">{m.stock_avant}</div>
                   <div className={m.stock_apres > m.stock_avant ? "text-secondary font-semibold" : "text-danger font-semibold"}>

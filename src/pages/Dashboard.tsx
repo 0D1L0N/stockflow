@@ -151,7 +151,7 @@ export default function Dashboard() {
             {/* Chiffre du jour + 7 jours */}
             <section className="lg:col-span-2 relative overflow-hidden rounded-3xl bg-ink-900 text-white p-5 sm:p-7">
               <div className="pointer-events-none absolute -top-24 -right-20 w-72 h-72 rounded-full bg-secondary-500/20 blur-3xl" />
-              <div className="relative flex items-start justify-between gap-3">
+              <div className="relative flex flex-wrap items-start justify-between gap-x-3 gap-y-4">
                 <div>
                   <div className="text-[13px] font-medium text-ink-300">Chiffre d'affaires du jour</div>
                   {loading ? <div className="h-12 w-56 mt-2 rounded-xl bg-white/10 animate-pulse" /> : (
@@ -167,7 +167,7 @@ export default function Dashboard() {
                     <span className="inline-block mt-3 text-xs text-ink-400">Pas de vente hier pour comparer</span>
                   ))}
                 </div>
-                <div className="text-right flex-shrink-0">
+                <div className="sm:text-right flex-shrink-0 order-last sm:order-none w-full sm:w-auto flex sm:block items-baseline justify-between border-t border-white/10 pt-3 sm:border-0 sm:pt-0">
                   <div className="text-[12px] text-ink-400">7 derniers jours</div>
                   <div className="chiffre text-lg sm:text-xl font-bold mt-0.5">{formatPrix(caSemaine)}</div>
                 </div>

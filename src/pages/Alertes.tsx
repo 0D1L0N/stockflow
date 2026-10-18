@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
-import { AlertTriangle, RefreshCw, ShoppingBag, Check, Send } from "lucide-react";
+import { AlertTriangle, RefreshCw, ShoppingBag, CheckCircle2, Send } from "lucide-react";
+import Avatar from "@/components/ui/Avatar";
+import EtatVide from "@/components/ui/EtatVide";
 import ModalBonCommande from "@/components/stock/ModalBonCommande";
 import { invoke } from "@/lib/db";
 import { useToast } from "@/components/ui/Toast";
@@ -85,10 +87,12 @@ export default function Alertes() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <Header
-        title="Alertes stock"
-        subtitle={loading ? "Chargement…" : alertes.length > 0
-          ? `${alertes.length} produit${alertes.length > 1 ? "s" : ""} sous le seuil d'alerte`
-          : "Tous les stocks sont suffisants"}
+        title="Alertes de stock" subtitle="Produits sous leur seuil d'alerte" icone={<AlertTriangle size={22} />}
+        chiffres={loading ? undefined : [
+          { label: "En alerte", valeur: alertes.length, ton: alertes.length > 0 ? "danger" : "succes" },
+          { label: "En rupture", valeur: alertes.filter(a => a.stock <= 0).length, ton: alertes.some(a => a.stock <= 0) ? "danger" : "neutre" },
+          { label: "Casiers manquants", valeur: alertes.reduce((t, a) => t + a.quantite_manquante, 0) },
+        ]}
         actions={
           <div className="flex gap-2">
             <Button size="sm" icon={<Send size={14} />} onClick={() => setBonCommande(true)}>Bon de commande</Button>
@@ -109,48 +113,35 @@ export default function Alertes() {
         {loading ? (
           <Skeleton variant="card" count={4} />
         ) : alertes.length === 0 ? (
-          <Card className="text-center py-16">
-            <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-3">
-              <Check size={26} className="text-secondary" />
-            </div>
-            <p className="font-semibold text-gray-700">Aucune alerte !</p>
-            <p className="text-gray-400 text-sm mt-1">Tous les stocks sont suffisants.</p>
-          </Card>
+          <EtatVide icone={<CheckCircle2 size={26} />} titre="Aucune alerte"
+            texte="Tous les stocks sont au-dessus de leur seuil." />
         ) : (
           <>
-            <div className="flex items-center gap-2 px-1">
-              <AlertTriangle size={15} className="text-danger" />
-              <span className="text-sm font-semibold text-danger">
-                {alertes.length} format{alertes.length > 1 ? "s" : ""} sous le seuil — touchez « Réappro » pour ajouter du stock
-              </span>
-            </div>
-
             {alertes.map((a) => (
               <Card key={a.id} className="flex flex-col gap-3">
-                {/* Infos produit */}
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <div className="font-semibold text-gray-800">{a.produit_nom}</div>
+                <div className="flex items-center gap-3">
+                  <Avatar nom={a.produit_nom} taille="lg" />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-display font-bold text-ink-900 truncate">{a.produit_nom}</div>
                     <div className="text-xs text-gray-500 mt-0.5">{volumeFr(a.volume, a.unite)} · {formatPrix(a.prix)} le casier</div>
                   </div>
-                  <span className="bg-red-50 text-danger text-[10px] font-bold px-2 py-1 rounded-md flex-shrink-0">
-                    ALERTE
+                  <span className={["text-[11px] font-bold px-2 py-1 rounded-md flex-shrink-0", a.stock <= 0 ? "bg-red-600 text-white" : "bg-red-50 text-red-600"].join(" ")}>
+                    {a.stock <= 0 ? "RUPTURE" : "ALERTE"}
                   </span>
                 </div>
 
-                {/* Métriques */}
-                <div className="grid grid-cols-3 gap-2 text-center">
-                  <div className="bg-red-50 rounded-lg p-2">
-                    <div className="text-[10px] text-gray-400 uppercase font-semibold mb-0.5">Stock actuel</div>
-                    <div className="text-xl font-extrabold text-danger leading-none">{a.stock}</div>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="rounded-xl bg-red-50 px-3 py-2">
+                    <div className="text-[11px] text-red-700/80">En stock</div>
+                    <div className="chiffre text-[22px] font-extrabold text-red-600 leading-tight">{a.stock}</div>
                   </div>
-                  <div className="bg-slate-50 rounded-lg p-2">
-                    <div className="text-[10px] text-gray-400 uppercase font-semibold mb-0.5">Seuil d'alerte</div>
-                    <div className="text-xl font-extrabold text-gray-600 leading-none">{a.seuil_alerte}</div>
+                  <div className="rounded-xl bg-slate-50 px-3 py-2">
+                    <div className="text-[11px] text-gray-500">Seuil</div>
+                    <div className="chiffre text-[22px] font-extrabold text-ink-900 leading-tight">{a.seuil_alerte}</div>
                   </div>
-                  <div className="bg-amber-50 rounded-lg p-2">
-                    <div className="text-[10px] text-gray-400 uppercase font-semibold mb-0.5">Manquant</div>
-                    <div className="text-xl font-extrabold text-warning leading-none">{a.quantite_manquante}</div>
+                  <div className="rounded-xl bg-amber-50 px-3 py-2">
+                    <div className="text-[11px] text-amber-800/80">Manquant</div>
+                    <div className="chiffre text-[22px] font-extrabold text-amber-600 leading-tight">{a.quantite_manquante}</div>
                   </div>
                 </div>
 

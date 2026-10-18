@@ -5,7 +5,10 @@ import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import Skeleton from "@/components/ui/Skeleton";
 import Button from "@/components/ui/Button";
-import { Filter } from "lucide-react";
+import { Filter, TrendingUp, ArrowLeftRight } from "lucide-react";
+import Avatar from "@/components/ui/Avatar";
+import EtatVide from "@/components/ui/EtatVide";
+import Pastilles from "@/components/ui/Pastilles";
 import { volumeFr } from "@/lib/format";
 
 interface Mouvement {
@@ -27,6 +30,7 @@ function formatDate(d: string | null) {
 export default function Mouvements() {
   const [mouvements, setMouvements] = useState<Mouvement[]>([]);
   const [loading, setLoading] = useState(true);
+  const [typeFiltre, setTypeFiltre] = useState<"tous" | "entrée" | "sortie" | "ajustement">("tous");
   const [dateDebut, setDateDebut] = useState("");
   const [dateFin, setDateFin] = useState("");
 
@@ -47,9 +51,17 @@ export default function Mouvements() {
   };
   useEffect(() => { load(); }, []);
 
+  const somme = (type: string) => mouvements.filter(m => m.type === type).reduce((t, m) => t + m.quantite, 0);
+  const affiches = mouvements.filter(m => typeFiltre === "tous" || m.type === typeFiltre);
+
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <Header title="Mouvements de stock" subtitle="Historique des entrées, sorties et ajustements" />
+      <Header title="Mouvements de stock" subtitle="Toutes les entrées, sorties et corrections" icone={<TrendingUp size={22} />}
+        chiffres={loading ? undefined : [
+          { label: "Casiers entrés", valeur: `+${somme("entrée")}`, ton: "succes" },
+          { label: "Casiers sortis", valeur: `−${somme("sortie")}`, ton: "danger" },
+          { label: "Ajustements", valeur: mouvements.filter(m => m.type === "ajustement").length },
+        ]} />
       <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-28 lg:pb-8 [&>*]:w-full [&>*]:max-w-4xl [&>*]:mx-auto flex flex-col gap-3">
         <Card className="flex flex-wrap gap-3 items-end">
           <div className="flex-1 min-w-28">
@@ -65,25 +77,33 @@ export default function Mouvements() {
           <Button size="sm" icon={<Filter size={14} />} onClick={load}>Filtrer</Button>
         </Card>
 
-        {loading ? <Skeleton variant="table-row" count={8} /> : mouvements.length === 0 ? (
-          <Card className="text-center py-12">
-            <p className="text-gray-400 text-sm">Aucun mouvement pour cette période</p>
-          </Card>
+        <Pastilles valeur={typeFiltre} onChange={setTypeFiltre} options={[
+          { valeur: "tous", label: "Tous", compte: mouvements.length },
+          { valeur: "entrée", label: "Entrées", compte: mouvements.filter(m => m.type === "entrée").length },
+          { valeur: "sortie", label: "Sorties", compte: mouvements.filter(m => m.type === "sortie").length },
+          { valeur: "ajustement", label: "Ajustements", compte: mouvements.filter(m => m.type === "ajustement").length },
+        ]} />
+
+        {loading ? <Skeleton variant="table-row" count={8} /> : affiches.length === 0 ? (
+          <EtatVide icone={<ArrowLeftRight size={26} />} titre="Aucun mouvement" texte="Aucune entrée ni sortie de stock sur cette période." />
         ) : (
-          <Card padding="none">
-            {mouvements.map(m => (
-              <div key={m.id} className="flex items-center gap-3 px-4 py-3 border-b border-gray-50 last:border-0">
-                <Badge variant={typeVariant[m.type] ?? "default"}>{m.type}</Badge>
+          <Card padding="none" className="overflow-hidden divide-y divide-slate-100">
+            {affiches.map(m => (
+              <div key={m.id} className="flex items-center gap-3 px-4 py-3.5">
+                <Avatar nom={m.produit_nom ?? "?"} taille="md" />
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium text-gray-800 truncate">
                     {m.produit_nom} {volumeFr(m.volume, m.unite)}
                   </div>
-                  <div className="text-xs text-gray-400">{m.source} · {formatDate(m.date)}</div>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <Badge variant={typeVariant[m.type] ?? "default"}>{m.type}</Badge>
+                    <span className="text-xs text-gray-400 truncate">{m.source} · {formatDate(m.date)}</span>
+                  </div>
                   {m.commentaire && <div className="text-xs text-gray-400 italic">{m.commentaire}</div>}
                 </div>
                 <div className="text-right flex-shrink-0">
-                  <div className={["text-sm font-bold", m.type === "sortie" ? "text-danger" : "text-secondary"].join(" ")}>
-                    {m.type === "sortie" ? "-" : "+"}{m.quantite}
+                  <div className={["chiffre text-[17px] font-extrabold", m.type === "sortie" ? "text-red-600" : m.type === "entrée" ? "text-emerald-600" : "text-ink-900"].join(" ")}>
+                    {m.type === "sortie" ? "−" : m.type === "entrée" ? "+" : ""}{m.type === "ajustement" ? `${m.stock_apres - m.stock_avant >= 0 ? "+" : "−"}${Math.abs(m.stock_apres - m.stock_avant)}` : m.quantite}
                   </div>
                   <div className="text-xs text-gray-400">{m.stock_avant} → {m.stock_apres}</div>
                 </div>

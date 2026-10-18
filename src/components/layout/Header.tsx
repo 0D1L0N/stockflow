@@ -48,7 +48,7 @@ export default function Header({ title, subtitle, actions, icone, chiffres }: He
         </div>
 
         {chiffres && chiffres.length > 0 && (
-          <div className="flex gap-2 sm:gap-3 mt-4 sm:mt-5 overflow-x-auto -mx-1 px-1 pb-0.5">
+          <div className="flex gap-2 sm:gap-3 mt-4 sm:mt-5 overflow-x-auto sans-barre -mx-4 px-4 sm:mx-0 sm:px-0">
             {chiffres.map(c => (
               <div key={c.label} className="flex-shrink-0 min-w-[96px] rounded-xl bg-slate-50 border border-slate-200/80 px-3 py-2 sm:px-4 sm:py-2.5">
                 <div className="text-[11px] sm:text-[12px] text-gray-500 whitespace-nowrap">{c.label}</div>

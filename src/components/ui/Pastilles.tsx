@@ -7,7 +7,7 @@ export default function Pastilles<T extends string>({ options, valeur, onChange 
   options: Pastille<T>[]; valeur: T; onChange: (v: T) => void;
 }) {
   return (
-    <div className="flex gap-2 overflow-x-auto -mx-1 px-1 pb-0.5" role="tablist">
+    <div className="flex flex-shrink-0 gap-2 overflow-x-auto sans-barre -mx-1 px-1" role="tablist">
       {options.map(o => {
         const actif = o.valeur === valeur;
         return (

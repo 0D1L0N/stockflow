@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
-import { AlertTriangle, Plus, RefreshCw, History, Send } from "lucide-react";
+import { Plus, RefreshCw, History, Send, PackagePlus, CheckCircle2 } from "lucide-react";
+import Avatar from "@/components/ui/Avatar";
+import EtatVide from "@/components/ui/EtatVide";
 import ModalBonCommande from "@/components/stock/ModalBonCommande";
 import { invoke } from "@/lib/db";
 import { useToast } from "@/components/ui/Toast";
@@ -131,8 +133,12 @@ export default function Reappro() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <Header
-        title="Réapprovisionnement"
-        subtitle={alertes.length > 0 ? `${alertes.length} produit${alertes.length > 1 ? "s" : ""} en alerte` : "Tous les stocks sont suffisants"}
+        title="Réapprovisionnement" subtitle="Ajouter du stock et commander au fournisseur" icone={<PackagePlus size={22} />}
+        chiffres={loading ? undefined : [
+          { label: "En alerte", valeur: alertes.length, ton: alertes.length > 0 ? "danger" : "succes" },
+          { label: "Casiers manquants", valeur: alertes.reduce((t, a) => t + a.quantite_manquante, 0) },
+          { label: "Entrées récentes", valeur: historique.length },
+        ]}
         actions={
           <div className="flex gap-2">
             <Button size="sm" icon={<Send size={14} />} onClick={() => setBonCommande(true)}>Bon de commande</Button>
@@ -149,44 +155,37 @@ export default function Reappro() {
           {loading ? (
             <Skeleton variant="card" count={3} />
           ) : alertes.length === 0 ? (
-            <Card className="text-center py-16">
-              <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-3">
-                <RefreshCw size={28} className="text-secondary" />
-              </div>
-              <p className="font-semibold text-gray-700">Tous les stocks sont suffisants !</p>
-              <p className="text-gray-400 text-sm mt-1">Aucun produit ne nécessite de réapprovisionnement.</p>
-            </Card>
+            <EtatVide icone={<CheckCircle2 size={26} />} titre="Rien à réapprovisionner"
+              texte="Tous les stocks sont au-dessus de leur seuil. Le bon de commande reste disponible en haut."/>
           ) : (
             <>
-              <div className="flex items-center gap-2 px-1">
-                <AlertTriangle size={16} className="text-danger" />
-                <span className="text-sm font-semibold text-danger">
-                  {alertes.length} produit{alertes.length > 1 ? "s" : ""} sous le seuil d'alerte
-                </span>
-              </div>
               {alertes.map(f => (
-                <Card key={f.id} className="flex items-center gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-gray-800">{f.produit_nom}</div>
-                    <div className="text-xs text-gray-500 mt-0.5">{volumeFr(f.volume, f.unite)}</div>
-                    <div className="mt-2 flex items-center gap-3">
-                      <div>
-                        <div className="text-[10px] text-gray-400 uppercase font-semibold">Stock actuel</div>
-                        <div className="text-2xl font-extrabold text-danger leading-none">{f.stock}</div>
+                <Card key={f.id} className="flex flex-col sm:flex-row sm:items-center gap-4">
+                  <div className="flex-1 min-w-0 flex flex-col gap-3">
+                    <div className="flex items-center gap-3">
+                      <Avatar nom={f.produit_nom} taille="lg" />
+                      <div className="min-w-0">
+                        <div className="font-display font-bold text-ink-900 truncate">{f.produit_nom}</div>
+                        <div className="text-xs text-gray-500 mt-0.5">{volumeFr(f.volume, f.unite)}</div>
                       </div>
-                      <div className="text-gray-300">→</div>
-                      <div>
-                        <div className="text-[10px] text-gray-400 uppercase font-semibold">Seuil</div>
-                        <div className="text-2xl font-extrabold text-gray-600 leading-none">{f.seuil_alerte}</div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="rounded-xl bg-red-50 px-3 py-2">
+                        <div className="text-[11px] text-red-700/80">En stock</div>
+                        <div className="chiffre text-[22px] font-extrabold text-red-600 leading-tight">{f.stock}</div>
                       </div>
-                      <div className="text-gray-300">→</div>
-                      <div>
-                        <div className="text-[10px] text-gray-400 uppercase font-semibold">Manquant</div>
-                        <div className="text-2xl font-extrabold text-warning leading-none">{f.quantite_manquante}</div>
+                      <div className="rounded-xl bg-slate-50 px-3 py-2">
+                        <div className="text-[11px] text-gray-500">Seuil</div>
+                        <div className="chiffre text-[22px] font-extrabold text-ink-900 leading-tight">{f.seuil_alerte}</div>
+                      </div>
+                      <div className="rounded-xl bg-amber-50 px-3 py-2">
+                        <div className="text-[11px] text-amber-800/80">Manquant</div>
+                        <div className="chiffre text-[22px] font-extrabold text-amber-600 leading-tight">{f.quantite_manquante}</div>
                       </div>
                     </div>
                   </div>
-                  <div className="flex flex-col gap-2 flex-shrink-0">
+                  <div className="grid grid-cols-2 sm:flex sm:flex-col gap-2 flex-shrink-0">
                     <Button size="sm" icon={<Plus size={14} />} onClick={() => openReappro(f)}>Réappro</Button>
                     <Button size="sm" variant="secondary" onClick={() => openAjust(f)}>Ajuster</Button>
                   </div>
@@ -200,8 +199,8 @@ export default function Reappro() {
         {!loading && historique.length > 0 && (
           <div>
             <div className="flex items-center gap-2 mb-3 px-1">
-              <History size={15} className="text-gray-400" />
-              <span className="text-sm font-semibold text-gray-600">Dernières entrées de stock</span>
+              <History size={16} className="text-gray-400" />
+              <h2 className="text-[15px] font-bold text-ink-900">Dernières entrées de stock</h2>
             </div>
             <Card padding="none">
               {historique.map(m => (
