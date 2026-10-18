@@ -4,6 +4,7 @@ import { useAuthStore } from "@/stores/authStore";
 import { col, ecrire, maintenant, type Commande, type Id } from "./outils";
 import type { Format } from "./catalogue";
 import { appliquerAuCompte, nouvelleOperation, type SoldesClient } from "./comptes";
+import { mouvementsVides } from "./casiers";
 import { volumeFr } from "@/lib/format";
 
 interface VenteItemArg { formatId: Id; quantite: number; prixUtilise: number; }
@@ -183,6 +184,9 @@ export const ventes: Record<string, Commande> = {
         commentaire: null, date, utilisateur_uid: uid, utilisateur_nom: profil?.nom ?? "",
       });
     }
+
+    // Les vides rapportés par le client rentrent au magasin (au comptoir aussi)
+    await mouvementsVides(batch, rendus, { source: "vente", reference_id: venteRef.id, commentaire: numeroFacture });
 
     await ecrire(batch.commit());
     return {

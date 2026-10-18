@@ -3,6 +3,7 @@ import { db, auth } from "@/lib/firebase";
 import { useAuthStore } from "@/stores/authStore";
 import { col, ecrire, lister, maintenant, type Commande, type Id } from "./outils";
 import { nombreFr } from "@/lib/format";
+import { mouvementsVides } from "./casiers";
 
 /** Ce qu'un client doit : de l'argent et des casiers (par type d'emballage). */
 export interface SoldesClient { solde_argent: number; emballages_dus: Record<string, number>; }
@@ -87,6 +88,9 @@ export const comptes: Record<string, Commande> = {
     const op = nouvelleOperation();
     const soldes = appliquerAuCompte(batch, clientId as Id, client, 0, retour, op.id);
     trace(batch, op, clientId as Id, client.nom, { type: "retour_emballages", montant: 0, emballages: retour, commentaire: commentaire || null });
+    // Les vides rapportés rentrent au magasin
+    await mouvementsVides(batch, Object.fromEntries(Object.entries(retour).map(([e, n]) => [e, -n])),
+      { source: "retour client", reference_id: op.id, commentaire: String(client.nom ?? "") || null });
     await ecrire(batch.commit());
     return soldes;
   },

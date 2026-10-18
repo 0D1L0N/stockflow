@@ -4,6 +4,9 @@ import { useAuthStore } from "@/stores/authStore";
 import { col, ecrire, lister, maintenant, parNom, type Commande, type Id } from "./outils";
 import { listerFormats, listerProduits, type Format } from "./catalogue";
 import { ajouterMouvement } from "./stock";
+import { mouvementsVides } from "./casiers";
+
+const oppose = (o: Record<string, number>) => Object.fromEntries(Object.entries(o).map(([k, n]) => [k, -n]));
 
 /**
  * Fournisseurs, réceptions de marchandises et compte fournisseur.
@@ -178,6 +181,8 @@ export const fournisseurs: Record<string, Commande> = {
     mouvementCompte(batch, f.id, { type: "réception", montant: total - paye, emballages: delta, reception_id: recRef.id, numero });
     // La commande cite la réception du batch (les règles le vérifient)
     if (commandeRef) batch.update(commandeRef, { statut: "reçue", reception_id: recRef.id });
+    // Les vides rendus au livreur sortent du magasin
+    await mouvementsVides(batch, oppose(rendus), { source: "réception fournisseur", reference_id: recRef.id, commentaire: `${f.nom} · ${numero}` });
     await ecrire(batch.commit());
     return { id: recRef.id, numero, total, reste_du: total - paye };
   },
@@ -225,13 +230,14 @@ export const fournisseurs: Record<string, Commande> = {
     if (m < 0) throw new Error("Le montant ne peut pas être négatif.");
     const rendus = entiers(emballagesRendus);
     if (m === 0 && Object.keys(rendus).length === 0) throw new Error("Indiquez un montant payé ou des casiers rendus.");
-    await lireFournisseur(fournisseurId as Id);
+    const f = await lireFournisseur(fournisseurId as Id);
     const batch = writeBatch(db);
     mouvementCompte(batch, fournisseurId as Id, {
       type: "paiement", montant: -m,
-      emballages: Object.fromEntries(Object.entries(rendus).map(([k, n]) => [k, -n])),
+      emballages: oppose(rendus),
       commentaire: String(commentaire ?? "").trim() || null,
     });
+    await mouvementsVides(batch, oppose(rendus), { source: "règlement fournisseur", commentaire: f.nom });
     await ecrire(batch.commit());
   },
 

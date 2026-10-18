@@ -13,6 +13,7 @@ import Alertes from "@/pages/Alertes";
 import Mouvements from "@/pages/Mouvements";
 import Parametres from "@/pages/Parametres";
 import AjustementStock from "@/pages/AjustementStock";
+import Casiers from "@/pages/Casiers";
 import Utilisateurs from "@/pages/Utilisateurs";
 import Fournisseurs from "@/pages/Fournisseurs";
 import { useAppStore } from "@/stores/appStore";
@@ -39,6 +40,7 @@ const ROUTES: { path: string; element: ReactNode }[] = [
   { path: "/parametres", element: <Parametres /> },
   { path: "/utilisateurs", element: <Utilisateurs /> },
   { path: "/ajustement", element: <AjustementStock /> },
+  { path: "/casiers",    element: <Casiers /> },
 ];
 
 function AppRoutes() {

@@ -36,6 +36,13 @@ service cloud.firestore {
       let m = getAfter(/databases/$(database)/documents/mouvements_stock/$(id)).data;
       return m.cree_le == request.time && m.utilisateur_uid == request.auth.uid && m.format_id == formatId;
     }
+    // Le mouvement de vides cité vient d'être créé dans ce batch, pour ce type,
+    // et le nouveau nombre de vides est exactement l'ancien plus sa variation
+    function mouvementVidesDuBatch(id, emballageId) {
+      let m = getAfter(/databases/$(database)/documents/mouvements_vides/$(id)).data;
+      return m.cree_le == request.time && m.utilisateur_uid == request.auth.uid && m.emballage_id == emballageId
+        && request.resource.data.stock_vides == resource.data.get('stock_vides', 0) + m.variation;
+    }
     // La réception citée vient d'être créée dans ce batch par l'utilisateur
     function receptionDuBatch(id) {
       let r = getAfter(/databases/$(database)/documents/receptions/$(id)).data;
@@ -132,9 +139,24 @@ service cloud.firestore {
         && horodate();
       allow update, delete: if false;
     }
+    // Le vendeur ne touche qu'aux vides au magasin, et chaque variation cite son mouvement
     match /emballages/{id} {
       allow read: if actif();
-      allow write: if gerant();
+      allow create, delete: if gerant();
+      allow update: if gerant()
+        || (aRole(['vendeur'])
+            && seulementChamps(['stock_vides', 'dernier_mouvement_vides', 'dernier_comptage'])
+            && mouvementVidesDuBatch(request.resource.data.dernier_mouvement_vides, id))
+        // Comptage sans écart : seule la date du comptage change
+        || (aRole(['vendeur']) && seulementChamps(['dernier_comptage']));
+    }
+    // Journal des casiers vides : on ajoute, on ne modifie ni ne supprime jamais.
+    match /mouvements_vides/{id} {
+      allow read: if aRole(['gerant', 'vendeur']);
+      allow create: if aRole(['gerant', 'vendeur'])
+        && request.resource.data.utilisateur_uid == request.auth.uid
+        && horodate();
+      allow update, delete: if false;
     }
     match /prix_clients/{id} {
       allow read: if aRole(['gerant', 'vendeur']);

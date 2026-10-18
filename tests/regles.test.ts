@@ -44,6 +44,8 @@ beforeEach(async () => {
     await setDoc(doc(db, "commandes_fournisseur/cmd-recue"), { fournisseur_id: "fo1", lignes: [{ format_id: "f1", quantite: 5 }], statut: "reçue", reception_id: "r0" });
     await setDoc(doc(db, "receptions/r0"), { utilisateur_uid: "vendeur", fournisseur_id: "fo1", total: 1000 });
     await setDoc(doc(db, "ventes/v-autre"), { vendeur_uid: "autre", total: 1, statut: "validée", format_ids: [] });
+    await setDoc(doc(db, "emballages/casier-24"), { nom: "Casier 24", ordre: 1, stock_vides: 10 });
+    await setDoc(doc(db, "emballages/casier-12"), { nom: "Casier 12", ordre: 3 });
   });
 });
 
@@ -83,7 +85,32 @@ function batchReception(db: Firestore, uid: string, formats: string[], opts: { a
   return b;
 }
 
+/** Vides entrés (variation > 0) ou sortis du magasin, tels que l'application les écrit. */
+function batchVides(b: ReturnType<typeof writeBatch>, db: Firestore, uid: string, id: string, emballage: string, variation: number, extra: Record<string, unknown> = {}) {
+  b.set(doc(db, `mouvements_vides/${id}`), { emballage_id: emballage, variation, utilisateur_uid: uid, source: "vente", cree_le: serverTimestamp() });
+  b.set(doc(db, `emballages/${emballage}`), { stock_vides: increment(variation), dernier_mouvement_vides: id, ...extra }, { merge: true });
+}
+
 describe("vendeur — usage normal", () => {
+  it("vend en récupérant des vides de deux types (vides au magasin tracés)", async () => {
+    const db = en("vendeur");
+    const b = batchVente(db, "vendeur");
+    batchVides(b, db, "vendeur", "mv1", "casier-24", 2);
+    batchVides(b, db, "vendeur", "mv2", "casier-12", 3);
+    await assertSucceeds(b.commit());
+  });
+
+  it("compte les vides : l'écart est tracé", async () => {
+    const db = en("vendeur");
+    const b = writeBatch(db);
+    batchVides(b, db, "vendeur", "mv3", "casier-24", -4, { dernier_comptage: "2026-10-18 18:00:00" });
+    await assertSucceeds(b.commit());
+  });
+
+  it("note un comptage sans écart", async () => {
+    await assertSucceeds(updateDoc(doc(en("vendeur"), "emballages/casier-24"), { dernier_comptage: "2026-10-18 18:00:00" }));
+  });
+
   it("enregistre un bon de commande envoyé", async () => {
     await assertSucceeds(setDoc(doc(en("vendeur"), "commandes_fournisseur/cmd2"), {
       fournisseur_id: "fo1", lignes: [{ format_id: "f1", quantite: 3 }], statut: "envoyée", reception_id: null,
@@ -163,6 +190,37 @@ describe("vendeur — tentatives refusées", () => {
 
   it("effacer la dette d'un fournisseur sans opération", async () => {
     await assertFails(updateDoc(doc(en("vendeur"), "fournisseurs/fo1"), { solde_argent: -50000 }));
+  });
+
+  it("changer le nombre de vides sans mouvement", async () => {
+    await assertFails(updateDoc(doc(en("vendeur"), "emballages/casier-24"), { stock_vides: 500 }));
+  });
+
+  it("annoncer 2 vides rentrés mais en ajouter 50", async () => {
+    const db = en("vendeur");
+    const b = writeBatch(db);
+    b.set(doc(db, "mouvements_vides/mv4"), { emballage_id: "casier-24", variation: 2, utilisateur_uid: "vendeur", cree_le: serverTimestamp() });
+    b.update(doc(db, "emballages/casier-24"), { stock_vides: increment(50), dernier_mouvement_vides: "mv4" });
+    await assertFails(b.commit());
+  });
+
+  it("citer le mouvement d'un autre type de casier", async () => {
+    const db = en("vendeur");
+    const b = writeBatch(db);
+    b.set(doc(db, "mouvements_vides/mv5"), { emballage_id: "casier-12", variation: 2, utilisateur_uid: "vendeur", cree_le: serverTimestamp() });
+    b.update(doc(db, "emballages/casier-24"), { stock_vides: increment(2), dernier_mouvement_vides: "mv5" });
+    await assertFails(b.commit());
+  });
+
+  it("renommer un type de casier", async () => {
+    await assertFails(updateDoc(doc(en("vendeur"), "emballages/casier-24"), { nom: "Autre" }));
+  });
+
+  it("modifier un mouvement de vides", async () => {
+    await env.withSecurityRulesDisabled(async ctx => {
+      await setDoc(doc(ctx.firestore(), "mouvements_vides/mv0"), { emballage_id: "casier-24", variation: -3, utilisateur_uid: "vendeur" });
+    });
+    await assertFails(updateDoc(doc(en("vendeur"), "mouvements_vides/mv0"), { variation: 0 }));
   });
 
   it("créer une commande déjà « reçue »", async () => {

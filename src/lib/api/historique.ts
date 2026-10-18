@@ -5,6 +5,7 @@ import { col, ecrire, lister, maintenant, type Commande, type Id } from "./outil
 import { listerFormats, listerProduits } from "./catalogue";
 import { appliquerAuCompte, nouvelleOperation } from "./comptes";
 import { listerEmballages } from "./emballages";
+import { mouvementsVides } from "./casiers";
 
 interface ArticleVente {
   format_id: Id; produit_id: Id; produit_nom: string; volume: number; unite: string;
@@ -122,6 +123,11 @@ export const historique: Record<string, Commande> = {
         utilisateur_uid: auth.currentUser?.uid, utilisateur_nom: useAuthStore.getState().profil?.nom ?? "",
       });
     }
+
+    // Les vides que le client avait rapportés ressortent du magasin
+    await mouvementsVides(batch,
+      Object.fromEntries(Object.entries(v.emballages_rendus ?? {}).map(([e, n]) => [e, -n])),
+      { source: "annulation", reference_id: v.id, commentaire: v.numero_facture });
 
     await ecrire(batch.commit());
   },
