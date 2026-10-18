@@ -4,9 +4,11 @@ import { col, ecrire, lister, maintenant, parNom, type Commande, type Id } from 
 import { listerFormats, listerProduits } from "./catalogue";
 import { volumeFr } from "@/lib/format";
 import { FAMILLES, familleDe } from "@/lib/familles";
+import { idPrixGroupe, prixDuGroupe } from "./groupes";
 
 export interface Client {
   id: Id; nom: string; telephone: string | null; adresse: string | null;
+  groupe_prix_id?: Id | null;
   est_defaut: number; date_creation: string | null;
 }
 
@@ -34,6 +36,7 @@ function arrondir(prix: number, multiple: number, versLeHaut: boolean): number {
 
 interface ChangementPrix {
   client_id: Id | null; client_nom: string | null; format_id: Id;
+  groupe_id?: Id | null;
   produit_nom: string; volume: number; unite: string;
   ancien_prix: number; nouveau_prix: number;
 }
@@ -48,18 +51,20 @@ export const clients: Record<string, Commande> = {
     return tous.sort((a, b) => (b.est_defaut - a.est_defaut) || parNom(a, b));
   },
 
-  create_client: async ({ nom, telephone, adresse }) => {
+  create_client: async ({ nom, telephone, adresse, groupePrixId }) => {
     const ref = doc(col("clients"));
     await ecrire(setDoc(ref, {
       nom: String(nom).trim(), telephone: telephone ?? null, adresse: adresse ?? null,
+      ...(groupePrixId ? { groupe_prix_id: groupePrixId } : {}),
       est_defaut: 0, date_creation: maintenant(),
     }));
     return ref.id;
   },
 
-  update_client: async ({ id, nom, telephone, adresse }) => {
+  update_client: async ({ id, nom, telephone, adresse, groupePrixId }) => {
     await ecrire(updateDoc(doc(db, "clients", id as Id), {
       nom: String(nom).trim(), telephone: telephone ?? null, adresse: adresse ?? null,
+      ...(groupePrixId !== undefined ? { groupe_prix_id: groupePrixId || null } : {}),
     }));
   },
 
@@ -82,11 +87,18 @@ export const clients: Record<string, Commande> = {
 
   /** Tous les formats avec, pour chacun, le prix spécifique du client s'il existe. */
   get_prix_client: async ({ clientId }) => {
-    const [produits, formats, prixSnap] = await Promise.all([
+    const [produits, formats, prixSnap, fiche] = await Promise.all([
       listerProduits(),
       listerFormats(),
       getDocs(query(col("prix_clients"), where("client_id", "==", clientId))),
+      getDoc(doc(db, "clients", clientId as Id)),
     ]);
+    const groupeId = (fiche.data()?.groupe_prix_id as Id | null | undefined) ?? null;
+    const [prixGroupe, groupe] = await Promise.all([
+      prixDuGroupe(groupeId),
+      groupeId ? getDoc(doc(db, "groupes_prix", groupeId)) : null,
+    ]);
+    const groupeNom = (groupe?.data()?.nom as string | undefined) ?? null;
     const noms = new Map(produits.map(p => [p.id, p.nom]));
     const rayons = new Map(produits.map(p => [p.id, p.rayon ?? null]));
     const prix = new Map(prixSnap.docs.map(d => [d.data().format_id as Id, d.data()]));
@@ -96,6 +108,7 @@ export const clients: Record<string, Commande> = {
         famille: familleDe(f.emballage_id, rayons.get(f.produit_id)),
         format_id: f.id, produit_id: f.produit_id, produit_nom: noms.get(f.produit_id) ?? "?",
         volume: f.volume, unite: f.unite, prix_base: f.prix,
+        prix_groupe: prixGroupe.get(f.id) ?? null, groupe_nom: groupeNom,
         prix_client: (prix.get(f.id)?.prix as number | undefined) ?? null,
         date_maj: (prix.get(f.id)?.date_maj as string | undefined) ?? null,
       }))
@@ -120,24 +133,29 @@ export const clients: Record<string, Commande> = {
    * portee : "base" | "clients" | "tous" ; mode : "pourcentage" | "montant" ;
    * appliquer = false → simple aperçu, rien n'est modifié.
    */
-  ajuster_prix_masse: async ({ portee, clientId, produitId, mode, valeur, arrondi, appliquer }) => {
+  ajuster_prix_masse: async ({ portee, clientId, groupeId, produitId, mode, valeur, arrondi, appliquer }) => {
     if (!["base", "clients", "tous"].includes(portee as string)) throw new Error(`Portée inconnue : ${portee}`);
     if (mode !== "pourcentage" && mode !== "montant") throw new Error(`Mode inconnu : ${mode}`);
     const v = Number(valeur), multiple = Number(arrondi) || 0;
 
     const [produits, formats, clientsListe, prixSnap] = await Promise.all([
       listerProduits(), listerFormats(), lister<Client>(col("clients")),
-      portee === "base" ? null : getDocs(clientId
+      portee === "base" || groupeId ? null : getDocs(clientId
         ? query(col("prix_clients"), where("client_id", "==", clientId))
         : col("prix_clients")),
     ]);
+    // Grilles de groupes : toutes (ajustement général) ou celle du groupe visé
+    const groupesSnap = portee === "base" || clientId ? null : await getDocs(groupeId
+      ? query(col("prix_groupes"), where("groupe_id", "==", groupeId))
+      : col("prix_groupes"));
+    const nomsGroupes = new Map((await lister<{ id: Id; nom: string }>(col("groupes_prix"))).map(g => [g.id, g.nom]));
     const noms = new Map(produits.map(p => [p.id, p.nom]));
     const nomsClients = new Map(clientsListe.map(c => [c.id, c.nom]));
     const formatsParId = new Map(formats.map(f => [f.id, f]));
     const garder = (produit: Id) => !produitId || produit === produitId;
 
     const changements: ChangementPrix[] = [];
-    if (portee !== "clients") {
+    if (portee !== "clients" && !groupeId) {
       for (const f of formats) {
         if (!garder(f.produit_id)) continue;
         changements.push({ client_id: null, client_nom: null, format_id: f.id, produit_nom: noms.get(f.produit_id) ?? "?",
@@ -150,6 +168,14 @@ export const clients: Record<string, Commande> = {
       if (!f || !garder(f.produit_id)) continue;
       changements.push({ client_id: pc.client_id, client_nom: nomsClients.get(pc.client_id) ?? "?", format_id: f.id,
         produit_nom: noms.get(f.produit_id) ?? "?", volume: f.volume, unite: f.unite, ancien_prix: pc.prix, nouveau_prix: 0 });
+    }
+
+    for (const d of groupesSnap?.docs ?? []) {
+      const pg = d.data();
+      const f = formatsParId.get(pg.format_id);
+      if (!f || !garder(f.produit_id)) continue;
+      changements.push({ client_id: null, groupe_id: pg.groupe_id, client_nom: `Groupe ${nomsGroupes.get(pg.groupe_id) ?? "?"}`, format_id: f.id,
+        produit_nom: noms.get(f.produit_id) ?? "?", volume: f.volume, unite: f.unite, ancien_prix: pg.prix, nouveau_prix: 0 });
     }
 
     for (const c of changements) {
@@ -165,7 +191,8 @@ export const clients: Record<string, Commande> = {
       for (let i = 0; i < changements.length; i += 450) {
         const batch = writeBatch(db);
         for (const c of changements.slice(i, i + 450)) {
-          if (c.client_id === null) batch.update(doc(db, "formats", c.format_id), { prix: c.nouveau_prix });
+          if (c.groupe_id) batch.update(doc(db, "prix_groupes", idPrixGroupe(c.groupe_id, c.format_id)), { prix: c.nouveau_prix, date_maj: maintenant() });
+          else if (c.client_id === null) batch.update(doc(db, "formats", c.format_id), { prix: c.nouveau_prix });
           else batch.update(doc(db, "prix_clients", idPrix(c.client_id, c.format_id)), { prix: c.nouveau_prix, date_maj: maintenant() });
         }
         await ecrire(batch.commit());

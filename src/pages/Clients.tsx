@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Plus, Search, Edit2, Trash2, Phone, MapPin, Shield, Tag, ChevronRight, Users } from "lucide-react";
+import { Plus, Search, Edit2, Trash2, Phone, MapPin, Shield, Tag, ChevronRight, Users, Layers } from "lucide-react";
+import ModalGroupesPrix, { type GroupePrixResume } from "@/components/clients/ModalGroupesPrix";
 import { useAppStore } from "@/stores/appStore";
 import Pastilles from "@/components/ui/Pastilles";
 import EtatVide from "@/components/ui/EtatVide";
@@ -23,6 +24,7 @@ interface Client {
   id: string; nom: string; telephone: string | null;
   adresse: string | null; est_defaut: number; date_creation: string | null;
   solde_argent?: number; emballages_dus?: Record<string, number>;
+  groupe_prix_id?: string | null;
 }
 
 export default function Clients() {
@@ -35,6 +37,9 @@ export default function Clients() {
   const [nom, setNom] = useState("");
   const [telephone, setTelephone] = useState("");
   const [adresse, setAdresse] = useState("");
+  const [groupePrixId, setGroupePrixId] = useState("");
+  const [groupes, setGroupes] = useState<GroupePrixResume[]>([]);
+  const [showGroupes, setShowGroupes] = useState(false);
   const [saving, setSaving] = useState(false);
   const [prixClient, setPrixClient] = useState<Client | null>(null);
   const [compte, setCompte] = useState<Client | null>(null);
@@ -45,9 +50,14 @@ export default function Clients() {
 
   const load = async (silencieux = false) => {
     if (!silencieux) setLoading(true);
-    setClients(await invoke<Client[]>("get_clients"));
+    const [liste, gps] = await Promise.all([
+      invoke<Client[]>("get_clients"),
+      invoke<GroupePrixResume[]>("get_groupes_prix").catch(() => [] as GroupePrixResume[]),
+    ]);
+    setClients(liste); setGroupes(gps);
     setLoading(false);
   };
+  const nomGroupe = (id?: string | null) => groupes.find(g => g.id === id)?.nom ?? null;
   useEffect(() => {
     load();
     invoke<{ id: string; nom: string }[]>("get_emballages")
@@ -69,15 +79,22 @@ export default function Clients() {
   const totalCasiers = clients.reduce((s, c) => s + Object.values(c.emballages_dus ?? {}).reduce((t, n) => t + Math.max(0, n), 0), 0);
   const formatPrix = useAppStore((st) => st.formatMontant);
 
-  const openNew = () => { setEdit(null); setNom(""); setTelephone(""); setAdresse(""); setModal(true); };
-  const openEdit = (c: Client) => { setEdit(c); setNom(c.nom); setTelephone(c.telephone ?? ""); setAdresse(c.adresse ?? ""); setModal(true); };
+  const openNew = () => { setEdit(null); setNom(""); setTelephone(""); setAdresse(""); setGroupePrixId(""); setModal(true); };
+  const openEdit = (c: Client) => { setEdit(c); setNom(c.nom); setTelephone(c.telephone ?? ""); setAdresse(c.adresse ?? ""); setGroupePrixId(c.groupe_prix_id ?? ""); setModal(true); };
 
   const save = async () => {
     if (!nom.trim()) return;
     setSaving(true);
     try {
-      if (edit) await invoke("update_client", { id: edit.id, nom: nom.trim(), telephone: telephone || null, adresse: adresse || null });
-      else await invoke("create_client", { nom: nom.trim(), telephone: telephone || null, adresse: adresse || null });
+      const groupe = estGerant ? (groupePrixId || null) : undefined;
+      if (edit) await invoke("update_client", { id: edit.id, nom: nom.trim(), telephone: telephone || null, adresse: adresse || null, groupePrixId: groupe });
+      else await invoke("create_client", { nom: nom.trim(), telephone: telephone || null, adresse: adresse || null, groupePrixId: groupe });
+      // Nouveau groupe pour un client existant : ses anciens prix propres masqueraient ceux du groupe
+      if (edit && groupe && groupe !== (edit.groupe_prix_id ?? null)
+          && confirm(`Effacer les prix propres de ${nom.trim()} pour qu'il suive entièrement le groupe « ${nomGroupe(groupe)} » ?
+(Annuler : il garde ses prix et n'hérite que des prix qui lui manquent.)`)) {
+        await invoke("vider_prix_client", { clientId: edit.id });
+      }
       toast(edit ? "Client mis à jour" : "Client créé", "success");
       setModal(false);
       await load();
@@ -98,7 +115,10 @@ export default function Clients() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <Header title="Clients" subtitle="Comptes, dettes et casiers à rendre" icone={<Users size={22} />}
-        actions={<Button icon={<Plus size={16} />} onClick={openNew}>Nouveau client</Button>}
+        actions={<>
+          {estGerant && <Button variant="secondary" icon={<Layers size={16} />} onClick={() => setShowGroupes(true)}>Groupes de prix</Button>}
+          <Button icon={<Plus size={16} />} onClick={openNew}>Nouveau client</Button>
+        </>}
         chiffres={loading ? undefined : [
           { label: "Clients", valeur: clients.filter(c => c.est_defaut !== 1).length },
           { label: "Argent dû", valeur: formatPrix(totalDettes), ton: totalDettes > 0 ? "alerte" : "neutre" },
@@ -139,6 +159,11 @@ export default function Clients() {
                       <div className="flex items-center gap-2">
                         <span className="font-semibold text-gray-900 text-[15px] truncate">{c.nom}</span>
                         {defaut && <Badge variant="info">Comptoir</Badge>}
+                        {nomGroupe(c.groupe_prix_id) && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-ink-900/5 text-ink-700 text-[11px] font-semibold flex-shrink-0">
+                            <Layers size={11} />{nomGroupe(c.groupe_prix_id)}
+                          </span>
+                        )}
                       </div>
                       <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
                         {c.telephone && (
@@ -183,6 +208,17 @@ export default function Clients() {
           <Input label="Nom" value={nom} onChange={e => setNom(e.target.value)} placeholder="ex. : Bar Le Central" />
           <Input label="Téléphone" value={telephone} onChange={e => setTelephone(e.target.value)} placeholder="+229 97 00 00 00" />
           <Input label="Adresse" value={adresse} onChange={e => setAdresse(e.target.value)} placeholder="ex. : Cotonou Centre" />
+          {estGerant && (
+            <div>
+              <label className="text-[13px] font-medium text-gray-700 block mb-1.5">Groupe de prix</label>
+              <select value={groupePrixId} onChange={e => setGroupePrixId(e.target.value)}
+                className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm bg-white focus:outline-none focus:border-secondary">
+                <option value="">Aucun (prix un à un)</option>
+                {groupes.map(g => <option key={g.id} value={g.id}>{g.nom}</option>)}
+              </select>
+              <p className="text-xs text-gray-400 mt-1">Le client hérite des prix du groupe ; ses prix hors du commun se règlent dans « Prix ».</p>
+            </div>
+          )}
           <div className="flex gap-2 justify-end">
             <Button variant="secondary" onClick={() => setModal(false)}>Annuler</Button>
             <Button onClick={save} loading={saving}>{edit ? "Mettre à jour" : "Créer"}</Button>
@@ -190,7 +226,8 @@ export default function Clients() {
         </div>
       </Modal>
 
-      <ModalPrixClient client={prixClient} onClose={() => setPrixClient(null)} />
+      <ModalPrixClient client={prixClient} onClose={() => setPrixClient(null)} onChange={() => load(true)} />
+      <ModalGroupesPrix isOpen={showGroupes} onClose={() => setShowGroupes(false)} onChange={() => load(true)} />
       <ModalCompteClient client={compte} nomEmballage={nomEmballage} onClose={() => setCompte(null)}
         onChange={() => { invoke<Client[]>("get_clients").then(setClients).catch(() => {}); }} />
     </div>

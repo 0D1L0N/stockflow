@@ -22,7 +22,7 @@ interface Client {
   id: string; nom: string; telephone: string | null; est_defaut: number;
   solde_argent?: number; emballages_dus?: Record<string, number>;
 }
-interface PrixClient { format_id: string; prix_base: number; prix_client: number | null; }
+interface PrixClient { format_id: string; prix_base: number; prix_client: number | null; prix_groupe: number | null; }
 export interface SoldesClient { solde_argent: number; emballages_dus: Record<string, number>; }
 
 interface VenteResult {
@@ -95,7 +95,7 @@ export default function Vente() {
   useTempsReel(["stock"], () => { chargerProduits().catch(() => {}); });
   useTempsReel(["clients"], () => { chargerClients().catch(() => {}); });
 
-  // Prix spécifiques du client sélectionné (format_id → prix)
+  // Prix du client sélectionné : propre, sinon celui de son groupe (format_id → prix)
   const [prixClient, setPrixClient] = useState<Record<string, number>>({});
   useEffect(() => {
     let annule = false;
@@ -103,13 +103,13 @@ export default function Vente() {
       .then(rows => {
         if (annule) return;
         setPrixClient(Object.fromEntries(
-          rows.filter(r => r.prix_client != null).map(r => [r.format_id, r.prix_client as number])
+          rows.filter(r => (r.prix_client ?? r.prix_groupe) != null).map(r => [r.format_id, (r.prix_client ?? r.prix_groupe) as number])
         ));
         // Réaligner les prix du panier sur le nouveau client
         const panier = useVenteStore.getState().items;
         for (const r of rows) {
           const item = panier.find(i => i.format_id === r.format_id);
-          const prix = r.prix_client ?? r.prix_base;
+          const prix = r.prix_client ?? r.prix_groupe ?? r.prix_base;
           if (item && item.prix !== prix) updatePrix(r.format_id, prix);
         }
       })

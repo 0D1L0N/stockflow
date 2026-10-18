@@ -30,8 +30,11 @@ async function formatVendu(formatId: Id): Promise<boolean> {
 
 /** Supprime les prix clients d'un format (Firestore n'a pas de suppression en cascade). */
 async function supprimerPrixClientsDuFormat(formatId: Id, batch: ReturnType<typeof writeBatch>) {
-  const snap = await getDocs(query(col("prix_clients"), where("format_id", "==", formatId)));
-  snap.docs.forEach(d => batch.delete(d.ref));
+  const [clients, groupes] = await Promise.all([
+    getDocs(query(col("prix_clients"), where("format_id", "==", formatId))),
+    getDocs(query(col("prix_groupes"), where("format_id", "==", formatId))),
+  ]);
+  [...clients.docs, ...groupes.docs].forEach(d => batch.delete(d.ref));
 }
 
 export const catalogue: Record<string, Commande> = {

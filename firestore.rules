@@ -124,6 +124,15 @@ service cloud.firestore {
       allow read: if aRole(['gerant', 'vendeur']);
       allow write: if gerant();
     }
+    // Groupes de prix : grilles partagées par plusieurs clients
+    match /groupes_prix/{id} {
+      allow read: if aRole(['gerant', 'vendeur']);
+      allow write: if gerant();
+    }
+    match /prix_groupes/{id} {
+      allow read: if aRole(['gerant', 'vendeur']);
+      allow write: if gerant();
+    }
 
     // ── Ventes ───────────────────────────────────────────────────────────
     match /ventes/{id} {

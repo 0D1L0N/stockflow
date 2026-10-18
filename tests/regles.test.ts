@@ -159,6 +159,14 @@ describe("vendeur — tentatives refusées", () => {
   it("changer la version minimale de l'application", async () => {
     await assertFails(setDoc(doc(en("vendeur"), "config/app"), { version_min: "0.0.1" }));
   });
+
+  it("changer le prix d'un groupe de prix", async () => {
+    await assertFails(setDoc(doc(en("vendeur"), "prix_groupes/g1_f1"), { groupe_id: "g1", format_id: "f1", prix: 100 }));
+  });
+
+  it("changer le groupe de prix d'un client", async () => {
+    await assertFails(updateDoc(doc(en("vendeur"), "clients/c1"), { groupe_prix_id: "g1" }));
+  });
 });
 
 describe("comptes désactivés et gérant", () => {
@@ -168,6 +176,15 @@ describe("comptes désactivés et gérant", () => {
 
   it("le gérant corrige un stock directement", async () => {
     await assertSucceeds(updateDoc(doc(en("gerant"), "formats/f1"), { stock: 7 }));
+  });
+
+  it("le gérant crée un groupe de prix et sa grille", async () => {
+    await assertSucceeds(setDoc(doc(en("gerant"), "groupes_prix/g2"), { nom: "Bars" }));
+    await assertSucceeds(setDoc(doc(en("gerant"), "prix_groupes/g2_f1"), { groupe_id: "g2", format_id: "f1", prix: 5750 }));
+  });
+
+  it("le vendeur lit les prix d'un groupe", async () => {
+    await assertSucceeds(getDoc(doc(en("vendeur"), "prix_groupes/g2_f1")));
   });
 
   it("le gérant fixe la version minimale", async () => {

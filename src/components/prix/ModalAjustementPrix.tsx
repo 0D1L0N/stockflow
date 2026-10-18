@@ -23,12 +23,15 @@ interface Props {
   onApplied?: () => void;
   /** Si fourni, ne modifie que les prix spécifiques de ce client. */
   clientFixe?: { id: string; nom: string } | null;
+  /** Si fourni, ne modifie que la grille de ce groupe de prix. */
+  groupeFixe?: { id: string; nom: string } | null;
 }
 
 const selectCls = "w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-secondary/40 focus:border-secondary";
 const labelCls = "text-[13px] font-medium text-gray-700 block mb-1.5";
 
-export default function ModalAjustementPrix({ isOpen, onClose, onApplied, clientFixe }: Props) {
+export default function ModalAjustementPrix({ isOpen, onClose, onApplied, clientFixe, groupeFixe }: Props) {
+  const cible = clientFixe ?? groupeFixe ?? null;
   const { toast } = useToast();
   const formatPrix = useAppStore((s) => s.formatMontant);
   const [produits, setProduits] = useState<{ id: string; nom: string }[]>([]);
@@ -50,8 +53,9 @@ export default function ModalAjustementPrix({ isOpen, onClose, onApplied, client
   useEffect(() => { setApercu(null); }, [portee, produitId, mode, valeur, arrondi]);
 
   const params = () => ({
-    portee: clientFixe ? "clients" : portee,
+    portee: cible ? "clients" : portee,
     clientId: clientFixe?.id ?? null,
+    groupeId: groupeFixe?.id ?? null,
     produitId: produitId || null,
     mode,
     valeur: parseFloat(valeur),
@@ -79,16 +83,16 @@ export default function ModalAjustementPrix({ isOpen, onClose, onApplied, client
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="lg"
-      title={clientFixe ? `Ajuster les prix — ${clientFixe.nom}` : "Ajustement des prix"}>
+      title={cible ? `Ajuster les prix — ${groupeFixe ? "groupe " : ""}${cible.nom}` : "Ajustement des prix"}>
       <div className="p-6 flex flex-col gap-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {!clientFixe && (
+          {!cible && (
             <div>
               <label className={labelCls}>Prix concernés</label>
               <select value={portee} onChange={e => setPortee(e.target.value as Portee)} className={selectCls}>
-                <option value="tous">Prix comptoir + prix clients</option>
+                <option value="tous">Tous les prix (comptoir, clients, groupes)</option>
                 <option value="base">Prix comptoir uniquement</option>
-                <option value="clients">Prix clients uniquement</option>
+                <option value="clients">Prix des clients et des groupes</option>
               </select>
             </div>
           )}
