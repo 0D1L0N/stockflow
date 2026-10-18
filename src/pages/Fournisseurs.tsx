@@ -203,7 +203,7 @@ export default function Fournisseurs() {
       <Modal isOpen={modal} onClose={() => setModal(false)} title={edit ? "Modifier le fournisseur" : "Nouveau fournisseur"}>
         <div className="p-6 flex flex-col gap-4">
           <Input label="Nom" value={nom} onChange={e => setNom(e.target.value)} placeholder="ex. : SOBEBRA Cotonou" />
-          <Input label="Téléphone / WhatsApp" value={telephone} onChange={e => setTelephone(e.target.value)} placeholder="+229 97 00 00 00" />
+          <Input label="Téléphone / WhatsApp" type="tel" value={telephone} onChange={e => setTelephone(e.target.value)} placeholder="01 97 00 00 00" />
           <Input label="Adresse" value={adresse} onChange={e => setAdresse(e.target.value)} placeholder="ex. : Zone industrielle" />
           <div className="flex gap-2 justify-end">
             <Button variant="secondary" onClick={() => setModal(false)}>Annuler</Button>

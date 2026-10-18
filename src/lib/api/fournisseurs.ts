@@ -1,4 +1,5 @@
 import { deleteDoc, doc, getDoc, increment, query, serverTimestamp, setDoc, updateDoc, where, writeBatch } from "firebase/firestore";
+import { telephoneFr } from "@/lib/format";
 import { db, auth } from "@/lib/firebase";
 import { useAuthStore } from "@/stores/authStore";
 import { col, ecrire, lister, maintenant, parNom, type Commande, type Id } from "./outils";
@@ -88,14 +89,14 @@ export const fournisseurs: Record<string, Commande> = {
     const n = String(nom ?? "").trim();
     if (!n) throw new Error("Donnez le nom du fournisseur.");
     const ref = doc(col("fournisseurs"));
-    await ecrire(setDoc(ref, { nom: n, telephone: telephone || null, adresse: adresse || null, date_creation: maintenant() }));
+    await ecrire(setDoc(ref, { nom: n, telephone: telephoneFr(telephone), adresse: adresse || null, date_creation: maintenant() }));
     return ref.id;
   },
 
   update_fournisseur: async ({ id, nom, telephone, adresse }) => {
     const n = String(nom ?? "").trim();
     if (!n) throw new Error("Donnez le nom du fournisseur.");
-    await ecrire(updateDoc(doc(db, "fournisseurs", id as Id), { nom: n, telephone: telephone || null, adresse: adresse || null }));
+    await ecrire(updateDoc(doc(db, "fournisseurs", id as Id), { nom: n, telephone: telephoneFr(telephone), adresse: adresse || null }));
   },
 
   /** Les réceptions passées restent dans l'historique (elles portent le nom du fournisseur). */

@@ -25,3 +25,27 @@ export function casiers(n: number): string {
 export function nombreFr(n: number): string {
   return n.toLocaleString("fr-FR").replace(/ /g, " ");
 }
+
+/**
+ * Numéro béninois au format à 10 chiffres (depuis 2024 : 01 devant les 8 anciens chiffres) :
+ * « 97000000 », « +229 97 00 00 00 » ou « 0197000000 » → « 01 97 00 00 00 ».
+ * Un numéro étranger ou incomplet est gardé tel que saisi. Vide → null.
+ */
+export function telephoneFr(saisie: unknown): string | null {
+  const brut = String(saisie ?? "").trim();
+  if (!brut) return null;
+  let chiffres = brut.replace(/\D/g, "");
+  if (chiffres.startsWith("00229")) chiffres = chiffres.slice(5);
+  else if (chiffres.startsWith("229") && (chiffres.length === 11 || chiffres.length === 13)) chiffres = chiffres.slice(3);
+  if (chiffres.length === 8) chiffres = "01" + chiffres;
+  if (chiffres.length !== 10 || !chiffres.startsWith("01")) return brut;
+  return chiffres.replace(/(\d{2})(?=\d)/g, "$1 ");
+}
+
+/** Numéro pour un lien WhatsApp (wa.me) : indicatif 229 compris, sans + ni espaces. */
+export function numeroWhatsApp(telephone: unknown): string {
+  const t = telephoneFr(telephone);
+  if (!t) return "";
+  const chiffres = t.replace(/\D/g, "");
+  return chiffres.length === 10 && chiffres.startsWith("01") ? "229" + chiffres : chiffres;
+}

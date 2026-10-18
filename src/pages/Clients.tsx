@@ -70,8 +70,11 @@ export default function Clients() {
   const doitQuelqueChose = (c: Client) =>
     (c.solde_argent ?? 0) > 0 || Object.values(c.emballages_dus ?? {}).some(n => n > 0);
 
+  // Téléphone : on compare les chiffres seuls (« 9700 » trouve « 01 97 00 00 00 »)
+  const chiffresRecherche = search.replace(/\D/g, "");
   const filtered = clients.filter(c =>
-    (c.nom.toLowerCase().includes(search.toLowerCase()) || (c.telephone ?? "").includes(search))
+    (c.nom.toLowerCase().includes(search.toLowerCase())
+      || (chiffresRecherche.length > 0 && (c.telephone ?? "").replace(/\D/g, "").includes(chiffresRecherche)))
     && (!seulementDebiteurs || doitQuelqueChose(c))
   );
   const nbDebiteurs = clients.filter(doitQuelqueChose).length;
@@ -206,7 +209,7 @@ export default function Clients() {
       <Modal isOpen={modal} onClose={() => setModal(false)} title={edit ? "Modifier le client" : "Nouveau client"}>
         <div className="p-6 flex flex-col gap-4">
           <Input label="Nom" value={nom} onChange={e => setNom(e.target.value)} placeholder="ex. : Bar Le Central" />
-          <Input label="Téléphone" value={telephone} onChange={e => setTelephone(e.target.value)} placeholder="+229 97 00 00 00" />
+          <Input label="Téléphone" type="tel" value={telephone} onChange={e => setTelephone(e.target.value)} placeholder="01 97 00 00 00" />
           <Input label="Adresse" value={adresse} onChange={e => setAdresse(e.target.value)} placeholder="ex. : Cotonou Centre" />
           {estGerant && (
             <div>

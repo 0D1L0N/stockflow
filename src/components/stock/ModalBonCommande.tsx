@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Send, FileDown, Share2, Copy, Loader, CheckCircle2 } from "lucide-react";
 import { invoke } from "@/lib/db";
-import { volumeFr } from "@/lib/format";
+import { numeroWhatsApp, volumeFr } from "@/lib/format";
 import { useToast } from "@/components/ui/Toast";
 import Modal from "@/components/ui/Modal";
 import Button from "@/components/ui/Button";
@@ -111,8 +111,8 @@ export default function ModalBonCommande({ isOpen, onClose }: { isOpen: boolean;
     setEnvoi(true);
     try {
       const c = await enregistrer();
-      // Numéro international sans + ni espaces (ex. 22997000000) ; sans numéro, WhatsApp demande le contact
-      const url = `https://wa.me/${telephone.replace(/\D/g, "")}?text=${encodeURIComponent(texteBonCommande(donnees(c)))}`;
+      // Numéro international (ex. 2290197000000) ; sans numéro, WhatsApp demande le contact
+      const url = `https://wa.me/${numeroWhatsApp(telephone)}?text=${encodeURIComponent(texteBonCommande(donnees(c)))}`;
       if (fenetre) fenetre.location.href = url; else window.open(url, "_blank");
     } catch (e) { fenetre?.close(); toast(e instanceof Error ? e.message : String(e), "error"); }
     setEnvoi(false);
@@ -157,7 +157,7 @@ export default function ModalBonCommande({ isOpen, onClose }: { isOpen: boolean;
               <input value={nouveau.nom} onChange={e => setNouveau(n => ({ ...n, nom: e.target.value }))} disabled={verrouille}
                 placeholder="ou nom d'un nouveau fournisseur" className={champ} />
               <input type="tel" value={nouveau.telephone} onChange={e => setNouveau(n => ({ ...n, telephone: e.target.value }))} disabled={verrouille}
-                placeholder="WhatsApp, ex. : 229 97 00 00 00" className={champ} />
+                placeholder="WhatsApp, ex. : 01 97 00 00 00" className={champ} />
             </div>
           ) : (
             <p className="text-xs text-gray-500 mt-1.5">

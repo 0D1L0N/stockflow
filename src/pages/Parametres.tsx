@@ -71,7 +71,7 @@ export default function Parametres() {
                 onChange={e => set("nom_commerce", e.target.value)} />
               <Input label="Adresse" value={params.adresse_commerce ?? ""}
                 onChange={e => set("adresse_commerce", e.target.value)} />
-              <Input label="Téléphone" value={params.telephone_commerce ?? ""}
+              <Input label="Téléphone" type="tel" placeholder="01 97 00 00 00" value={params.telephone_commerce ?? ""}
                 onChange={e => set("telephone_commerce", e.target.value)} />
               <Input label="E-mail" type="email" value={params.email_commerce ?? ""}
                 onChange={e => set("email_commerce", e.target.value)} />

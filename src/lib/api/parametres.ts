@@ -1,4 +1,5 @@
 import { doc, getDoc, setDoc } from "firebase/firestore";
+import { telephoneFr } from "@/lib/format";
 import { db } from "@/lib/firebase";
 import { ecrire, type Commande } from "./outils";
 
@@ -28,7 +29,7 @@ export const parametres: Record<string, Commande> = {
     await ecrire(setDoc(REF(), {
       nom_commerce: String(a.nomCommerce ?? DEFAUTS.nom_commerce).trim(),
       adresse_commerce: a.adresseCommerce ?? null,
-      telephone_commerce: a.telephoneCommerce ?? null,
+      telephone_commerce: telephoneFr(a.telephoneCommerce),
       email_commerce: a.emailCommerce ?? null,
       devise: a.devise ?? DEFAUTS.devise,
       symbole_devise: a.symboleDevise ?? DEFAUTS.symbole_devise,

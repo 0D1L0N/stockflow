@@ -2,7 +2,7 @@ import { deleteDoc, doc, getDoc, getDocs, query, setDoc, updateDoc, where, write
 import { db } from "@/lib/firebase";
 import { col, ecrire, lister, maintenant, parNom, type Commande, type Id } from "./outils";
 import { listerFormats, listerProduits } from "./catalogue";
-import { volumeFr } from "@/lib/format";
+import { telephoneFr, volumeFr } from "@/lib/format";
 import { FAMILLES, familleDe } from "@/lib/familles";
 import { idPrixGroupe, prixDuGroupe } from "./groupes";
 
@@ -54,7 +54,7 @@ export const clients: Record<string, Commande> = {
   create_client: async ({ nom, telephone, adresse, groupePrixId }) => {
     const ref = doc(col("clients"));
     await ecrire(setDoc(ref, {
-      nom: String(nom).trim(), telephone: telephone ?? null, adresse: adresse ?? null,
+      nom: String(nom).trim(), telephone: telephoneFr(telephone), adresse: adresse ?? null,
       ...(groupePrixId ? { groupe_prix_id: groupePrixId } : {}),
       est_defaut: 0, date_creation: maintenant(),
     }));
@@ -63,7 +63,7 @@ export const clients: Record<string, Commande> = {
 
   update_client: async ({ id, nom, telephone, adresse, groupePrixId }) => {
     await ecrire(updateDoc(doc(db, "clients", id as Id), {
-      nom: String(nom).trim(), telephone: telephone ?? null, adresse: adresse ?? null,
+      nom: String(nom).trim(), telephone: telephoneFr(telephone), adresse: adresse ?? null,
       ...(groupePrixId !== undefined ? { groupe_prix_id: groupePrixId || null } : {}),
     }));
   },

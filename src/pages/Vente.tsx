@@ -9,7 +9,7 @@ import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import SoldesBandeau from "@/components/clients/SoldesBandeau";
-import { volumeFr, casiers } from "@/lib/format";
+import { volumeFr, casiers, telephoneFr } from "@/lib/format";
 import Avatar from "@/components/ui/Avatar";
 import { useTempsReel } from "@/lib/tempsReel";
 import { useAuthStore } from "@/stores/authStore";
@@ -253,7 +253,7 @@ export default function Vente() {
     if (!rapideNom.trim()) { toast("Le nom est obligatoire", "warning"); return; }
     try {
       const id = await invoke<string>("create_client", { nom: rapideNom.trim(), telephone: rapideTel.trim() || null, adresse: null });
-      const client: Client = { id, nom: rapideNom.trim(), telephone: rapideTel.trim() || null, est_defaut: 0 };
+      const client: Client = { id, nom: rapideNom.trim(), telephone: telephoneFr(rapideTel), est_defaut: 0 };
       setClients(cs => [...cs, client]);
       setClient(id);
       setClientRapide(false);
@@ -666,7 +666,7 @@ export default function Vente() {
             Pour garder une trace, enregistrez son nom et son téléphone.
           </p>
           <Input label="Nom" value={rapideNom} onChange={e => setRapideNom(e.target.value)} placeholder="ex. : Mme Adjovi (fête samedi)" autoFocus />
-          <Input label="Téléphone" type="tel" value={rapideTel} onChange={e => setRapideTel(e.target.value)} placeholder="+229 97 00 00 00" />
+          <Input label="Téléphone" type="tel" value={rapideTel} onChange={e => setRapideTel(e.target.value)} placeholder="01 97 00 00 00" />
           <div className="flex gap-2 justify-end">
             <Button variant="secondary" onClick={() => setClientRapide(false)}>Annuler</Button>
             <Button onClick={creerClientRapideEtValider} loading={validating}>Enregistrer et valider</Button>
