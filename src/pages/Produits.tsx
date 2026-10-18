@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
-import { Plus, Search, Edit2, Trash2, ChevronDown, ChevronRight, TrendingUp } from "lucide-react";
+import { Plus, Search, Edit2, Trash2, ChevronDown, ChevronRight, TrendingUp, Package } from "lucide-react";
+import Pastilles from "@/components/ui/Pastilles";
+import EtatVide from "@/components/ui/EtatVide";
 import { invoke } from "@/lib/db";
 import { useToast } from "@/components/ui/Toast";
 import { useAppStore } from "@/stores/appStore";
@@ -38,6 +40,7 @@ export default function Produits() {
   const [data, setData] = useState<ProduitAvecFormats[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [filtre, setFiltre] = useState<"tous" | "alerte">("tous");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   // Modal produit
@@ -75,7 +78,11 @@ export default function Produits() {
   // Stock modifié depuis un autre appareil : liste rafraîchie sans clignotement
   useTempsReel(["stock"], () => { load(true); });
 
-  const filtered = data.filter(d => d.produit.nom.toLowerCase().includes(search.toLowerCase()));
+  const enAlerte = (d: ProduitAvecFormats) => d.formats.some(f => f.stock <= f.seuil_alerte);
+  const filtered = data.filter(d => d.produit.nom.toLowerCase().includes(search.toLowerCase()) && (filtre === "tous" || enAlerte(d)));
+  const nbFormats = data.reduce((s, d) => s + d.formats.length, 0);
+  const stockTotal = data.reduce((s, d) => s + d.formats.reduce((t, f) => t + f.stock, 0), 0);
+  const nbAlertes = data.filter(enAlerte).length;
 
   const toggleExpand = (id: string) => setExpanded(prev => {
     const s = new Set(prev);
@@ -155,7 +162,13 @@ export default function Produits() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <Header title="Produits" subtitle="Gérer les produits et leurs formats"
+      <Header title="Produits" subtitle="Catalogue, formats, prix et stock" icone={<Package size={22} />}
+        chiffres={loading ? undefined : [
+          { label: "Produits", valeur: data.length },
+          { label: "Formats", valeur: nbFormats },
+          { label: "Casiers en stock", valeur: stockTotal },
+          { label: "En alerte", valeur: nbAlertes, ton: nbAlertes > 0 ? "danger" : "succes" },
+        ]}
         actions={estGerant ? (
           <div className="flex gap-2">
             <Button variant="secondary" icon={<TrendingUp size={16} />} onClick={() => setModalPrix(true)}>Ajuster les prix</Button>
@@ -167,12 +180,18 @@ export default function Produits() {
         <Input placeholder="Rechercher un produit…" value={search} onChange={e => setSearch(e.target.value)}
           icon={<Search size={16} />} />
 
+        <Pastilles valeur={filtre} onChange={setFiltre} options={[
+          { valeur: "tous", label: "Tous", compte: data.length },
+          { valeur: "alerte", label: "En alerte", compte: nbAlertes },
+        ]} />
+
         {loading ? (
           <Skeleton variant="card" count={3} />
         ) : filtered.length === 0 ? (
-          <Card className="text-center py-12">
-            <p className="text-gray-400 text-sm">{search ? `Aucun résultat pour "${search}"` : "Aucun produit. Créez-en un !"}</p>
-          </Card>
+          <EtatVide icone={<Package size={26} />}
+            titre={search ? `Aucun résultat pour « ${search} »` : filtre === "alerte" ? "Aucun produit en alerte" : "Aucun produit"}
+            texte={search ? "Vérifiez l'orthographe." : filtre === "alerte" ? "Tous les stocks sont au-dessus de leur seuil." : "Ajoutez vos boissons et leurs formats (0,33 L, 0,5 L…)."}
+            action={!search && filtre === "tous" && estGerant ? <Button icon={<Plus size={16} />} onClick={openNewProduit}>Nouveau produit</Button> : undefined} />
         ) : (
           filtered.map(({ produit, formats }) => {
             const isOpen = expanded.has(produit.id);

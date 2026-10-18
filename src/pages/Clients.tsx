@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
-import { Plus, Search, Edit2, Trash2, Phone, MapPin, Shield, Tag, ChevronRight } from "lucide-react";
+import { Plus, Search, Edit2, Trash2, Phone, MapPin, Shield, Tag, ChevronRight, Users } from "lucide-react";
+import { useAppStore } from "@/stores/appStore";
+import Pastilles from "@/components/ui/Pastilles";
+import EtatVide from "@/components/ui/EtatVide";
 import { useAuthStore } from "@/stores/authStore";
 import { invoke } from "@/lib/db";
 import { useToast } from "@/components/ui/Toast";
@@ -62,6 +65,9 @@ export default function Clients() {
     && (!seulementDebiteurs || doitQuelqueChose(c))
   );
   const nbDebiteurs = clients.filter(doitQuelqueChose).length;
+  const totalDettes = clients.reduce((s, c) => s + Math.max(0, c.solde_argent ?? 0), 0);
+  const totalCasiers = clients.reduce((s, c) => s + Object.values(c.emballages_dus ?? {}).reduce((t, n) => t + Math.max(0, n), 0), 0);
+  const formatPrix = useAppStore((st) => st.formatMontant);
 
   const openNew = () => { setEdit(null); setNom(""); setTelephone(""); setAdresse(""); setModal(true); };
   const openEdit = (c: Client) => { setEdit(c); setNom(c.nom); setTelephone(c.telephone ?? ""); setAdresse(c.adresse ?? ""); setModal(true); };
@@ -91,32 +97,32 @@ export default function Clients() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <Header title="Clients" subtitle={`${clients.length} client${clients.length > 1 ? "s" : ""}`}
-        actions={<Button icon={<Plus size={16} />} onClick={openNew}>Nouveau client</Button>} />
+      <Header title="Clients" subtitle="Comptes, dettes et casiers à rendre" icone={<Users size={22} />}
+        actions={<Button icon={<Plus size={16} />} onClick={openNew}>Nouveau client</Button>}
+        chiffres={loading ? undefined : [
+          { label: "Clients", valeur: clients.filter(c => c.est_defaut !== 1).length },
+          { label: "Argent dû", valeur: formatPrix(totalDettes), ton: totalDettes > 0 ? "alerte" : "neutre" },
+          { label: "Casiers dehors", valeur: totalCasiers, ton: totalCasiers > 0 ? "alerte" : "neutre" },
+          { label: "Clients à crédit", valeur: nbDebiteurs },
+        ]} />
 
       <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-28 lg:pb-8 [&>*]:w-full [&>*]:max-w-4xl [&>*]:mx-auto flex flex-col gap-3">
         <Input placeholder="Rechercher par nom ou téléphone…" value={search}
           onChange={e => setSearch(e.target.value)} icon={<Search size={16} />} />
 
-        <div className="flex gap-2">
-          <button onClick={() => setSeulementDebiteurs(false)}
-            className={["px-3 py-1.5 rounded-full text-xs font-semibold transition-colors",
-              !seulementDebiteurs ? "bg-primary text-white" : "bg-white text-gray-600 border border-slate-200"].join(" ")}>
-            Tous
-          </button>
-          <button onClick={() => setSeulementDebiteurs(true)}
-            className={["px-3 py-1.5 rounded-full text-xs font-semibold transition-colors",
-              seulementDebiteurs ? "bg-orange-600 text-white" : "bg-white text-gray-600 border border-slate-200"].join(" ")}>
-            Doivent quelque chose ({nbDebiteurs})
-          </button>
-        </div>
+        <Pastilles valeur={seulementDebiteurs ? "debiteurs" : "tous"} onChange={v => setSeulementDebiteurs(v === "debiteurs")}
+          options={[
+            { valeur: "tous", label: "Tous", compte: clients.length },
+            { valeur: "debiteurs", label: "Doivent quelque chose", compte: nbDebiteurs },
+          ]} />
 
         {loading ? (
           <Skeleton variant="card" count={4} />
         ) : filtered.length === 0 ? (
-          <Card className="text-center py-12">
-            <p className="text-gray-400 text-sm">{search ? `Aucun résultat pour "${search}"` : "Aucun client. Créez-en un !"}</p>
-          </Card>
+          <EtatVide icone={<Users size={26} />}
+            titre={search ? `Aucun résultat pour « ${search} »` : seulementDebiteurs ? "Personne ne doit rien" : "Aucun client"}
+            texte={search ? "Vérifiez l'orthographe ou cherchez par téléphone." : seulementDebiteurs ? "Tous les comptes clients sont à jour." : "Ajoutez vos clients réguliers pour suivre leurs prix et leurs dettes."}
+            action={!search && !seulementDebiteurs ? <Button icon={<Plus size={16} />} onClick={openNew}>Nouveau client</Button> : undefined} />
         ) : (
           <div className="flex flex-col gap-2">
             {filtered.map(c => {

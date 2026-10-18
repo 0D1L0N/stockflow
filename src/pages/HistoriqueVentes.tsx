@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
-import { XCircle, Filter, Printer, Download, Loader } from "lucide-react";
+import { XCircle, Filter, Printer, Download, Loader, History, Receipt } from "lucide-react";
+import Pastilles from "@/components/ui/Pastilles";
+import EtatVide from "@/components/ui/EtatVide";
+import Avatar from "@/components/ui/Avatar";
 import { invoke } from "@/lib/db";
 import { useToast } from "@/components/ui/Toast";
 import { useAppStore } from "@/stores/appStore";
@@ -44,6 +47,7 @@ export default function HistoriqueVentes() {
   const { symbole, position, formatMontant } = useAppStore();
   const formatPrix = formatMontant;
   const [ventes, setVentes] = useState<Vente[]>([]);
+  const [statut, setStatut] = useState<"toutes" | "payees" | "credit" | "annulees">("toutes");
   const [loading, setLoading] = useState(true);
   const [dateDebut, setDateDebut] = useState("");
   const [dateFin, setDateFin] = useState("");
@@ -135,12 +139,25 @@ export default function HistoriqueVentes() {
   };
 
   const nbValidees = ventes.filter(v => v.statut === "validée").length;
+  const estCredit = (v: Vente) => v.statut === "validée" && (v.reste_du ?? 0) > 0;
+  const nbCredit = ventes.filter(estCredit).length;
+  const nbAnnulees = ventes.filter(v => v.statut !== "validée").length;
+  const ventesAffichees = ventes.filter(v =>
+    statut === "toutes" ? true
+    : statut === "annulees" ? v.statut !== "validée"
+    : statut === "credit" ? estCredit(v)
+    : v.statut === "validée" && !estCredit(v));
   const totalJour = ventes.filter(v => v.statut === "validée").reduce((s, v) => s + v.total, 0);
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <Header title="Historique des ventes"
-        subtitle={`${nbValidees} vente${nbValidees > 1 ? "s" : ""} — ${formatPrix(totalJour)}`} />
+      <Header title="Historique des ventes" subtitle="Factures, réimpression et annulation" icone={<History size={22} />}
+        chiffres={loading ? undefined : [
+          { label: "Ventes", valeur: nbValidees },
+          { label: "Montant total", valeur: formatPrix(totalJour), ton: "succes" },
+          { label: "À crédit", valeur: nbCredit, ton: nbCredit > 0 ? "alerte" : "neutre" },
+          { label: "Annulées", valeur: nbAnnulees, ton: nbAnnulees > 0 ? "danger" : "neutre" },
+        ]} />
 
       <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-28 lg:pb-8 [&>*]:w-full [&>*]:max-w-4xl [&>*]:mx-auto flex flex-col gap-3">
         {/* Filtres date */}
@@ -161,26 +178,33 @@ export default function HistoriqueVentes() {
           </Button>
         </Card>
 
+        <Pastilles valeur={statut} onChange={setStatut} options={[
+          { valeur: "toutes", label: "Toutes", compte: ventes.length },
+          { valeur: "payees", label: "Payées", compte: nbValidees - nbCredit },
+          { valeur: "credit", label: "À crédit", compte: nbCredit },
+          { valeur: "annulees", label: "Annulées", compte: nbAnnulees },
+        ]} />
+
         {loading ? (
           <Skeleton variant="table-row" count={6} />
-        ) : ventes.length === 0 ? (
-          <Card className="text-center py-12">
-            <p className="text-gray-400 text-sm">Aucune vente pour cette période</p>
-          </Card>
+        ) : ventesAffichees.length === 0 ? (
+          <EtatVide icone={<Receipt size={26} />} titre="Aucune vente"
+            texte={ventes.length === 0 ? "Aucune vente sur cette période." : "Aucune vente ne correspond à ce filtre."} />
         ) : (
           <Card padding="none" className="overflow-hidden divide-y divide-slate-100">
-            {ventes.map(v => {
+            {ventesAffichees.map(v => {
               const annulee = v.statut !== "validée";
               const credit = !annulee && (v.reste_du ?? 0) > 0;
               return (
                 <div key={v.id} onClick={() => openDetail(v)}
-                  className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-slate-50 active:bg-slate-100 transition-colors">
+                  className="flex items-center gap-3 px-4 py-3.5 cursor-pointer hover:bg-slate-50 active:bg-slate-100 transition-colors">
+                  <Avatar nom={v.client_nom ?? "?"} taille="md" rond className={annulee ? "opacity-40" : ""} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-baseline justify-between gap-3">
                       <span className={["font-semibold text-sm truncate", annulee ? "text-gray-400 line-through" : "text-gray-900"].join(" ")}>
                         {v.client_nom ?? "—"}
                       </span>
-                      <span className={["font-bold text-sm tabular-nums whitespace-nowrap", annulee ? "text-gray-400 line-through" : "text-gray-900"].join(" ")}>
+                      <span className={["chiffre font-extrabold text-[15px] whitespace-nowrap", annulee ? "text-gray-400 line-through" : "text-gray-900"].join(" ")}>
                         {formatPrix(v.total)}
                       </span>
                     </div>
