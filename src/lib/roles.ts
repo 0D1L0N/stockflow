@@ -22,6 +22,7 @@ export const ROUTE_ROLES: Record<string, Role[]> = {
   "/clients":     ["gerant", "vendeur"],
   "/historique":  ["gerant", "vendeur"],
   "/reappro":     ["gerant", "vendeur", "magasinier"],
+  "/fournisseurs": ["gerant", "vendeur"],
   "/alertes":     ["gerant", "vendeur", "magasinier"],
   "/mouvements":  ["gerant", "vendeur", "magasinier"],
   "/ajustement":  ["gerant", "vendeur", "magasinier"],

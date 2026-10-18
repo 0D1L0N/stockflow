@@ -35,9 +35,11 @@ beforeEach(async () => {
     await setDoc(doc(db, "users/autre"), { nom: "A", role: "vendeur", actif: true });
     await setDoc(doc(db, "users/ancien"), { nom: "X", role: "vendeur", actif: false });
     await setDoc(doc(db, "formats/f1"), { produit_id: "p1", volume: 0.33, unite: "L", prix: 6000, stock: 10, seuil_alerte: 2 });
+    await setDoc(doc(db, "formats/f9"), { produit_id: "p9", volume: 0.33, unite: "L", prix: 6000, stock: 10, seuil_alerte: 2 });
     await setDoc(doc(db, "clients/c1"), { nom: "Client", est_defaut: 0, solde_argent: 5000, emballages_dus: { "casier-24": 2 } });
     await setDoc(doc(db, "clients/c2"), { nom: "Autre client", est_defaut: 0 });
     await setDoc(doc(db, `stats_jour/${JOUR}`), { ca: 100, nb_ventes: 1 });
+    await setDoc(doc(db, "fournisseurs/fo1"), { nom: "Fournisseur", solde_argent: 0 });
     await setDoc(doc(db, "ventes/v-autre"), { vendeur_uid: "autre", total: 1, statut: "validée", format_ids: [] });
   });
 });
@@ -63,7 +65,36 @@ function batchVente(db: Firestore, uid: string, opts: { total?: number; ca?: num
   return b;
 }
 
+/** Livraison reçue : bon de réception, stock des formats, dette et casiers dus au fournisseur. */
+function batchReception(db: Firestore, uid: string, formats: string[], opts: { autreFormat?: string } = {}) {
+  const b = writeBatch(db);
+  b.set(doc(db, "receptions/r1"), { utilisateur_uid: uid, fournisseur_id: "fo1", format_ids: formats, total: 50000, cree_le: serverTimestamp() });
+  for (const id of [...formats, ...(opts.autreFormat ? [opts.autreFormat] : [])]) {
+    b.update(doc(db, `formats/${id}`), { stock: increment(3), derniere_reception: "r1" });
+    b.set(doc(db, `mouvements_stock/mr-${id}`), { format_id: id, utilisateur_uid: uid, type: "entrée", cree_le: serverTimestamp() });
+  }
+  b.set(doc(db, "operations_fournisseur/of1"), { fournisseur_id: "fo1", utilisateur_uid: uid, type: "réception", cree_le: serverTimestamp() });
+  b.set(doc(db, "fournisseurs/fo1"), { solde_argent: increment(20000), emballages_dus: { "casier-24": increment(3) }, derniere_operation: "of1" }, { merge: true });
+  return b;
+}
+
 describe("vendeur — usage normal", () => {
+  it("réceptionne une livraison de 25 produits (stock, dette et casiers fournisseur)", async () => {
+    const ids = Array.from({ length: 25 }, (_, i) => `h${i}`);
+    await env.withSecurityRulesDisabled(async ctx => {
+      for (const id of ids) await setDoc(doc(ctx.firestore(), `formats/${id}`), { produit_id: "p", volume: 1, unite: "L", prix: 1, stock: 0, seuil_alerte: 1 });
+    });
+    await assertSucceeds(batchReception(en("vendeur"), "vendeur", ids).commit());
+  });
+
+  it("paie un fournisseur avec une opération tracée", async () => {
+    const db = en("vendeur");
+    const b = writeBatch(db);
+    b.set(doc(db, "operations_fournisseur/of2"), { fournisseur_id: "fo1", utilisateur_uid: "vendeur", type: "paiement", cree_le: serverTimestamp() });
+    b.set(doc(db, "fournisseurs/fo1"), { solde_argent: increment(-10000), derniere_operation: "of2" }, { merge: true });
+    await assertSucceeds(b.commit());
+  });
+
   it("enregistre une vente complète (stock, journal, dette, totaux du jour)", async () => {
     await assertSucceeds(batchVente(en("vendeur"), "vendeur").commit());
   });
@@ -106,6 +137,21 @@ describe("vendeur — usage normal", () => {
 });
 
 describe("vendeur — tentatives refusées", () => {
+  it("monter le stock d'un produit absent de la réception", async () => {
+    await assertFails(batchReception(en("vendeur"), "vendeur", ["f1"], { autreFormat: "f9" }).commit());
+  });
+
+  it("effacer la dette d'un fournisseur sans opération", async () => {
+    await assertFails(updateDoc(doc(en("vendeur"), "fournisseurs/fo1"), { solde_argent: -50000 }));
+  });
+
+  it("modifier un bon de réception", async () => {
+    await env.withSecurityRulesDisabled(async ctx => {
+      await setDoc(doc(ctx.firestore(), "receptions/r0"), { utilisateur_uid: "vendeur", total: 1000 });
+    });
+    await assertFails(updateDoc(doc(en("vendeur"), "receptions/r0"), { total: 1 }));
+  });
+
   it("modifier un stock sans preuve", async () => {
     await assertFails(updateDoc(doc(en("vendeur"), "formats/f1"), { stock: 999 }));
   });

@@ -22,10 +22,10 @@ async function lireFormat(formatId: Id) {
  * Enregistre un mouvement de stock dans le même batch que la mise à jour du format.
  * Renvoie son identifiant : le format doit le citer (exigé par les règles).
  */
-function ajouterMouvement(
+export function ajouterMouvement(
   batch: ReturnType<typeof writeBatch>,
   format: Format, produitNom: string,
-  m: { type: string; quantite: number; stock_apres: number; source: string; commentaire: unknown },
+  m: { type: string; quantite: number; stock_apres: number; source: string; commentaire: unknown; reference_id?: Id },
 ): Id {
   const ref = doc(col("mouvements_stock"));
   batch.set(ref, {
@@ -38,7 +38,7 @@ function ajouterMouvement(
     stock_avant: format.stock,
     stock_apres: m.stock_apres,
     source: m.source,
-    reference_id: null,
+    reference_id: m.reference_id ?? null,
     commentaire: (m.commentaire as string | null) ?? null,
     utilisateur_uid: auth.currentUser?.uid,
     date: maintenant(),

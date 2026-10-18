@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { Plus, RefreshCw, History, Send, PackagePlus, CheckCircle2 } from "lucide-react";
+import { Plus, RefreshCw, History, Send, PackagePlus, CheckCircle2, PackageCheck } from "lucide-react";
 import Avatar from "@/components/ui/Avatar";
 import EtatVide from "@/components/ui/EtatVide";
 import ModalBonCommande from "@/components/stock/ModalBonCommande";
+import ModalReception from "@/components/fournisseurs/ModalReception";
 import { invoke } from "@/lib/db";
 import { useToast } from "@/components/ui/Toast";
 import { useAppStore } from "@/stores/appStore";
@@ -40,6 +41,7 @@ export default function Reappro() {
   const [historique, setHistorique] = useState<Mouvement[]>([]);
   const [loading, setLoading] = useState(true);
   const [bonCommande, setBonCommande] = useState(false);
+  const [reception, setReception] = useState(false);
 
   // Modal réapprovisionnement
   const [modal, setModal] = useState(false);
@@ -140,8 +142,9 @@ export default function Reappro() {
           { label: "Entrées récentes", valeur: historique.length },
         ]}
         actions={
-          <div className="flex gap-2">
-            <Button size="sm" icon={<Send size={14} />} onClick={() => setBonCommande(true)}>Bon de commande</Button>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" icon={<PackageCheck size={14} />} onClick={() => setReception(true)}>Réceptionner une livraison</Button>
+            <Button size="sm" variant="secondary" icon={<Send size={14} />} onClick={() => setBonCommande(true)}>Bon de commande</Button>
             <Button variant="secondary" icon={<RefreshCw size={15} />} onClick={() => load()} size="sm">
               Actualiser
             </Button>
@@ -283,6 +286,7 @@ export default function Reappro() {
         )}
       </Modal>
       <ModalBonCommande isOpen={bonCommande} onClose={() => setBonCommande(false)} />
+      <ModalReception isOpen={reception} onClose={() => setReception(false)} onDone={() => load()} />
     </div>
   );
 }

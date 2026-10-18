@@ -9,6 +9,7 @@ import { emballages } from "./emballages";
 import { comptes } from "./comptes";
 import { sauvegarde } from "./sauvegarde";
 import { groupes } from "./groupes";
+import { fournisseurs } from "./fournisseurs";
 import { traduireErreur, type Commande } from "./outils";
 
 const brutes: Record<string, Commande> = {
@@ -23,6 +24,7 @@ const brutes: Record<string, Commande> = {
   ...comptes,
   ...sauvegarde,
   ...groupes,
+  ...fournisseurs,
 };
 
 /** Commandes déjà migrées vers Firestore, avec des erreurs traduites pour l'interface. */

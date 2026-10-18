@@ -14,6 +14,7 @@ import Mouvements from "@/pages/Mouvements";
 import Parametres from "@/pages/Parametres";
 import AjustementStock from "@/pages/AjustementStock";
 import Utilisateurs from "@/pages/Utilisateurs";
+import Fournisseurs from "@/pages/Fournisseurs";
 import { useAppStore } from "@/stores/appStore";
 import { useAuthStore } from "@/stores/authStore";
 import { peutAcceder, routeAccueil } from "@/lib/roles";
@@ -32,6 +33,7 @@ const ROUTES: { path: string; element: ReactNode }[] = [
   { path: "/clients",    element: <Clients /> },
   { path: "/historique", element: <HistoriqueVentes /> },
   { path: "/reappro",    element: <Reappro /> },
+  { path: "/fournisseurs", element: <Fournisseurs /> },
   { path: "/alertes",    element: <Alertes /> },
   { path: "/mouvements", element: <Mouvements /> },
   { path: "/parametres", element: <Parametres /> },

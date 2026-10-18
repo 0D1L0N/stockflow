@@ -36,6 +36,16 @@ service cloud.firestore {
       let m = getAfter(/databases/$(database)/documents/mouvements_stock/$(id)).data;
       return m.cree_le == request.time && m.utilisateur_uid == request.auth.uid && m.format_id == formatId;
     }
+    // La réception citée vient d'être créée dans ce batch par l'utilisateur
+    function receptionDuBatch(id) {
+      let r = getAfter(/databases/$(database)/documents/receptions/$(id)).data;
+      return r.cree_le == request.time && r.utilisateur_uid == request.auth.uid;
+    }
+    // L'opération citée vient d'être créée dans ce batch, pour ce fournisseur
+    function operationFournisseurDuBatch(id, fournisseurId) {
+      let o = getAfter(/databases/$(database)/documents/operations_fournisseur/$(id)).data;
+      return o.cree_le == request.time && o.utilisateur_uid == request.auth.uid && o.fournisseur_id == fournisseurId;
+    }
     // L'opération de journal citée vient d'être créée dans ce batch, pour ce client
     function operationDuBatch(id, clientId) {
       let o = getAfter(/databases/$(database)/documents/operations_client/$(id)).data;
@@ -88,6 +98,12 @@ service cloud.firestore {
             && request.resource.data.stock < resource.data.stock
             && venteDuBatch(request.resource.data.derniere_vente)
             && formatId in getAfter(/databases/$(database)/documents/ventes/$(request.resource.data.derniere_vente)).data.format_ids)
+        // Réception fournisseur : le stock monte et la réception du batch contient ce format
+        || (aRole(['vendeur', 'magasinier'])
+            && seulementChamps(['stock', 'derniere_reception'])
+            && request.resource.data.stock > resource.data.stock
+            && receptionDuBatch(request.resource.data.derniere_reception)
+            && formatId in getAfter(/databases/$(database)/documents/receptions/$(request.resource.data.derniere_reception)).data.format_ids)
         // Réappro ou inventaire : un mouvement de stock du batch l'explique
         || (aRole(['vendeur', 'magasinier'])
             && seulementChamps(['stock', 'dernier_mouvement'])
@@ -145,6 +161,36 @@ service cloud.firestore {
       // Seul le gérant annule une vente (statut uniquement).
       allow update: if gerant() && seulementChamps(['statut', 'date_annulation']);
       allow delete: if false;
+    }
+
+    // ── Fournisseurs ─────────────────────────────────────────────────────
+    // Le vendeur réceptionne les livraisons ; chaque variation de compte cite son opération.
+    match /fournisseurs/{fournisseurId} {
+      allow read: if aRole(['gerant', 'vendeur']);
+      allow create: if gerant()
+        || (aRole(['vendeur'])
+            && !('solde_argent' in request.resource.data)
+            && !('emballages_dus' in request.resource.data));
+      allow update: if gerant()
+        || (aRole(['vendeur'])
+            && seulementChamps(['solde_argent', 'emballages_dus', 'derniere_operation'])
+            && operationFournisseurDuBatch(request.resource.data.derniere_operation, fournisseurId));
+      allow delete: if gerant();
+    }
+    // Bons de réception et journal fournisseur : on ajoute, on ne modifie ni ne supprime jamais.
+    match /receptions/{id} {
+      allow read: if aRole(['gerant', 'vendeur']);
+      allow create: if aRole(['gerant', 'vendeur'])
+        && request.resource.data.utilisateur_uid == request.auth.uid
+        && horodate();
+      allow update, delete: if false;
+    }
+    match /operations_fournisseur/{id} {
+      allow read: if aRole(['gerant', 'vendeur']);
+      allow create: if aRole(['gerant', 'vendeur'])
+        && request.resource.data.utilisateur_uid == request.auth.uid
+        && horodate();
+      allow update, delete: if false;
     }
 
     // ── Stock ────────────────────────────────────────────────────────────
