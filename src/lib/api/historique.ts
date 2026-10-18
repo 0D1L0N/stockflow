@@ -127,13 +127,18 @@ export const historique: Record<string, Commande> = {
   },
 
   get_stats_dashboard: async () => {
-    const [aujourdhui, hier, produits, formats, clients, emballages] = await Promise.all([
+    // Les 7 derniers jours (aujourd'hui inclus) pour le graphique du tableau de bord
+    const jours = Array.from({ length: 7 }, (_, i) => jourLocal(i - 6));
+    const semaine = Promise.all(jours.map(j => getDoc(doc(db, "stats_jour", j))))
+      .then(snaps => snaps.map((s, i) => ({ jour: jours[i], ca: (s.data()?.ca as number) ?? 0, ventes: (s.data()?.nb_ventes as number) ?? 0 })));
+    const [aujourdhui, hier, produits, formats, clients, emballages, sept] = await Promise.all([
       getDoc(doc(db, "stats_jour", jourLocal(0))),
       getDoc(doc(db, "stats_jour", jourLocal(-1))),
       listerProduits(),
       listerFormats(),
       lister<{ id: Id; solde_argent?: number; emballages_dus?: Record<string, number> }>(col("clients")),
       listerEmballages(),
+      semaine,
     ]);
 
     // Ce que les clients doivent au dépôt
@@ -171,6 +176,7 @@ export const historique: Record<string, Commande> = {
       total_dettes: debiteurs.reduce((s, c) => s + (c.solde_argent ?? 0), 0),
       clients_debiteurs: debiteurs.length,
       emballages_dehors,
+      semaine: sept,
     };
   },
 };

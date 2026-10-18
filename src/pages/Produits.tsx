@@ -13,6 +13,7 @@ import Card from "@/components/ui/Card";
 import ModalAjustementPrix from "@/components/prix/ModalAjustementPrix";
 import { CASIER_PAR_VOLUME } from "@/lib/api/emballages";
 import { volumeFr, casiers } from "@/lib/format";
+import Avatar from "@/components/ui/Avatar";
 import { useAuthStore } from "@/stores/authStore";
 import { useTempsReel } from "@/lib/tempsReel";
 
@@ -185,6 +186,7 @@ export default function Produits() {
                   <button className="text-gray-400">
                     {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                   </button>
+                  <Avatar nom={produit.nom} taille="md" />
                   <div className="flex-1 min-w-0">
                     <div className="font-semibold text-gray-800">{produit.nom}</div>
                     <div className="text-xs text-gray-400 mt-0.5">{formats.length} format{formats.length > 1 ? "s" : ""} · {casiers(totalStock)} en stock</div>

@@ -13,6 +13,7 @@ import Card from "@/components/ui/Card";
 import ModalPrixClient from "@/components/clients/ModalPrixClient";
 import ModalCompteClient from "@/components/clients/ModalCompteClient";
 import SoldesBandeau from "@/components/clients/SoldesBandeau";
+import Avatar from "@/components/ui/Avatar";
 import { useTempsReel } from "@/lib/tempsReel";
 
 interface Client {
@@ -87,7 +88,6 @@ export default function Clients() {
     } catch (e) { toast(String(e), "error"); }
   };
 
-  const initials = (nom: string) => nom.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -126,10 +126,9 @@ export default function Clients() {
               return (
                 <Card key={c.id} padding="sm" onClick={defaut ? undefined : () => setCompte(c)} className="sm:p-4">
                   <div className="flex items-center gap-3">
-                    <div className={["w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0",
-                      doitQuelqueChose(c) ? "bg-orange-100 text-orange-700" : "bg-primary-50 text-primary-700"].join(" ")}>
-                      {defaut ? <Shield size={18} /> : <span className="font-bold text-sm">{initials(c.nom)}</span>}
-                    </div>
+                    {defaut ? (
+                      <div className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 bg-slate-100 text-gray-500"><Shield size={18} /></div>
+                    ) : <Avatar nom={c.nom} taille="lg" rond />}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="font-semibold text-gray-900 text-[15px] truncate">{c.nom}</span>

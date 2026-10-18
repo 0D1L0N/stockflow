@@ -27,9 +27,22 @@
   input[type="number"] { -moz-appearance: textfield; }
 
   ::selection { background: theme('colors.secondary.200'); }
+
+  /* Titres en police d'affichage, plus de caractère que le texte courant */
+  h1, h2, h3 {
+    font-family: theme('fontFamily.display');
+    letter-spacing: -0.02em;
+  }
 }
 
 @layer utilities {
+  /* Montants et compteurs : police d'affichage, chiffres de même largeur */
+  .chiffre {
+    font-family: theme('fontFamily.display');
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+  }
+
   /* Zones sûres des téléphones à encoche (iPhone, Android plein écran) */
   .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
   .pt-safe { padding-top: env(safe-area-inset-top); }

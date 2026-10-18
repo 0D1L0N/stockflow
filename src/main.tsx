@@ -10,6 +10,8 @@ import "@fontsource/inter/600.css";
 // @ts-ignore
 import "@fontsource/inter/700.css";
 // @ts-ignore
+import "@fontsource-variable/plus-jakarta-sans/wght.css";
+// @ts-ignore
 import "./index.css";
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(

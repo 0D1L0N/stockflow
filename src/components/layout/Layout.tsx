@@ -24,7 +24,7 @@ export default function Layout({ children }: LayoutProps) {
   const loadAlertes = useAppStore((s) => s.loadAlertes);
   useTempsReel(["stock"], () => { loadAlertes().catch(() => {}); });
 
-  const showFab =["/", "/clients", "/historique", "/produits"].includes(pathname) && peutAcceder(role, "/vente");
+  const showFab = ["/clients", "/historique", "/produits"].includes(pathname) && peutAcceder(role, "/vente");
 
   return (
     // 100dvh : la hauteur réelle visible sur mobile (barres du navigateur exclues)
@@ -44,7 +44,7 @@ export default function Layout({ children }: LayoutProps) {
       {showFab && (
         <button
           onClick={() => navigate("/vente")}
-          className="fixed z-20 right-4 bottom-[calc(76px+env(safe-area-inset-bottom))] lg:bottom-6 lg:right-6 h-14 w-14 lg:w-auto lg:px-5 lg:gap-2
+          className="fixed z-20 right-4 bottom-[calc(88px+env(safe-area-inset-bottom))] lg:bottom-6 lg:right-6 h-14 w-14 lg:w-auto lg:px-5 lg:gap-2
             bg-gradient-to-br from-secondary-400 to-secondary-600 text-white rounded-full shadow-glow
             flex items-center justify-center font-semibold transition-all hover:scale-105 active:scale-95"
           title="Nouvelle vente"

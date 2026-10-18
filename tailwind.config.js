@@ -36,10 +36,23 @@ export default {
         danger:  '#ef4444',
         warning: '#f59e0b',
         info:    '#3b82f6',
-        background: '#f7f8fa',
+        background: '#f5f6f8',
+        // Encre : structure (menu, en-têtes forts, écran de connexion)
+        ink: {
+          DEFAULT: '#0b1220',
+          950: '#070c17',
+          900: '#0b1220',
+          800: '#131c30',
+          700: '#1d2842',
+          600: '#2b3854',
+          400: '#7b879f',
+          300: '#a6b0c3',
+        },
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
+        // Titres et montants
+        display: ['"Plus Jakarta Sans Variable"', 'Inter', 'system-ui', 'sans-serif'],
       },
       borderRadius: {
         DEFAULT: '8px',

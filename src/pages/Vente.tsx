@@ -10,6 +10,7 @@ import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import SoldesBandeau from "@/components/clients/SoldesBandeau";
 import { volumeFr, casiers } from "@/lib/format";
+import Avatar from "@/components/ui/Avatar";
 import { useTempsReel } from "@/lib/tempsReel";
 
 interface Format { id: string; produit_id: string; volume: number; unite: string; prix: number; stock: number; seuil_alerte: number; emballage_id?: string | null; }
@@ -331,7 +332,7 @@ export default function Vente() {
 
           <div className="flex items-center justify-between">
             <span className="font-bold text-gray-800">{ancienSolde > 0 ? "Achat du jour" : "Total"}</span>
-            <span className="font-extrabold text-xl text-primary">{formatPrix(total)}</span>
+            <span className="chiffre font-extrabold text-2xl text-ink-900">{formatPrix(total)}</span>
           </div>
           {ancienSolde > 0 && (
             <div className="flex flex-col gap-0.5 bg-orange-50 rounded-lg px-3 py-2 text-xs text-orange-800">
@@ -515,7 +516,7 @@ export default function Vente() {
       {/* Barre « Voir le panier » sur téléphone : le panier toujours à portée de pouce */}
       {items.length > 0 && !showCart && (
         <button onClick={() => setShowCart(true)}
-          className="lg:hidden fixed left-3 right-3 z-30 bottom-[calc(72px+env(safe-area-inset-bottom))] h-14 px-4 rounded-2xl
+          className="lg:hidden fixed left-3 right-3 z-30 bottom-[calc(84px+env(safe-area-inset-bottom))] h-14 px-4 rounded-2xl
             bg-secondary-600 text-white shadow-modal flex items-center gap-3 animate-slide-up active:scale-[0.98] transition-transform">
           <span className="relative">
             <ShoppingCart size={20} />
@@ -620,11 +621,14 @@ function ProduitCard({
         </span>
       )}
 
-      <div className="min-w-0">
+      <div className="flex items-center gap-2.5 min-w-0">
+        <Avatar nom={nom} taille="md" />
+        <div className="min-w-0">
         <div className="font-bold text-[15px] text-gray-900 truncate">{nom}</div>
         <div className={["text-xs font-medium mt-0.5",
           outOfStock ? "text-danger" : lowStock ? "text-amber-600" : "text-gray-400"].join(" ")}>
           {outOfStock ? "Rupture de stock" : `${casiers(fmt.stock)} en stock`}
+        </div>
         </div>
       </div>
 
@@ -653,7 +657,7 @@ function ProduitCard({
       )}
 
       <div className="mt-auto">
-        <div className="text-base font-bold text-gray-900 tabular-nums leading-tight">{formatPrix(prixDe(fmt))}</div>
+        <div className="chiffre text-[17px] font-extrabold text-ink-900 leading-tight">{formatPrix(prixDe(fmt))}</div>
         {prixSpecifique && (
           <div className="text-[11px] text-gray-400">
             <span className="line-through">{formatPrix(fmt.prix)}</span>

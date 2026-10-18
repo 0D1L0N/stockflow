@@ -42,7 +42,7 @@ export default function BottomNav() {
       {/* Feuille « Plus » */}
       {drawerOpen && (
         <div className="fixed inset-0 z-30 bg-slate-900/40 backdrop-blur-[2px] animate-fade-in lg:hidden" onClick={() => setDrawerOpen(false)}>
-          <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl p-4 pb-24 shadow-modal animate-slide-up"
+          <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl p-4 pb-28 shadow-modal animate-slide-up"
             onClick={e => e.stopPropagation()}>
             <div className="flex justify-center -mt-1 mb-3"><div className="w-10 h-1 rounded-full bg-slate-200" /></div>
             <div className="flex items-center justify-between mb-3 px-1">
@@ -90,15 +90,15 @@ export default function BottomNav() {
       )}
 
       {/* Barre du bas */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur border-t border-slate-200/70 flex lg:hidden shadow-sticky pb-safe">
+      <nav className="fixed left-3 right-3 bottom-[calc(10px+env(safe-area-inset-bottom))] z-40 bg-ink-900/95 backdrop-blur-md rounded-2xl flex lg:hidden shadow-[0_12px_32px_-8px_rgba(7,12,23,0.55)] ring-1 ring-white/[0.06] px-1">
         {principaux.map(item => (
           <NavLink key={item.to} to={item.to} end={item.to === "/"} className="flex-1" onClick={() => setDrawerOpen(false)}>
-            {({ isActive }) => <Onglet actif={isActive} icone={item.icon(21)} label={item.label} badge={item.badge} />}
+            {({ isActive }) => <Onglet actif={isActive} icone={item.icon(20)} label={item.label} badge={item.badge} />}
           </NavLink>
         ))}
         {autres.length > 0 && (
           <button onClick={() => setDrawerOpen(o => !o)} className="flex-1">
-            <Onglet actif={drawerOpen || autreActif} icone={<MoreHorizontal size={21} />} label="Plus" badge={badgeAutres} />
+            <Onglet actif={drawerOpen || autreActif} icone={<MoreHorizontal size={20} />} label="Plus" badge={badgeAutres} />
           </button>
         )}
       </nav>
@@ -108,14 +108,14 @@ export default function BottomNav() {
 
 function Onglet({ actif, icone, label, badge = 0 }: { actif: boolean; icone: React.ReactNode; label: string; badge?: number }) {
   return (
-    <div className="relative flex flex-col items-center gap-0.5 pt-2 pb-1.5">
-      <span className={["flex items-center justify-center w-14 h-8 rounded-full transition-colors",
-        actif ? "bg-secondary-50 text-secondary-600" : "text-gray-400"].join(" ")}>
+    <div className="relative flex flex-col items-center gap-1 pt-2.5 pb-2">
+      <span className={["flex items-center justify-center w-11 h-7 rounded-full transition-colors",
+        actif ? "bg-secondary-400/15 text-secondary-400" : "text-ink-300"].join(" ")}>
         {icone}
       </span>
-      <span className={["text-[11px]", actif ? "text-secondary-700 font-semibold" : "text-gray-500 font-medium"].join(" ")}>{label}</span>
+      <span className={["text-[10.5px] leading-none", actif ? "text-white font-semibold" : "text-ink-400 font-medium"].join(" ")}>{label}</span>
       {badge > 0 && (
-        <span className="absolute top-1 left-1/2 ml-2 min-w-[18px] h-[18px] px-1 bg-danger rounded-full text-[10px] font-bold text-white flex items-center justify-center ring-2 ring-white">
+        <span className="absolute top-1.5 left-1/2 ml-1.5 min-w-[17px] h-[17px] px-1 bg-red-500 rounded-full text-[10px] font-bold text-white flex items-center justify-center ring-2 ring-ink-900">
           {badge}
         </span>
       )}

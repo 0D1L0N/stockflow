@@ -50,17 +50,31 @@ export default function Connexion() {
     } catch (err) { setErreur(messageErreurAuth(err)); }
     setEnvoi(false);
   };
-
   return (
-    <div className="min-h-[100dvh] bg-background flex items-center justify-center p-4">
-      {/* Halos décoratifs */}
-
-      <div className="relative w-full max-w-sm animate-slide-up">
-        <div className="flex justify-center mb-8">
-          <Logo clair={false} taille="lg" sousTitre="Ventes, stock et casiers de votre dépôt" />
+    <div className="min-h-[100dvh] bg-background lg:grid lg:grid-cols-[1.05fr_1fr]">
+      {/* Panneau de marque (encre) : bandeau en haut sur téléphone, moitié gauche sur ordinateur */}
+      <aside className="relative overflow-hidden bg-ink-900 text-white px-6 pt-[calc(2.5rem+env(safe-area-inset-top))] pb-24 lg:pb-10 lg:px-14 lg:py-14 flex flex-col">
+        <MotifCasiers />
+        <div className="pointer-events-none absolute -bottom-32 -right-24 w-96 h-96 rounded-full bg-secondary-500/20 blur-3xl" />
+        <div className="relative"><Logo sousTitre="Gestion de dépôt de boissons" /></div>
+        <div className="relative mt-10 lg:mt-auto lg:mb-auto max-w-md">
+          <h2 className="text-[28px] lg:text-[42px] font-extrabold leading-[1.08] tracking-[-0.03em]">
+            Votre dépôt,<br /><span className="text-secondary-400">sous contrôle.</span>
+          </h2>
+          <ul className="hidden lg:flex flex-col gap-3 mt-8 text-[15px] text-ink-300">
+            {["Ventes, stock et casiers en temps réel", "Dettes clients et casiers à rendre suivis", "Fonctionne même sans connexion"].map(t => (
+              <li key={t} className="flex items-center gap-3">
+                <span className="w-5 h-5 rounded-full bg-secondary-400/15 text-secondary-400 flex items-center justify-center text-xs">✓</span>{t}
+              </li>
+            ))}
+          </ul>
         </div>
+        <p className="relative hidden lg:block text-xs text-ink-400">© StockFlow</p>
+      </aside>
 
-        <form onSubmit={soumettre} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8 flex flex-col gap-4">
+      <div className="relative -mt-14 lg:mt-0 px-4 pb-10 lg:p-10 flex lg:items-center justify-center">
+        <div className="w-full max-w-sm animate-slide-up">
+        <form onSubmit={soumettre} className="bg-white rounded-2xl border border-slate-200 shadow-[0_20px_40px_-20px_rgba(11,18,32,0.25)] lg:shadow-none lg:border-0 lg:bg-transparent p-6 sm:p-8 lg:p-0 flex flex-col gap-4">
           <div>
             <h1 className="font-bold text-gray-900 text-xl tracking-tight">
               {mode === "connexion" ? "Connexion" : "Première installation"}
@@ -117,8 +131,24 @@ export default function Connexion() {
             </button>
           )}
         </form>
-        <p className="text-center text-gray-400 text-xs mt-6">Fonctionne aussi hors connexion</p>
+        <p className="text-center text-gray-400 text-xs mt-6 lg:text-left">Fonctionne aussi hors connexion</p>
+        </div>
       </div>
     </div>
+  );
+}
+
+/** Motif décoratif : grille de casiers vus de face, très discrète. */
+function MotifCasiers() {
+  return (
+    <svg aria-hidden className="pointer-events-none absolute inset-0 w-full h-full opacity-[0.06]" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <pattern id="casiers" width="64" height="52" patternUnits="userSpaceOnUse">
+          <rect x="6" y="6" width="52" height="40" rx="7" fill="none" stroke="white" strokeWidth="1.5" />
+          <path d="M6 26h52M23.3 6v40M40.6 6v40" stroke="white" strokeWidth="1.5" />
+        </pattern>
+      </defs>
+      <rect width="100%" height="100%" fill="url(#casiers)" />
+    </svg>
   );
 }
