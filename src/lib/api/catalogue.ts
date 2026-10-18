@@ -1,8 +1,9 @@
 import { doc, getDoc, getDocs, limit, query, setDoc, updateDoc, where, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import type { Rayon } from "@/lib/familles";
 import { col, ecrire, lister, maintenant, parNom, type Commande, type Id } from "./outils";
 
-export interface Produit { id: Id; nom: string; date_creation: string | null; }
+export interface Produit { id: Id; nom: string; date_creation: string | null; rayon?: Rayon | null; }
 export interface Format {
   id: Id; produit_id: Id; volume: number; unite: string;
   prix: number; stock: number; seuil_alerte: number;
@@ -42,14 +43,14 @@ export const catalogue: Record<string, Commande> = {
     return { produit: { id: snap.id, ...snap.data() }, formats: await listerFormats(id as Id) };
   },
 
-  create_produit: async ({ nom }) => {
+  create_produit: async ({ nom, rayon }) => {
     const ref = doc(col("produits"));
-    await ecrire(setDoc(ref, { nom: String(nom).trim(), date_creation: maintenant() }));
+    await ecrire(setDoc(ref, { nom: String(nom).trim(), rayon: rayon || null, date_creation: maintenant() }));
     return ref.id;
   },
 
-  update_produit: async ({ id, nom }) => {
-    await ecrire(updateDoc(doc(db, "produits", id as Id), { nom: String(nom).trim() }));
+  update_produit: async ({ id, nom, rayon }) => {
+    await ecrire(updateDoc(doc(db, "produits", id as Id), { nom: String(nom).trim(), rayon: rayon || null }));
   },
 
   delete_produit: async ({ id }) => {

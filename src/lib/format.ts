@@ -1,6 +1,8 @@
 /** Volume à la française : 0.33 + "L" → « 0,33 L ». */
 export function volumeFr(volume: number | null | undefined, unite: string | null | undefined): string {
   if (volume == null) return "";
+  // Packs (eaux, PET) : le volume est le nombre de bouteilles, 1 = « pack » simplement
+  if (unite === "pack") return volume > 1 ? `pack de ${volume}` : "pack";
   return `${volume.toLocaleString("fr-FR")} ${unite ?? ""}`.trim();
 }
 

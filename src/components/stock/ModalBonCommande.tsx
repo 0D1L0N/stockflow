@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Send, FileDown, Share2, Copy, Loader } from "lucide-react";
 import { invoke } from "@/lib/db";
+import { volumeFr } from "@/lib/format";
 import { useToast } from "@/components/ui/Toast";
 import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
@@ -54,7 +55,7 @@ export default function ModalBonCommande({ isOpen, onClose }: { isOpen: boolean;
       setCommerce({ nom: params.nom_commerce, adresse: params.adresse_commerce ?? "", telephone: params.telephone_commerce ?? "" });
       const details = await Promise.all(produits.map(p => invoke<{ formats: Format[] }>("get_produit", { id: p.id })));
       const toutes: Ligne[] = produits.flatMap((p, i) => details[i].formats.map(f => ({
-        formatId: f.id, produit: p.nom, format: `${f.volume.toLocaleString("fr-FR")} ${f.unite}`,
+        formatId: f.id, produit: p.nom, format: volumeFr(f.volume, f.unite),
         emballage: emballages.find(e => e.id === f.emballage_id)?.nom ?? null,
         stock: f.stock, seuil: f.seuil_alerte, enAlerte: f.stock <= f.seuil_alerte,
       })));

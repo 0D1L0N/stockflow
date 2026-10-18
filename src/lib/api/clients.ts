@@ -1,8 +1,9 @@
-import { deleteDoc, doc, getDoc, getDocs, limit, query, setDoc, updateDoc, where, writeBatch } from "firebase/firestore";
+import { deleteDoc, doc, getDoc, getDocs, query, setDoc, updateDoc, where, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { col, ecrire, lister, maintenant, parNom, type Commande, type Id } from "./outils";
 import { listerFormats, listerProduits } from "./catalogue";
 import { volumeFr } from "@/lib/format";
+import { FAMILLES, familleDe } from "@/lib/familles";
 
 export interface Client {
   id: Id; nom: string; telephone: string | null; adresse: string | null;
@@ -64,8 +65,13 @@ export const clients: Record<string, Commande> = {
 
   delete_client: async ({ id }) => {
     if (id === CLIENT_DEFAUT) throw new Error("Le client standard ne peut pas être supprimé.");
-    const ventes = await getDocs(query(col("ventes"), where("client_id", "==", id), limit(1)));
-    if (!ventes.empty) throw new Error("Impossible de supprimer : ce client a des ventes associées.");
+    // Les ventes passées restent dans l'historique (elles portent le nom du client) ;
+    // on refuse seulement si le client doit encore de l'argent ou des casiers.
+    const fiche = (await getDoc(doc(db, "clients", id as Id))).data() ?? {};
+    if (((fiche.solde_argent as number) ?? 0) !== 0)
+      throw new Error("Impossible de supprimer : le compte de ce client n'est pas soldé.");
+    if (Object.values((fiche.emballages_dus ?? {}) as Record<string, number>).some(n => n !== 0))
+      throw new Error("Impossible de supprimer : ce client doit encore des casiers.");
     const batch = writeBatch(db);
     (await getDocs(query(col("prix_clients"), where("client_id", "==", id)))).docs.forEach(d => batch.delete(d.ref));
     batch.delete(doc(db, "clients", id as Id));
@@ -82,15 +88,18 @@ export const clients: Record<string, Commande> = {
       getDocs(query(col("prix_clients"), where("client_id", "==", clientId))),
     ]);
     const noms = new Map(produits.map(p => [p.id, p.nom]));
+    const rayons = new Map(produits.map(p => [p.id, p.rayon ?? null]));
     const prix = new Map(prixSnap.docs.map(d => [d.data().format_id as Id, d.data()]));
+    const ordre = (cle: string) => FAMILLES.findIndex(f => f.cle === cle);
     return formats
       .map(f => ({
+        famille: familleDe(f.emballage_id, rayons.get(f.produit_id)),
         format_id: f.id, produit_id: f.produit_id, produit_nom: noms.get(f.produit_id) ?? "?",
         volume: f.volume, unite: f.unite, prix_base: f.prix,
         prix_client: (prix.get(f.id)?.prix as number | undefined) ?? null,
         date_maj: (prix.get(f.id)?.date_maj as string | undefined) ?? null,
       }))
-      .sort((a, b) => a.produit_nom.localeCompare(b.produit_nom, "fr") || a.volume - b.volume);
+      .sort((a, b) => ordre(a.famille) - ordre(b.famille) || a.produit_nom.localeCompare(b.produit_nom, "fr") || a.volume - b.volume);
   },
 
   set_prix_client: async ({ clientId, formatId, prix }) => {

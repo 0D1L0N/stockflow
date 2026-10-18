@@ -18,3 +18,6 @@ firebase-debug.log
 
 # Réglages personnels de Claude Code
 .claude/settings.local.json
+
+# Relevé des prix clients (données privées)
+grille-prix-clients.csv

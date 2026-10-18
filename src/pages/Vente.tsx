@@ -12,9 +12,11 @@ import SoldesBandeau from "@/components/clients/SoldesBandeau";
 import { volumeFr, casiers } from "@/lib/format";
 import Avatar from "@/components/ui/Avatar";
 import { useTempsReel } from "@/lib/tempsReel";
+import Pastilles from "@/components/ui/Pastilles";
+import { familleDe, grouperParFamille, type CleFamille, type Rayon } from "@/lib/familles";
 
 interface Format { id: string; produit_id: string; volume: number; unite: string; prix: number; stock: number; seuil_alerte: number; emballage_id?: string | null; }
-interface ProduitAvecFormats { produit: { id: string; nom: string }; formats: Format[]; }
+interface ProduitAvecFormats { produit: { id: string; nom: string; rayon?: Rayon | null }; formats: Format[]; }
 interface Client {
   id: string; nom: string; telephone: string | null; est_defaut: number;
   solde_argent?: number; emballages_dus?: Record<string, number>;
@@ -53,6 +55,7 @@ export default function Vente() {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [famille, setFamille] = useState<"toutes" | CleFamille>("toutes");
   const [showClientDrop, setShowClientDrop] = useState(false);
   const [clientSearch, setClientSearch] = useState("");
   const [showCart, setShowCart] = useState(false);
@@ -113,6 +116,17 @@ export default function Vente() {
   const filtered = produits.filter(p =>
     p.produit.nom.toLowerCase().includes(search.toLowerCase())
   );
+  // Une carte par produit et par famille (Béninoise casier 12, Béninoise casier 24…), comme sur les fiches
+  const cartes = filtered.flatMap(({ produit, formats }) => {
+    const parFamille = new Map<CleFamille, Format[]>();
+    formats.forEach(f => {
+      const cle = familleDe(f.emballage_id, produit.rayon);
+      parFamille.set(cle, [...(parFamille.get(cle) ?? []), f]);
+    });
+    return [...parFamille].map(([cle, fs]) => ({ cle, produit, formats: fs }));
+  });
+  const groupes = grouperParFamille(cartes, c => c.cle);
+  const groupesAffiches = groupes.filter(g => famille === "toutes" || g.cle === famille);
 
   const selectedClient = clients.find(c => c.id === client_id);
   const filteredClients = clients.filter(c => c.nom.toLowerCase().includes(clientSearch.toLowerCase()));
@@ -496,6 +510,13 @@ export default function Vente() {
               className="w-full pl-9 pr-3 py-2.5 bg-white border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-secondary" />
           </div>
 
+          {groupes.length > 1 && (
+            <Pastilles valeur={famille} onChange={setFamille} options={[
+              { valeur: "toutes" as const, label: "Tout" },
+              ...groupes.map(g => ({ valeur: g.cle, label: g.court, compte: g.items.length })),
+            ]} />
+          )}
+
           {/* Grille produits */}
           {loading ? (
             <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
@@ -508,15 +529,22 @@ export default function Vente() {
               ))}
             </div>
           ) : (
-            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
-              {filtered.map(({ produit, formats }) => (
-                <ProduitCard key={produit.id} nom={produit.nom} formats={formats}
-                  cartItems={items} onAdd={handleAddToCart} prixClient={prixClient} />
+            <div className="flex flex-col gap-5">
+              {groupesAffiches.map(g => (
+                <section key={g.cle}>
+                  <h2 className="text-[12px] font-bold uppercase tracking-wide text-ink-600 mb-2.5 flex items-center gap-2">
+                    {g.label}<span className="flex-1 h-px bg-slate-200" /><span className="text-gray-400 normal-case">{g.items.length}</span>
+                  </h2>
+                  <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
+                    {g.items.map(({ cle, produit, formats }) => (
+                      <ProduitCard key={`${produit.id}-${cle}`} nom={produit.nom} formats={formats}
+                        cartItems={items} onAdd={handleAddToCart} prixClient={prixClient} />
+                    ))}
+                  </div>
+                </section>
               ))}
-              {filtered.length === 0 && (
-                <div className="col-span-2 lg:col-span-3 text-center py-10 text-gray-400 text-sm">
-                  Aucun produit trouvé
-                </div>
+              {cartes.length === 0 && (
+                <div className="text-center py-10 text-gray-400 text-sm">Aucun produit trouvé</div>
               )}
             </div>
           )}

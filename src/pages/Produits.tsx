@@ -18,12 +18,13 @@ import { volumeFr, casiers } from "@/lib/format";
 import Avatar from "@/components/ui/Avatar";
 import { useAuthStore } from "@/stores/authStore";
 import { useTempsReel } from "@/lib/tempsReel";
+import { RAYONS, type Rayon } from "@/lib/familles";
 
 interface Format {
   id: string; produit_id: string; volume: number; unite: string;
   prix: number; stock: number; seuil_alerte: number; emballage_id?: string | null;
 }
-interface Produit { id: string; nom: string; date_creation: string; }
+interface Produit { id: string; nom: string; date_creation: string; rayon?: Rayon | null; }
 interface ProduitAvecFormats { produit: Produit; formats: Format[]; }
 
 
@@ -47,6 +48,7 @@ export default function Produits() {
   const [modalProduit, setModalProduit] = useState(false);
   const [editProduit, setEditProduit] = useState<Produit | null>(null);
   const [nomProduit, setNomProduit] = useState("");
+  const [rayon, setRayon] = useState<"" | Rayon>("");
   const [saving, setSaving] = useState(false);
   const [modalPrix, setModalPrix] = useState(false);
 
@@ -90,15 +92,15 @@ export default function Produits() {
     return s;
   });
 
-  const openNewProduit = () => { setEditProduit(null); setNomProduit(""); setModalProduit(true); };
-  const openEditProduit = (p: Produit) => { setEditProduit(p); setNomProduit(p.nom); setModalProduit(true); };
+  const openNewProduit = () => { setEditProduit(null); setNomProduit(""); setRayon(""); setModalProduit(true); };
+  const openEditProduit = (p: Produit) => { setEditProduit(p); setNomProduit(p.nom); setRayon(p.rayon ?? ""); setModalProduit(true); };
 
   const saveProduit = async () => {
     if (!nomProduit.trim()) return;
     setSaving(true);
     try {
-      if (editProduit) await invoke("update_produit", { id: editProduit.id, nom: nomProduit.trim() });
-      else await invoke("create_produit", { nom: nomProduit.trim() });
+      if (editProduit) await invoke("update_produit", { id: editProduit.id, nom: nomProduit.trim(), rayon });
+      else await invoke("create_produit", { nom: nomProduit.trim(), rayon });
       toast(editProduit ? "Produit mis à jour" : "Produit créé", "success");
       setModalProduit(false);
       await load();
@@ -269,6 +271,14 @@ export default function Produits() {
         <div className="p-6 flex flex-col gap-4">
           <Input label="Nom du produit" value={nomProduit} onChange={e => setNomProduit(e.target.value)}
             placeholder="ex. : Coca-Cola" />
+          <div>
+            <label className="text-[13px] font-medium text-gray-700 block mb-1.5">Rayon</label>
+            <select value={rayon} onChange={e => setRayon(e.target.value as "" | Rayon)}
+              className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm bg-white focus:outline-none focus:border-secondary">
+              {RAYONS.map(r => <option key={r.valeur} value={r.valeur}>{r.label}</option>)}
+            </select>
+            <p className="text-xs text-gray-400 mt-1">Sert à classer les prix : casiers de 12, 20, 24, puis eaux et PET.</p>
+          </div>
           <div className="flex gap-2 justify-end">
             <Button variant="secondary" onClick={() => setModalProduit(false)}>Annuler</Button>
             <Button onClick={saveProduit} loading={saving}>{editProduit ? "Mettre à jour" : "Créer"}</Button>
@@ -282,7 +292,7 @@ export default function Produits() {
           {!editFormat && (
             <div className="flex gap-2">
               <div className="flex-1">
-                <Input label="Volume" type="number" step="0.01" value={fVolume} placeholder="ex. : 0.33"
+                <Input label={fUnite === "pack" ? "Bouteilles par pack" : "Volume"} type="number" step="0.01" value={fVolume} placeholder={fUnite === "pack" ? "ex. : 6 (1 = pack)" : "ex. : 0.33"}
                   onChange={e => {
                     setFVolume(e.target.value);
                     // Suggère le casier habituel pour ce volume
@@ -294,12 +304,12 @@ export default function Produits() {
                 <label className="text-[13px] font-medium text-gray-700 block mb-1.5">Unité</label>
                 <select value={fUnite} onChange={e => setFUnite(e.target.value)}
                   className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:border-secondary">
-                  <option>L</option><option>cL</option><option>mL</option><option>kg</option><option>g</option>
+                  <option>L</option><option>cL</option><option>mL</option><option value="pack">pack</option><option>kg</option><option>g</option>
                 </select>
               </div>
             </div>
           )}
-          <Input label="Prix du casier" type="number" value={fPrix} onChange={e => setFPrix(e.target.value)} placeholder="ex. : 6000" />
+          <Input label={fUnite === "pack" ? "Prix du pack" : "Prix du casier"} type="number" value={fPrix} onChange={e => setFPrix(e.target.value)} placeholder="ex. : 6000" />
           {!editFormat && (
             <Input label="Stock initial (casiers)" type="number" value={fStock} onChange={e => setFStock(e.target.value)} placeholder="0" />
           )}
