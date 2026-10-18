@@ -17,6 +17,8 @@ interface Parametres {
   devise: string; symbole_devise: string; symbole_position: string;
   notifications_son: number; mode_sombre: number; langue: string;
   derniere_sauvegarde?: string | null;
+  derniere_sauvegarde_auto?: string | null;
+  sauvegarde_auto?: boolean;
 }
 
 export default function Parametres() {
@@ -108,7 +110,9 @@ export default function Parametres() {
             <GestionEmballages />
 
             <CarteSauvegarde derniere={params.derniere_sauvegarde ?? null}
-              onFaite={date => setParams(p => p && { ...p, derniere_sauvegarde: date })} />
+              derniereAuto={params.derniere_sauvegarde_auto ?? null}
+              auto={params.sauvegarde_auto !== false}
+              onChange={champs => setParams(p => p && { ...p, ...champs })} />
           </>
         )}
       </div>

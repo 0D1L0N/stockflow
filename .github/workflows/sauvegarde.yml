@@ -1,0 +1,52 @@
+# Sauvegarde automatique hebdomadaire des données StockFlow.
+# Le fichier est conservé 90 jours dans les « artifacts » de GitHub Actions.
+# Le gérant peut la désactiver dans l'application (Paramètres > Sauvegarde).
+name: Sauvegarde hebdomadaire
+
+on:
+  schedule:
+    # Chaque dimanche à 21 h UTC (22 h au Bénin)
+    - cron: "0 21 * * 0"
+  # Lancement manuel depuis GitHub (onglet Actions > Sauvegarde hebdomadaire > Run workflow)
+  workflow_dispatch:
+    inputs:
+      forcer:
+        description: "Sauvegarder même si le mode automatique est désactivé"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  sauvegarde:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # Dossier isolé : seul le SDK d'administration est installé, pas toute l'application
+      - name: Préparer le script
+        run: |
+          mkdir -p "$RUNNER_TEMP/sauvegarde"
+          cp scripts/sauvegarde.mjs "$RUNNER_TEMP/sauvegarde/"
+          cd "$RUNNER_TEMP/sauvegarde" && npm init -y >/dev/null && npm install firebase-admin@12
+
+      - name: Lire toutes les données
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          FORCER: ${{ github.event_name == 'workflow_dispatch' && inputs.forcer && '1' || '0' }}
+        working-directory: ${{ runner.temp }}/sauvegarde
+        run: node sauvegarde.mjs
+
+      - name: Conserver le fichier (90 jours)
+        uses: actions/upload-artifact@v4
+        with:
+          name: stockflow-sauvegarde-${{ github.run_number }}
+          path: ${{ runner.temp }}/sauvegarde/sauvegarde/*.json
+          if-no-files-found: ignore
+          retention-days: 90

@@ -9,6 +9,11 @@ const COLLECTIONS = [
 ];
 
 export const sauvegarde: Record<string, Commande> = {
+  /** Le gérant choisit : sauvegarde automatique chaque semaine (GitHub Actions) ou manuelle seulement. */
+  set_sauvegarde_auto: async ({ actif }) => {
+    await ecrire(setDoc(doc(db, "parametres", "general"), { sauvegarde_auto: actif === true }, { merge: true }));
+  },
+
   /**
    * Copie complète des données au format JSON, à garder hors de Firebase
    * (téléphone, Google Drive, WhatsApp…). L'offre gratuite n'a pas de sauvegarde automatique.

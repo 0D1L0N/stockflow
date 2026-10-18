@@ -7,7 +7,7 @@ import {
 import { invoke } from "@/lib/db";
 import Card from "@/components/ui/Card";
 import Skeleton from "@/components/ui/Skeleton";
-import { joursDepuis } from "@/components/sauvegarde/CarteSauvegarde";
+import { joursDepuisDerniereSauvegarde } from "@/components/sauvegarde/CarteSauvegarde";
 import { useTempsReel } from "@/lib/tempsReel";
 import { useAppStore } from "@/stores/appStore";
 import { useAuthStore } from "@/stores/authStore";
@@ -62,8 +62,8 @@ export default function Dashboard() {
     await Promise.all([
       loadStats(),
       loadAlertes(),
-      invoke<{ derniere_sauvegarde?: string | null }>("get_parametres")
-        .then(p => setJoursSansSauvegarde(joursDepuis(p.derniere_sauvegarde) ?? 999))
+      invoke<{ derniere_sauvegarde?: string | null; derniere_sauvegarde_auto?: string | null }>("get_parametres")
+        .then(p => setJoursSansSauvegarde(joursDepuisDerniereSauvegarde(p) ?? 999))
         .catch(() => {}),
     ]);
     setLoading(false);
