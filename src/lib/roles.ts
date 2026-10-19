@@ -74,6 +74,7 @@ export const ROUTE_ROLES: Record<string, Role[]> = {
   "/alertes":      TOUS,
   "/mouvements":   TOUS,
   "/ajustement":   TOUS,
+  "/journal":      RESPONSABLES,
   "/parametres":   ["admin"],
   "/utilisateurs": ["admin"],
 };

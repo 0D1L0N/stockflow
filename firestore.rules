@@ -285,6 +285,21 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // ── Journal des actions ──────────────────────────────────────────────
+    // Chacun note ses propres actions (horodatées par le serveur) ; seuls les responsables le lisent
+    // et seul l'admin marque une action comme restaurée. Rien ne s'efface ni ne se réécrit.
+    match /journal/{id} {
+      allow read: if responsable();
+      allow create: if equipe()
+        && request.resource.data.utilisateur_uid == request.auth.uid
+        && request.resource.data.restaure_le == null
+        && horodate();
+      allow update: if admin()
+        && resource.data.restaure_le == null
+        && seulementChamps(['restaure_le', 'restaure_par']);
+      allow delete: if false;
+    }
+
     // ── Paramètres du commerce ───────────────────────────────────────────
     match /parametres/{id} {
       allow read: if actif();

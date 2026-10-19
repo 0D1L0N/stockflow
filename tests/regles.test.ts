@@ -432,3 +432,40 @@ describe("admin et propriétaire", () => {
     await assertFails(updateDoc(doc(en("admin"), "users/admin"), { role: "gerant" }));
   });
 });
+
+describe("journal des actions", () => {
+  const entree = (uid: string, extra: Record<string, unknown> = {}) => ({
+    categorie: "prix", action: "update_format", libelle: "Format modifié", details: [], restauration: null,
+    utilisateur_uid: uid, restaure_le: null, restaure_par: null, cree_le: serverTimestamp(), ...extra,
+  });
+
+  it("chacun note ses propres actions", async () => {
+    await assertSucceeds(setDoc(doc(en("vendeur"), "journal/j1"), entree("vendeur")));
+    await assertSucceeds(setDoc(doc(en("chef"), "journal/j2"), entree("chef")));
+  });
+
+  it("personne ne note une action au nom d'un autre ni ne l'antidate", async () => {
+    await assertFails(setDoc(doc(en("vendeur"), "journal/j3"), entree("chef")));
+    await assertFails(setDoc(doc(en("vendeur"), "journal/j4"), entree("vendeur", { cree_le: new Date(2020, 0, 1) })));
+    await assertFails(setDoc(doc(en("vendeur"), "journal/j5"), entree("vendeur", { restaure_le: JOUR })));
+  });
+
+  it("le gérant lit le journal, pas le magasinier", async () => {
+    await env.withSecurityRulesDisabled(async ctx => { await setDoc(doc(ctx.firestore(), "journal/j0"), { ...entree("admin"), cree_le: null }); });
+    await assertSucceeds(getDoc(doc(en("chef"), "journal/j0")));
+    await assertFails(getDoc(doc(en("vendeur"), "journal/j0")));
+  });
+
+  it("seul l'admin marque une action restaurée, une seule fois, sans rien réécrire d'autre", async () => {
+    await env.withSecurityRulesDisabled(async ctx => { await setDoc(doc(ctx.firestore(), "journal/j0"), { ...entree("admin"), cree_le: null }); });
+    await assertFails(updateDoc(doc(en("chef"), "journal/j0"), { restaure_le: JOUR, restaure_par: "G" }));
+    await assertFails(updateDoc(doc(en("admin"), "journal/j0"), { libelle: "autre chose" }));
+    await assertSucceeds(updateDoc(doc(en("admin"), "journal/j0"), { restaure_le: JOUR, restaure_par: "Ad" }));
+    await assertFails(updateDoc(doc(en("admin"), "journal/j0"), { restaure_le: "2026-10-20", restaure_par: "Ad" }));
+  });
+
+  it("personne n'efface le journal", async () => {
+    await env.withSecurityRulesDisabled(async ctx => { await setDoc(doc(ctx.firestore(), "journal/j0"), { ...entree("admin"), cree_le: null }); });
+    await assertFails(deleteDoc(doc(en("admin"), "journal/j0")));
+  });
+});
