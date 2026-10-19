@@ -143,7 +143,7 @@ export default function Produits() {
   };
 
   const deleteProduit = async (p: Produit) => {
-    if (!confirm(`Supprimer "${p.nom}" ?`)) return;
+    if (!confirm(`Supprimer définitivement « ${p.nom} » et tous ses formats ?\n\nSon stock disparaît avec lui. Les ventes passées restent dans l'historique.`)) return;
     try {
       await invoke("delete_produit", { id: p.id });
       toast("Produit supprimé", "success");
@@ -189,10 +189,11 @@ export default function Produits() {
   };
 
   const deleteFormat = async (f: Format) => {
-    if (!confirm("Supprimer ce format ?\n\nS'il a déjà été vendu, il est retiré du catalogue (stock remis à 0) et ses ventes restent dans l'historique.")) return;
+    const libelle = volumeFr(f.volume, f.unite, f.casier);
+    if (!confirm(`Supprimer définitivement le format ${libelle}${f.stock > 0 ? ` (${f.stock} en stock)` : ""} ?\n\nLes ventes passées restent dans l'historique.`)) return;
     try {
-      const res = await invoke<{ retire: boolean }>("delete_format", { id: f.id });
-      toast(res.retire ? "Format retiré du catalogue : ses ventes restent dans l'historique" : "Format supprimé", "success");
+      await invoke("delete_format", { id: f.id });
+      toast(`Format ${libelle} supprimé`, "success");
       await load();
     } catch (e) { toast(String(e), "error"); }
   };

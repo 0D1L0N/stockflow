@@ -1,8 +1,7 @@
-import { doc, getDoc, getDocs, getDocsFromCache, limit, query, setDoc, updateDoc, where, writeBatch } from "firebase/firestore";
+import { doc, getDoc, getDocs, getDocsFromCache, query, setDoc, updateDoc, where, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { Rayon } from "@/lib/familles";
 import { col, ecrire, lister, maintenant, parNom, type Commande, type Id } from "./outils";
-import { ajouterMouvement } from "./stock";
 import { CASIER_PAR_VOLUME } from "./emballages";
 
 export interface Produit { id: Id; nom: string; date_creation: string | null; rayon?: Rayon | null; }
@@ -58,12 +57,6 @@ export async function listerFormats(produitId?: Id, avecRetires = false): Promis
   return (await avecCasier(formats)).sort(parVolume);
 }
 
-/** Une vente existe-t-elle pour ce format ? (les ventes listent leurs format_ids) */
-async function formatVendu(formatId: Id): Promise<boolean> {
-  const snap = await getDocs(query(col("ventes"), where("format_ids", "array-contains", formatId), limit(1)));
-  return !snap.empty;
-}
-
 /** Supprime les prix clients d'un format (Firestore n'a pas de suppression en cascade). */
 async function supprimerPrixClientsDuFormat(formatId: Id, batch: ReturnType<typeof writeBatch>) {
   const [clients, groupes] = await Promise.all([
@@ -92,12 +85,12 @@ export const catalogue: Record<string, Commande> = {
     await ecrire(updateDoc(doc(db, "produits", id as Id), { nom: String(nom).trim(), rayon: rayon || null }));
   },
 
+  /**
+   * Suppression définitive du produit et de tous ses formats (même retirés, même avec du stock).
+   * Les ventes, mouvements et réceptions passés gardent leur propre copie du nom et du volume.
+   */
   delete_produit: async ({ id }) => {
     const formats = await listerFormats(id as Id, true);
-    if (formats.some(f => f.stock > 0)) throw new Error("Impossible de supprimer : ce produit a encore du stock.");
-    for (const f of formats) {
-      if (await formatVendu(f.id)) throw new Error("Impossible de supprimer : des ventes existent pour ce produit.");
-    }
     const batch = writeBatch(db);
     for (const f of formats) {
       await supprimerPrixClientsDuFormat(f.id, batch);
@@ -137,32 +130,15 @@ export const catalogue: Record<string, Commande> = {
   },
 
   /**
-   * Jamais vendu : supprimé. Déjà vendu : retiré du catalogue (les ventes et mouvements
-   * gardent leur historique) ; un stock restant est remis à 0 avec un mouvement tracé.
+   * Suppression définitive du format (même s'il a du stock ou des ventes), avec ses prix clients
+   * et de groupe. L'historique (ventes, mouvements, réceptions) garde sa propre copie du format.
    */
   delete_format: async ({ id }) => {
     const batch = writeBatch(db);
     await supprimerPrixClientsDuFormat(id as Id, batch);
-    if (!(await formatVendu(id as Id))) {
-      batch.delete(doc(db, "formats", id as Id));
-      await ecrire(batch.commit());
-      return { retire: false };
-    }
-    const snap = await getDoc(doc(db, "formats", id as Id));
-    if (!snap.exists()) throw new Error("Format introuvable.");
-    const format = { id: snap.id, ...snap.data() } as Format;
-    const produit = await getDoc(doc(db, "produits", format.produit_id));
-    const champs: Record<string, unknown> = { archive: true, date_retrait: maintenant() };
-    if (format.stock !== 0) {
-      champs.stock = 0;
-      champs.dernier_mouvement = ajouterMouvement(batch, format, (produit.data()?.nom as string) ?? "—", {
-        type: "ajustement", quantite: Math.abs(format.stock), stock_apres: 0, source: "inventaire",
-        commentaire: "Format retiré du catalogue",
-      });
-    }
-    batch.update(snap.ref, champs);
+    batch.delete(doc(db, "formats", id as Id));
     await ecrire(batch.commit());
-    return { retire: true };
+    return { retire: false };
   },
 
   get_formats_en_alerte: async () => {

@@ -4,7 +4,7 @@ import { col, ecrire, lister, maintenant, parNom, type Commande, type Id } from 
 import { listerFormats, listerProduits } from "./catalogue";
 import { telephoneFr, volumeFr } from "@/lib/format";
 import { FAMILLES, familleDe } from "@/lib/familles";
-import { idPrixGroupe, prixDuGroupe } from "./groupes";
+import { idPrixGroupe, lireRegleComptoir, appliquerRegleComptoir, prixDuGroupe } from "./groupes";
 
 export interface Client {
   id: Id; nom: string; telephone: string | null; adresse: string | null;
@@ -197,6 +197,9 @@ export const clients: Record<string, Commande> = {
         }
         await ecrire(batch.commit());
       }
+      const regle = await lireRegleComptoir();
+      const touches = changements.filter(c => regle && c.groupe_id === regle.groupe_id).map(c => c.format_id);
+      if (regle && touches.length) await appliquerRegleComptoir(regle, touches);
     }
 
     // Même ordre que l'ancienne version : prix de base, puis par client

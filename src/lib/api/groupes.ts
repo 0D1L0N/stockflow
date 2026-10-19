@@ -1,4 +1,4 @@
-import { deleteDoc, doc, getDocs, query, setDoc, updateDoc, where, writeBatch } from "firebase/firestore";
+import { deleteDoc, deleteField, doc, getDoc, getDocs, query, setDoc, updateDoc, where, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { col, ecrire, lister, maintenant, parNom, type Commande, type Id } from "./outils";
 import { listerFormats, listerProduits } from "./catalogue";
@@ -19,7 +19,56 @@ export async function prixDuGroupe(groupeId: Id | null | undefined): Promise<Map
   return new Map(snap.docs.map(d => [d.data().format_id as Id, d.data().prix as number]));
 }
 
+/**
+ * Règle du prix comptoir (client standard) : prix d'un groupe de référence + un écart.
+ * Ex. comptoir = GROUPE 2 + 200 F. Gardée dans parametres/general.regle_comptoir.
+ */
+export interface RegleComptoir { groupe_id: Id; ecart: number }
+
+export async function lireRegleComptoir(): Promise<RegleComptoir | null> {
+  const r = (await getDoc(doc(db, "parametres", "general"))).data()?.regle_comptoir as RegleComptoir | undefined;
+  return r?.groupe_id ? { groupe_id: r.groupe_id, ecart: Number(r.ecart) || 0 } : null;
+}
+
+/**
+ * Aligne les prix comptoir sur le groupe de référence (tous les formats, ou seulement ceux indiqués).
+ * Un format sans prix dans ce groupe garde son prix comptoir. Renvoie les prix changés.
+ */
+export async function appliquerRegleComptoir(regle: RegleComptoir, formatIds?: Id[]) {
+  const [formats, prix, produits] = await Promise.all([listerFormats(), prixDuGroupe(regle.groupe_id), listerProduits()]);
+  const noms = new Map(produits.map(p => [p.id, p.nom]));
+  const changes: { format_id: Id; produit_nom: string; volume: number; unite: string; ancien: number; nouveau: number }[] = [];
+  for (const f of formats) {
+    if (formatIds && !formatIds.includes(f.id)) continue;
+    const p = prix.get(f.id);
+    if (p === undefined) continue;
+    const nouveau = p + regle.ecart;
+    if (nouveau > 0 && nouveau !== f.prix) changes.push({ format_id: f.id, produit_nom: noms.get(f.produit_id) ?? "?", volume: f.volume, unite: f.unite, ancien: f.prix, nouveau });
+  }
+  for (let i = 0; i < changes.length; i += 450) {
+    const batch = writeBatch(db);
+    for (const c of changes.slice(i, i + 450)) batch.update(doc(db, "formats", c.format_id), { prix: c.nouveau });
+    await ecrire(batch.commit());
+  }
+  return changes;
+}
+
 export const groupes: Record<string, Commande> = {
+  get_regle_comptoir: async () => lireRegleComptoir(),
+
+  /** groupeId vide : plus de règle. Sinon enregistre la règle et l'applique tout de suite. */
+  set_regle_comptoir: async ({ groupeId, ecart }) => {
+    if (!groupeId) {
+      await ecrire(setDoc(doc(db, "parametres", "general"), { regle_comptoir: deleteField() }, { merge: true }));
+      return [];
+    }
+    const e = Math.round(Number(ecart));
+    if (!Number.isFinite(e)) throw new Error("Indiquez l'écart en francs (ex. : 200).");
+    const regle = { groupe_id: groupeId as Id, ecart: e };
+    await ecrire(setDoc(doc(db, "parametres", "general"), { regle_comptoir: regle }, { merge: true }));
+    return appliquerRegleComptoir(regle);
+  },
+
   get_groupes_prix: async () => {
     const [liste, clients, prix] = await Promise.all([
       lister<GroupePrix>(col("groupes_prix")),
@@ -49,6 +98,9 @@ export const groupes: Record<string, Commande> = {
 
   /** Supprime le groupe et sa grille ; ses clients repassent à leurs prix propres ou au prix comptoir. */
   delete_groupe_prix: async ({ id }) => {
+    if ((await lireRegleComptoir())?.groupe_id === id) {
+      await ecrire(setDoc(doc(db, "parametres", "general"), { regle_comptoir: deleteField() }, { merge: true }));
+    }
     const [clients, prix] = await Promise.all([
       getDocs(query(col("clients"), where("groupe_prix_id", "==", id))),
       getDocs(query(col("prix_groupes"), where("groupe_id", "==", id))),
@@ -88,6 +140,9 @@ export const groupes: Record<string, Commande> = {
     await ecrire(setDoc(doc(db, "prix_groupes", idPrixGroupe(groupeId as Id, formatId as Id)), {
       groupe_id: groupeId, format_id: formatId, prix: p, date_maj: maintenant(),
     }));
+    // Groupe de référence du comptoir : le prix comptoir suit
+    const regle = await lireRegleComptoir();
+    if (regle && regle.groupe_id === groupeId) await appliquerRegleComptoir(regle, [formatId as Id]);
   },
 
   delete_prix_groupe: async ({ groupeId, formatId }) => {

@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
-import { Plus, Layers, Tag, Edit2, Trash2, Check, X, Users, Search } from "lucide-react";
+import { Plus, Layers, Tag, Edit2, Trash2, Check, X, Users, Search, Store } from "lucide-react";
+import { useAppStore } from "@/stores/appStore";
+import { volumeFr } from "@/lib/format";
 import { invoke } from "@/lib/db";
 import { useToast } from "@/components/ui/Toast";
 import Modal from "@/components/ui/Modal";
@@ -35,6 +37,27 @@ export default function ModalGroupesPrix({ isOpen, onClose, onChange }: Props) {
   const [clients, setClients] = useState<ClientGroupe[]>([]);
   const [recherche, setRecherche] = useState("");
   const [enCours, setEnCours] = useState<string | null>(null);
+  // Prix comptoir (client standard) = un groupe + un écart
+  const formatPrix = useAppStore((st) => st.formatMontant);
+  const [regle, setRegle] = useState<{ groupe_id: string; ecart: number } | null>(null);
+  const [refGroupe, setRefGroupe] = useState("");
+  const [ecartStr, setEcartStr] = useState("200");
+  const [applique, setApplique] = useState(false);
+  const [derniersChangements, setDerniersChangements] = useState<{ produit_nom: string; volume: number; unite: string; ancien: number; nouveau: number }[] | null>(null);
+  const chargerRegle = async () => {
+    const r = await invoke<{ groupe_id: string; ecart: number } | null>("get_regle_comptoir").catch(() => null);
+    setRegle(r); setRefGroupe(r?.groupe_id ?? ""); setEcartStr(String(r?.ecart ?? 200));
+  };
+  const appliquerRegle = async () => {
+    setApplique(true);
+    try {
+      const changes = await invoke<{ produit_nom: string; volume: number; unite: string; ancien: number; nouveau: number }[]>("set_regle_comptoir", { groupeId: refGroupe || null, ecart: parseFloat(ecartStr) });
+      await chargerRegle();
+      setDerniersChangements(refGroupe ? changes : null);
+      toast(!refGroupe ? "Règle du prix comptoir retirée" : changes.length ? `${changes.length} prix comptoir mis à jour` : "Les prix comptoir étaient déjà à jour", "success");
+    } catch (e) { toast(String(e), "error"); }
+    setApplique(false);
+  };
 
   const ouvrirMembres = async (g: { id: string; nom: string }) => {
     setMembres(g); setRecherche("");
@@ -63,7 +86,7 @@ export default function ModalGroupesPrix({ isOpen, onClose, onChange }: Props) {
     catch (e) { toast(String(e), "error"); }
     setLoading(false);
   };
-  useEffect(() => { if (isOpen) { setNouveau(""); setRenomme(null); load(); } }, [isOpen]);
+  useEffect(() => { if (isOpen) { setNouveau(""); setRenomme(null); setDerniersChangements(null); load(); chargerRegle(); } }, [isOpen]);
 
   const creer = async () => {
     if (!nouveau.trim()) return;
@@ -138,6 +161,11 @@ export default function ModalGroupesPrix({ isOpen, onClose, onChange }: Props) {
                         <div className="text-xs text-gray-400 mt-0.5">
                           {g.nb_clients} client{g.nb_clients > 1 ? "s" : ""} · {g.nb_prix} prix
                         </div>
+                        {regle?.groupe_id === g.id && (
+                          <div className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-secondary-800 bg-secondary-50 px-2 py-0.5 rounded-full">
+                            <Store size={11} /> Comptoir = ce groupe {regle.ecart >= 0 ? "+" : "−"} {formatPrix(Math.abs(regle.ecart))}
+                          </div>
+                        )}
                       </>
                     )}
                   </div>
@@ -164,6 +192,43 @@ export default function ModalGroupesPrix({ isOpen, onClose, onChange }: Props) {
                 </div>
               ))}
             </div>
+          )}
+
+          {/* Prix comptoir rattaché à un groupe */}
+          {groupes.length > 0 && (
+            <section className="rounded-2xl border border-slate-200 p-4 flex flex-col gap-3">
+              <h3 className="text-[13px] font-bold uppercase tracking-wide text-ink-600 flex items-center gap-2"><Store size={14} /> Prix du client standard (comptoir)</h3>
+              <p className="text-xs text-gray-500">
+                Le prix comptoir suit un groupe, plus un écart. Il se met à jour tout seul quand vous changez un prix de ce groupe.
+              </p>
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                <span className="text-gray-600">Comptoir =</span>
+                <select value={refGroupe} onChange={e => setRefGroupe(e.target.value)}
+                  className="flex-1 min-w-[140px] h-11 rounded-xl border border-slate-300 px-3 bg-white focus:outline-none focus:border-secondary">
+                  <option value="">Aucun lien (prix comptoir saisi à la main)</option>
+                  {groupes.map(g => <option key={g.id} value={g.id}>{g.nom}</option>)}
+                </select>
+                {refGroupe && (<>
+                  <span className="text-gray-600">+</span>
+                  <input type="number" inputMode="numeric" value={ecartStr} onChange={e => setEcartStr(e.target.value)} aria-label="Écart en francs"
+                    className="w-24 h-11 rounded-xl border border-slate-300 px-3 text-right font-semibold focus:outline-none focus:border-secondary" />
+                  <span className="text-gray-600">F</span>
+                </>)}
+              </div>
+              <Button onClick={appliquerRegle} loading={applique}>
+                {refGroupe ? "Appliquer aux prix comptoir" : "Retirer le lien"}
+              </Button>
+              {derniersChangements && derniersChangements.length > 0 && (
+                <div className="flex flex-col divide-y divide-slate-100 border border-slate-200 rounded-xl max-h-60 overflow-y-auto">
+                  {derniersChangements.map((c, i) => (
+                    <div key={i} className="flex items-center justify-between gap-3 px-3 py-2 text-xs">
+                      <span className="text-gray-700 truncate">{c.produit_nom} {volumeFr(c.volume, c.unite)}</span>
+                      <span className="flex-shrink-0"><span className="text-gray-400 line-through">{c.ancien ? formatPrix(c.ancien) : "à fixer"}</span> → <b className="text-ink-900">{formatPrix(c.nouveau)}</b></span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
           )}
         </div>
       </Modal>
