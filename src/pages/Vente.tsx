@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Search, ShoppingCart, Plus, Minus, Trash2, Check, User, ChevronDown, X, FileText } from "lucide-react";
+import { Search, ShoppingCart, Plus, Minus, Trash2, Check, User, ChevronDown, X, FileText, Mic } from "lucide-react";
 import { sansAccent } from "@/lib/format";
 import { invoke } from "@/lib/db";
 import { useToast } from "@/components/ui/Toast";
@@ -7,6 +7,7 @@ import { useVenteStore, type VenteItem } from "@/stores/venteStore";
 import { useAppStore } from "@/stores/appStore";
 import ModalConfirmationVente from "./ModalConfirmationVente";
 import ModalApercuFacture from "@/components/facture/ModalApercuFacture";
+import ModalDictee, { type ArticleDicte } from "@/components/vente/ModalDictee";
 import { construireCompte } from "@/lib/pdf";
 import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
@@ -79,6 +80,7 @@ export default function Vente() {
   const [montantRecuStr, setMontantRecuStr] = useState(montant_recu > 0 ? String(montant_recu) : "");
   const [validating, setValidating] = useState(false);
   const [showApercu, setShowApercu] = useState(false);
+  const [showDictee, setShowDictee] = useState(false);
   const [venteResult, setVenteResult] = useState<VenteResult | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
 
@@ -267,6 +269,25 @@ export default function Vente() {
         },
       }, nomEmballage),
     };
+  };
+
+  const ajouterDicte = (articles: ArticleDicte[], clientId: string | null) => {
+    if (clientId && clientId !== client_id) setClient(clientId);
+    const remarques: string[] = [];
+    let ajoutes = 0;
+    for (const a of articles) {
+      const f = a.format as unknown as Format;
+      const deja = useVenteStore.getState().items.find(i => i.format_id === f.id)?.quantite ?? 0;
+      const voulu = Math.min(deja + a.quantite, f.stock);
+      if (voulu <= deja) { remarques.push(`${a.produitNom} : plus de stock`); continue; }
+      if (deja === 0) addItem({ format_id: f.id, nom: a.produitNom, volume: f.volume, unite: f.unite, casier: f.casier ?? null, prix: prixDe(f), stock: f.stock });
+      updateQuantite(f.id, voulu);
+      if (voulu < deja + a.quantite) remarques.push(`${a.produitNom} : ${f.stock} seulement en stock`);
+      ajoutes++;
+    }
+    setShowDictee(false);
+    if (ajoutes) { setShowCart(true); toast(`${ajoutes} article${ajoutes > 1 ? "s" : ""} ajouté${ajoutes > 1 ? "s" : ""} au panier : vérifiez puis validez`, "success"); }
+    if (remarques.length) toast(remarques.join(" · "), "warning");
   };
 
   const validerVente = async (clientForce?: Client) => {
@@ -607,7 +628,8 @@ export default function Vente() {
 
           {/* Recherche et familles : collées en haut pendant qu'on fait défiler les produits */}
           <div ref={rechercheRef} className="sticky -top-4 sm:-top-6 z-20 -mx-4 sm:-mx-6 px-4 sm:px-6 pt-4 sm:pt-6 -mt-4 sm:-mt-6 pb-2 bg-background flex flex-col gap-2.5">
-            <div className="relative">
+            <div className="flex items-center gap-2">
+            <div className="relative flex-1 min-w-0">
               <Search size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
               <input type="search" inputMode="search" enterKeyHint="search" autoComplete="off" value={search}
                 onChange={e => setSearch(e.target.value)}
@@ -621,6 +643,11 @@ export default function Vente() {
                   <X size={17} />
                 </button>
               )}
+            </div>
+            <button onClick={() => setShowDictee(true)} aria-label="Dicter la commande" title="Dicter la commande"
+              className="w-12 h-12 rounded-xl bg-secondary-600 text-white flex items-center justify-center flex-shrink-0 hover:bg-secondary-700 active:scale-95 transition-transform">
+              <Mic size={20} />
+            </button>
             </div>
             {recherche ? (
               <div className="text-xs font-semibold text-gray-500 px-1">
@@ -711,6 +738,10 @@ export default function Vente() {
           </div>
         </>
       )}
+
+      {/* Commande dictée : rédigée par l'app, vérifiée puis ajoutée au panier */}
+      <ModalDictee isOpen={showDictee} onClose={() => setShowDictee(false)}
+        produits={produits as never} clients={clients.filter(c => c.est_defaut !== 1)} prixDe={prixDe as never} onAjouter={ajouterDicte} />
 
       {/* Aperçu de la facture, avant d'enregistrer */}
       {showApercu && items.length > 0 && (
