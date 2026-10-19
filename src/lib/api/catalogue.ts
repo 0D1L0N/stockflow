@@ -112,7 +112,8 @@ export const catalogue: Record<string, Commande> = {
   create_format: async ({ produitId, volume, unite, prix, stock, seuilAlerte, emballageId }) => {
     const v = Number(volume), p = Number(prix), s = Number(stock), seuil = Number(seuilAlerte);
     if (!(v > 0)) throw new Error("Le volume doit être supérieur à 0.");
-    if (!(p > 0)) throw new Error("Le prix doit être supérieur à 0.");
+    // 0 : « prix à fixer » — le format existe mais ne peut pas encore être vendu
+    if (!(p >= 0)) throw new Error("Le prix ne peut pas être négatif.");
     if (!(s >= 0) || !(seuil >= 0)) throw new Error("Stock et seuil doivent être positifs.");
     const ref = doc(col("formats"));
     await ecrire(setDoc(ref, {
@@ -168,7 +169,8 @@ export const catalogue: Record<string, Commande> = {
     const [produits, formats] = await Promise.all([listerProduits(), listerFormats()]);
     const noms = new Map(produits.map(p => [p.id, p.nom]));
     return formats
-      .filter(f => f.stock <= f.seuil_alerte)
+      // Un format sans prix n'est pas encore en vente : pas d'alerte
+      .filter(f => f.prix > 0 && f.stock <= f.seuil_alerte)
       .map(f => ({
         ...f,
         produit_nom: noms.get(f.produit_id) ?? "?",

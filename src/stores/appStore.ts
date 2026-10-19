@@ -51,7 +51,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
 function alertesDuCatalogue(c: ReturnType<typeof useCatalogueStore.getState>): FormatAlerte[] {
   const noms = new Map(c.produits.map(p => [p.id, p.nom]));
   return formatsActifs(c)
-    .filter(f => f.stock <= f.seuil_alerte)
+    .filter(f => f.prix > 0 && f.stock <= f.seuil_alerte)
     .map(f => ({ ...f, produit_nom: noms.get(f.produit_id) ?? "?", en_alerte: 1, quantite_manquante: Math.max(0, f.seuil_alerte - f.stock) }))
     .sort((a, b) => a.stock - b.stock);
 }

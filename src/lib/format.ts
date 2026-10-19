@@ -49,3 +49,8 @@ export function numeroWhatsApp(telephone: unknown): string {
   const chiffres = t.replace(/\D/g, "");
   return chiffres.length === 10 && chiffres.startsWith("01") ? "229" + chiffres : chiffres;
 }
+
+/** Texte en minuscules sans accents, pour chercher « beninoise » et trouver « Béninoise ». */
+export function sansAccent(texte: string): string {
+  return texte.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+}

@@ -129,7 +129,7 @@ export default function CarteSauvegarde({ derniere, derniereAuto, auto, onChange
 
       {auto && (
         <a href={URL_SAUVEGARDES_AUTO} target="_blank" rel="noreferrer"
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-secondary-700 hover:underline self-start">
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-secondary-700 hover:underline self-start py-2">
           <ExternalLink size={13} /> Retrouver les sauvegardes automatiques (GitHub)
         </a>
       )}

@@ -14,7 +14,7 @@ import Skeleton from "@/components/ui/Skeleton";
 import Card from "@/components/ui/Card";
 import ModalAjustementPrix from "@/components/prix/ModalAjustementPrix";
 import { CASIER_PAR_VOLUME } from "@/lib/api/emballages";
-import { volumeFr, casiers } from "@/lib/format";
+import { volumeFr, casiers, sansAccent } from "@/lib/format";
 import Avatar from "@/components/ui/Avatar";
 import { useAuthStore } from "@/stores/authStore";
 import { useCatalogue } from "@/stores/catalogueStore";
@@ -96,7 +96,7 @@ export default function Produits() {
   useEffect(() => { if (estGerant) invoke("get_emballages").catch(() => {}); }, [estGerant]);
 
   const enAlerte = (d: ProduitAvecFormats) => d.formats.some(f => f.stock <= f.seuil_alerte);
-  const filtered = data.filter(d => d.produit.nom.toLowerCase().includes(search.toLowerCase()) && (filtre !== "alerte" || enAlerte(d)));
+  const filtered = data.filter(d => sansAccent(d.produit.nom).includes(sansAccent(search)) && (filtre !== "alerte" || enAlerte(d)));
   // Un produit apparaît dans chaque famille où il a un format (Beaufort : casier 24, 20 et 12)
   const entrees = filtered.flatMap(d => {
     const famillesDuProduit = [...new Set(d.formats.map(f => familleDe(f.emballage_id, d.produit.rayon)))];
@@ -104,7 +104,8 @@ export default function Produits() {
       ...d, famille, formatsFamille: d.formats.filter(f => familleDe(f.emballage_id, d.produit.rayon) === famille),
     }));
   });
-  const familleChoisie = FAMILLES.find(f => f.cle === filtre)?.cle ?? null;
+  // Pendant une recherche on cherche dans toutes les familles
+  const familleChoisie = search.trim() ? null : FAMILLES.find(f => f.cle === filtre)?.cle ?? null;
   const groupes = familleChoisie
     ? [{ ...FAMILLES.find(f => f.cle === familleChoisie)!, items: entrees.filter(e => e.famille === familleChoisie) }]
     : grouperParFamille(entrees, e => e.famille);
@@ -258,9 +259,9 @@ export default function Produits() {
                 {/* Produit row */}
                 <div className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-slate-50 transition-colors"
                   onClick={() => toggleExpand(cle)}>
-                  <button className="text-gray-400">
+                  <span className="text-gray-400" aria-hidden>
                     {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                  </button>
+                  </span>
                   <Avatar nom={produit.nom} taille="md" />
                   <div className="flex-1 min-w-0">
                     <div className="font-semibold text-gray-800">{produit.nom}</div>
@@ -285,7 +286,9 @@ export default function Produits() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-baseline gap-2">
                             <span className="text-sm font-semibold text-gray-800">{volumeFr(f.volume, f.unite, f.casier)}</span>
-                            <span className="text-sm text-primary-700 font-semibold tabular-nums">{formatPrix(f.prix)}</span>
+                            {f.prix > 0
+                              ? <span className="text-sm text-primary-700 font-semibold tabular-nums">{formatPrix(f.prix)}</span>
+                              : <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">Prix à fixer</span>}
                           </div>
                           <div className={["text-xs mt-0.5 truncate", f.emballage_id ? "text-gray-400" : "text-orange-600"].join(" ")}>
                             {emballages.find(e => e.id === f.emballage_id)?.nom ?? "Sans casier consigné"}

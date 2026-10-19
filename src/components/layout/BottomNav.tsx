@@ -8,12 +8,14 @@ import { useAppStore } from "@/stores/appStore";
 import { useAuthStore } from "@/stores/authStore";
 import { peutAcceder, ROLE_LABELS } from "@/lib/roles";
 import { useRetourFerme } from "@/lib/retour";
+import { useClavierOuvert } from "@/lib/clavier";
 
 interface Item { to: string; icon: (taille: number) => React.ReactNode; label: string; badge?: number; }
 
 export default function BottomNav() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   useRetourFerme(drawerOpen, () => setDrawerOpen(false));
+  const clavierOuvert = useClavierOuvert();
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const nombreAlertes = useAppStore((s) => s.nombreAlertes);
@@ -40,6 +42,9 @@ export default function BottomNav() {
   const autres = autorises.slice(4);
   const badgeAutres = autres.reduce((s, i) => s + (i.badge ?? 0), 0);
   const autreActif = autres.some(i => i.to === pathname);
+
+  // Clavier ouvert : la barre se retire pour laisser voir ce qu'on cherche
+  if (clavierOuvert && !drawerOpen) return null;
 
   return (
     <>

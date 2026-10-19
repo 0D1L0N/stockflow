@@ -236,7 +236,7 @@ export default function Dashboard() {
               <div className="p-5 flex flex-col gap-4 h-full">
                 <div className="flex items-center justify-between">
                   <h2 className="text-[15px] font-bold text-ink-900">Ce que les clients doivent</h2>
-                  <button onClick={() => navigate("/clients")} className="text-[13px] text-gray-500 hover:text-ink-900 flex items-center">
+                  <button onClick={() => navigate("/clients")} className="text-[13px] text-gray-500 hover:text-ink-900 flex items-center h-10 px-2 -mr-2 rounded-lg">
                     Voir <ChevronRight size={14} />
                   </button>
                 </div>

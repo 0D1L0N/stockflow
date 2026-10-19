@@ -7,6 +7,7 @@ import { useAppStore } from "@/stores/appStore";
 import { useAuthStore } from "@/stores/authStore";
 import { peutAcceder } from "@/lib/roles";
 import { demarrerCatalogue, useCatalogueStore } from "@/stores/catalogueStore";
+import { useClavierOuvert } from "@/lib/clavier";
 import IndicateurConnexion from "./IndicateurConnexion";
 
 interface LayoutProps {
@@ -27,6 +28,7 @@ export default function Layout({ children }: LayoutProps) {
   const versionCatalogue = useCatalogueStore((s) => s.version);
   useEffect(() => { if (useCatalogueStore.getState().pret) loadAlertes().catch(() => {}); }, [versionCatalogue]);
 
+  const clavierOuvert = useClavierOuvert();
   const showFab = ["/clients", "/historique", "/produits"].includes(pathname) && peutAcceder(role, "/vente");
 
   return (
@@ -44,7 +46,7 @@ export default function Layout({ children }: LayoutProps) {
       <BottomNav />
 
       {/* Bouton flottant : nouvelle vente */}
-      {showFab && (
+      {showFab && !clavierOuvert && (
         <button
           onClick={() => navigate("/vente")}
           className="fixed z-20 right-4 bottom-[calc(88px+env(safe-area-inset-bottom))] lg:bottom-6 lg:right-6 h-14 w-14 lg:w-auto lg:px-5 lg:gap-2

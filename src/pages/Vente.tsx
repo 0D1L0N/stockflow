@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Search, ShoppingCart, Plus, Minus, Trash2, Check, User, ChevronDown, X, FileText } from "lucide-react";
+import { sansAccent } from "@/lib/format";
 import { invoke } from "@/lib/db";
 import { useToast } from "@/components/ui/Toast";
 import { useVenteStore, type VenteItem } from "@/stores/venteStore";
@@ -18,6 +19,7 @@ import { useAuthStore } from "@/stores/authStore";
 import Pastilles from "@/components/ui/Pastilles";
 import { familleDe, grouperParFamille, type CleFamille, type Rayon } from "@/lib/familles";
 import { useRetourFerme } from "@/lib/retour";
+import { useClavierOuvert } from "@/lib/clavier";
 import { useCatalogue } from "@/stores/catalogueStore";
 
 interface Format { casier?: number | null; id: string; produit_id: string; volume: number; unite: string; prix: number; stock: number; seuil_alerte: number; emballage_id?: string | null; }
@@ -72,6 +74,7 @@ export default function Vente() {
   const [clientSearch, setClientSearch] = useState("");
   const [showCart, setShowCart] = useState(false);
   useRetourFerme(showCart, () => setShowCart(false));
+  const clavierOuvert = useClavierOuvert();
   const [montantRecuStr, setMontantRecuStr] = useState(montant_recu > 0 ? String(montant_recu) : "");
   const [validating, setValidating] = useState(false);
   const [showApercu, setShowApercu] = useState(false);
@@ -126,9 +129,17 @@ export default function Vente() {
   }, [client_id, versionPrix]);
   const prixDe = (f: Format) => prixClient[f.id] ?? f.prix;
 
-  const filtered = produits.filter(p =>
-    p.produit.nom.toLowerCase().includes(search.toLowerCase())
-  );
+  const termes = sansAccent(search).split(/\s+/).filter(Boolean);
+  const recherche = termes.length > 0;
+  // Chaque mot doit se retrouver dans le nom ou un format (« pils 33 », « beninoise »)
+  const filtered = !recherche ? produits : produits
+    .map(p => {
+      const nom = sansAccent(p.produit.nom);
+      if (termes.every(t => nom.includes(t))) return p;
+      const formats = p.formats.filter(f => termes.every(t => `${nom} ${sansAccent(volumeFr(f.volume, f.unite, f.casier))} ${String(f.volume)}`.includes(t)));
+      return formats.length ? { ...p, formats } : null;
+    })
+    .filter((p): p is ProduitAvecFormats => p !== null);
   // Une carte par produit et par famille (Béninoise casier 12, Béninoise casier 24…), comme sur les fiches
   const cartes = filtered.flatMap(({ produit, formats }) => {
     const parFamille = new Map<CleFamille, Format[]>();
@@ -139,12 +150,27 @@ export default function Vente() {
     return [...parFamille].map(([cle, fs]) => ({ cle, produit, formats: fs }));
   });
   const groupes = grouperParFamille(cartes, c => c.cle);
-  const groupesAffiches = groupes.filter(g => famille === "toutes" || g.cle === famille);
+  // Pendant une recherche, toutes les familles : le produit cherché ne doit jamais être caché
+  const groupesAffiches = groupes.filter(g => recherche || famille === "toutes" || g.cle === famille);
+  const nbResultats = cartes.length;
+
+  // La barre de recherche reste en haut ; en tapant, la liste remonte pour montrer les résultats au-dessus du clavier
+  const listeRef = useRef<HTMLDivElement>(null);
+  const rechercheRef = useRef<HTMLDivElement>(null);
+  const montrerResultats = () => {
+    const liste = listeRef.current, barre = rechercheRef.current;
+    if (!liste || !barre) return;
+    const cible = liste.scrollTop + barre.getBoundingClientRect().top - liste.getBoundingClientRect().top;
+    // Le haut de la barre arrive tout en haut de la zone qui défile
+    if (Math.abs(liste.scrollTop - cible) > 4) liste.scrollTo({ top: cible });
+  };
+  useEffect(() => { if (recherche) montrerResultats(); }, [search]);
 
   const selectedClient = clients.find(c => c.id === client_id);
-  const filteredClients = clients.filter(c => c.nom.toLowerCase().includes(clientSearch.toLowerCase()));
+  const filteredClients = clients.filter(c => sansAccent(c.nom).includes(sansAccent(clientSearch)));
 
   const handleAddToCart = (f: Format, produitNom: string) => {
+    if (prixDe(f) <= 0) { toast(`Le prix de ${produitNom} ${volumeFr(f.volume, f.unite, f.casier)} n'est pas encore fixé (Produits)`, "warning"); return; }
     // Vérification stock
     const existing = items.find(i => i.format_id === f.id);
     const currentQty = existing ? existing.quantite : 0;
@@ -540,7 +566,7 @@ export default function Vente() {
 
       <div className="flex flex-1 overflow-hidden">
         {/* Produits */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col gap-4 pb-40 lg:pb-6">
+        <div ref={listeRef} className="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col gap-4 pb-40 lg:pb-6">
           {/* Sélection client */}
           <div className="relative">
             <label className="text-[13px] font-medium text-gray-700 block mb-1.5">Client</label>
@@ -578,20 +604,34 @@ export default function Vente() {
             {selectedClient && selectedClient.est_defaut !== 1 && <SoldesBandeau client={selectedClient} nomEmballage={nomEmballage} />}
           </div>
 
-          {/* Recherche produit */}
-          <div className="relative">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input value={search} onChange={e => setSearch(e.target.value)}
-              placeholder="Rechercher un produit…"
-              className="w-full pl-9 pr-3 py-2.5 bg-white border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-secondary" />
+          {/* Recherche et familles : collées en haut pendant qu'on fait défiler les produits */}
+          <div ref={rechercheRef} className="sticky -top-4 sm:-top-6 z-20 -mx-4 sm:-mx-6 px-4 sm:px-6 pt-4 sm:pt-6 -mt-4 sm:-mt-6 pb-2 bg-background flex flex-col gap-2.5">
+            <div className="relative">
+              <Search size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              <input type="search" inputMode="search" enterKeyHint="search" autoComplete="off" value={search}
+                onChange={e => setSearch(e.target.value)}
+                onFocus={() => setTimeout(montrerResultats, 250)}
+                onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                placeholder="Rechercher un produit (ex. : pils, 0,5)…" aria-label="Rechercher un produit"
+                className="w-full h-12 pl-10 pr-11 bg-white border border-gray-300 rounded-xl text-[15px] focus:outline-none focus:border-secondary [&::-webkit-search-cancel-button]:hidden" />
+              {search && (
+                <button onClick={() => setSearch("")} aria-label="Effacer la recherche"
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 w-9 h-9 rounded-lg flex items-center justify-center text-gray-400 hover:bg-slate-100">
+                  <X size={17} />
+                </button>
+              )}
+            </div>
+            {recherche ? (
+              <div className="text-xs font-semibold text-gray-500 px-1">
+                {nbResultats === 0 ? "Aucun produit trouvé" : `${nbResultats} résultat${nbResultats > 1 ? "s" : ""}`}
+              </div>
+            ) : groupes.length > 1 && (
+              <Pastilles valeur={famille} onChange={setFamille} options={[
+                { valeur: "toutes" as const, label: "Tout" },
+                ...groupes.map(g => ({ valeur: g.cle, label: g.court, compte: g.items.length })),
+              ]} />
+            )}
           </div>
-
-          {groupes.length > 1 && (
-            <Pastilles valeur={famille} onChange={setFamille} options={[
-              { valeur: "toutes" as const, label: "Tout" },
-              ...groupes.map(g => ({ valeur: g.cle, label: g.court, compte: g.items.length })),
-            ]} />
-          )}
 
           {/* Grille produits */}
           {loading ? (
@@ -620,7 +660,10 @@ export default function Vente() {
                 </section>
               ))}
               {cartes.length === 0 && (
-                <div className="text-center py-10 text-gray-400 text-sm">Aucun produit trouvé</div>
+                <div className="text-center py-10 text-gray-400 text-sm flex flex-col items-center gap-3">
+                  Aucun produit ne correspond à « {search} ».
+                  <button onClick={() => setSearch("")} className="h-10 px-4 rounded-full bg-white border border-slate-300 text-gray-700 font-semibold">Effacer la recherche</button>
+                </div>
               )}
             </div>
           )}
@@ -635,7 +678,7 @@ export default function Vente() {
       </div>
 
       {/* Barre « Voir le panier » sur téléphone : le panier toujours à portée de pouce */}
-      {items.length > 0 && !showCart && (
+      {items.length > 0 && !showCart && !clavierOuvert && (
         <button onClick={() => setShowCart(true)}
           className="lg:hidden fixed left-3 right-3 z-30 bottom-[calc(84px+env(safe-area-inset-bottom))] h-14 px-4 rounded-2xl
             bg-secondary-600 text-white shadow-modal flex items-center gap-3 animate-slide-up active:scale-[0.98] transition-transform">
@@ -736,6 +779,8 @@ function ProduitCard({
   const prixDe = (f: Format) => prixClient[f.id] ?? f.prix;
   const prixSpecifique = prixClient[fmt.id] != null && prixClient[fmt.id] !== fmt.prix;
   const outOfStock = fmt.stock <= 0;
+  // Format créé sans prix : visible mais pas encore vendable
+  const sansPrix = prixDe(fmt) <= 0;
   const lowStock = !outOfStock && fmt.stock <= fmt.seuil_alerte;
   const inCart = cartItems.find(i => i.format_id === fmt.id);
 
@@ -784,7 +829,9 @@ function ProduitCard({
       )}
 
       <div className="mt-auto">
-        <div className="chiffre text-[17px] font-extrabold text-ink-900 leading-tight">{formatPrix(prixDe(fmt))}</div>
+        {sansPrix
+          ? <div className="text-[13px] font-bold text-amber-700 leading-tight">Prix à fixer</div>
+          : <div className="chiffre text-[17px] font-extrabold text-ink-900 leading-tight">{formatPrix(prixDe(fmt))}</div>}
         {prixSpecifique && (
           <div className="text-[11px] text-gray-400">
             <span className="font-semibold text-secondary-700">prix du client</span>
@@ -792,10 +839,9 @@ function ProduitCard({
         )}
       </div>
 
-      <button onClick={() => !outOfStock && onAdd(fmt, nom)} disabled={outOfStock}
+      <button onClick={() => !outOfStock && !sansPrix && onAdd(fmt, nom)} disabled={outOfStock || sansPrix}
         className="w-full h-10 flex items-center justify-center gap-1.5 rounded-lg text-sm font-semibold transition-colors bg-secondary-600 text-white hover:bg-secondary-700 active:translate-y-px disabled:bg-slate-200 disabled:text-gray-400 disabled:cursor-not-allowed">
-        <Plus size={15} strokeWidth={2.5} />
-        Ajouter
+        {sansPrix ? "Pas encore en vente" : <><Plus size={15} strokeWidth={2.5} /> Ajouter</>}
       </button>
     </div>
   );

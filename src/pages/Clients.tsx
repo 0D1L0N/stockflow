@@ -1,3 +1,4 @@
+import { sansAccent } from "@/lib/format";
 import { useEffect, useState } from "react";
 import { Plus, Search, Edit2, Trash2, Phone, MapPin, Shield, Tag, ChevronRight, Users, Layers } from "lucide-react";
 import ModalGroupesPrix, { type GroupePrixResume } from "@/components/clients/ModalGroupesPrix";
@@ -73,7 +74,7 @@ export default function Clients() {
   // Téléphone : on compare les chiffres seuls (« 9700 » trouve « 01 97 00 00 00 »)
   const chiffresRecherche = search.replace(/\D/g, "");
   const filtered = clients.filter(c =>
-    (c.nom.toLowerCase().includes(search.toLowerCase())
+    (sansAccent(c.nom).includes(sansAccent(search))
       || (chiffresRecherche.length > 0 && (c.telephone ?? "").replace(/\D/g, "").includes(chiffresRecherche)))
     && (!seulementDebiteurs || doitQuelqueChose(c))
   );
