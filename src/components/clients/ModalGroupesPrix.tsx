@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, Layers, Tag, Edit2, Trash2, Check, X } from "lucide-react";
+import { Plus, Layers, Tag, Edit2, Trash2, Check, X, Users, Search } from "lucide-react";
 import { invoke } from "@/lib/db";
 import { useToast } from "@/components/ui/Toast";
 import Modal from "@/components/ui/Modal";
@@ -9,6 +9,8 @@ import Skeleton from "@/components/ui/Skeleton";
 import EtatVide from "@/components/ui/EtatVide";
 import Avatar from "@/components/ui/Avatar";
 import ModalPrixClient from "./ModalPrixClient";
+
+interface ClientGroupe { id: string; nom: string; telephone?: string | null; est_defaut?: number; groupe_prix_id?: string | null; }
 
 export interface GroupePrixResume { id: string; nom: string; nb_clients: number; nb_prix: number; }
 
@@ -28,6 +30,32 @@ export default function ModalGroupesPrix({ isOpen, onClose, onChange }: Props) {
   const [creating, setCreating] = useState(false);
   const [renomme, setRenomme] = useState<{ id: string; nom: string } | null>(null);
   const [grille, setGrille] = useState<{ id: string; nom: string } | null>(null);
+  // Choix des clients d'un groupe
+  const [membres, setMembres] = useState<{ id: string; nom: string } | null>(null);
+  const [clients, setClients] = useState<ClientGroupe[]>([]);
+  const [recherche, setRecherche] = useState("");
+  const [enCours, setEnCours] = useState<string | null>(null);
+
+  const ouvrirMembres = async (g: { id: string; nom: string }) => {
+    setMembres(g); setRecherche("");
+    try { setClients((await invoke<ClientGroupe[]>("get_clients")).filter(c => c.est_defaut !== 1)); }
+    catch (e) { toast(String(e), "error"); }
+  };
+
+  /** Coche : le client entre dans le groupe (et quitte l'ancien) ; décoche : il n'a plus de groupe. */
+  const basculer = async (c: ClientGroupe) => {
+    if (!membres) return;
+    const dedans = c.groupe_prix_id === membres.id;
+    const ancien = !dedans && c.groupe_prix_id ? groupes.find(g => g.id === c.groupe_prix_id)?.nom : null;
+    setEnCours(c.id);
+    try {
+      await invoke("set_groupe_client", { clientId: c.id, groupeId: dedans ? null : membres.id });
+      setClients(cs => cs.map(x => x.id === c.id ? { ...x, groupe_prix_id: dedans ? null : membres.id } : x));
+      toast(dedans ? `${c.nom} retiré du groupe` : ancien ? `${c.nom} passe de « ${ancien} » à « ${membres.nom} »` : `${c.nom} ajouté au groupe`, "success");
+      onChange?.();
+    } catch (e) { toast(String(e), "error"); }
+    setEnCours(null);
+  };
 
   const load = async () => {
     setLoading(true);
@@ -71,7 +99,7 @@ export default function ModalGroupesPrix({ isOpen, onClose, onChange }: Props) {
 
   return (
     <>
-      <Modal isOpen={isOpen && !grille} onClose={onClose} title="Groupes de prix" size="lg">
+      <Modal isOpen={isOpen && !grille && !membres} onClose={onClose} title="Groupes de prix" size="lg">
         <div className="p-4 sm:p-6 flex flex-col gap-4">
           <p className="text-xs text-gray-500">
             Un groupe réunit les clients qui ont les mêmes prix. Un client du groupe en hérite automatiquement ;
@@ -93,9 +121,9 @@ export default function ModalGroupesPrix({ isOpen, onClose, onChange }: Props) {
           ) : (
             <div className="flex flex-col divide-y divide-slate-100 border border-slate-200 rounded-xl">
               {groupes.map(g => (
-                <div key={g.id} className="flex items-center gap-3 px-3 py-3">
+                <div key={g.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-3">
                   <Avatar nom={g.nom} taille="md" />
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-[150px]">
                     {renomme?.id === g.id ? (
                       <div className="flex items-center gap-1">
                         <input autoFocus value={renomme.nom} onChange={e => setRenomme({ ...renomme, nom: e.target.value })}
@@ -114,9 +142,13 @@ export default function ModalGroupesPrix({ isOpen, onClose, onChange }: Props) {
                     )}
                   </div>
                   {renomme?.id !== g.id && (
-                    <div className="flex items-center gap-0.5 flex-shrink-0">
+                    <div className="flex items-center gap-1 flex-shrink-0 ml-auto">
+                      <button onClick={() => ouvrirMembres({ id: g.id, nom: g.nom })}
+                        className="flex items-center gap-1.5 px-2.5 h-9 rounded-lg text-xs font-semibold text-secondary-700 bg-secondary-50 hover:bg-secondary-100">
+                        <Users size={13} /> Clients
+                      </button>
                       <button onClick={() => setGrille({ id: g.id, nom: g.nom })}
-                        className="flex items-center gap-1.5 px-2.5 h-8 rounded-lg text-xs font-semibold text-gray-700 bg-slate-100 hover:bg-slate-200">
+                        className="flex items-center gap-1.5 px-2.5 h-9 rounded-lg text-xs font-semibold text-gray-700 bg-slate-100 hover:bg-slate-200">
                         <Tag size={13} /> Prix
                       </button>
                       <button onClick={() => setRenomme({ id: g.id, nom: g.nom })} aria-label={`Renommer ${g.nom}`}
@@ -137,6 +169,41 @@ export default function ModalGroupesPrix({ isOpen, onClose, onChange }: Props) {
       </Modal>
 
       <ModalPrixClient groupe={grille} onClose={() => { setGrille(null); load(); }} />
+
+      {/* Clients du groupe : cocher pour ajouter, décocher pour retirer */}
+      <Modal isOpen={!!membres} onClose={() => { setMembres(null); load(); }} title={membres ? `Clients du groupe « ${membres.nom} »` : ""} size="lg">
+        <div className="p-4 sm:p-6 flex flex-col gap-3">
+          <p className="text-xs text-gray-500">
+            Cochez les clients qui ont les prix de ce groupe. Leurs prix propres (dans leur fiche) restent prioritaires.
+          </p>
+          <Input placeholder="Chercher un client…" value={recherche} onChange={e => setRecherche(e.target.value)} icon={<Search size={16} />} />
+          <div className="text-xs font-semibold text-gray-500">
+            {clients.filter(c => c.groupe_prix_id === membres?.id).length} client(s) dans le groupe
+          </div>
+          <div className="flex flex-col divide-y divide-slate-100 border border-slate-200 rounded-xl">
+            {clients
+              .filter(c => c.nom.toLowerCase().includes(recherche.toLowerCase()))
+              // Membres d'abord, puis les autres par nom
+              .sort((a, b) => Number(b.groupe_prix_id === membres?.id) - Number(a.groupe_prix_id === membres?.id) || a.nom.localeCompare(b.nom, "fr"))
+              .map(c => {
+                const dedans = c.groupe_prix_id === membres?.id;
+                const autre = !dedans && c.groupe_prix_id ? groupes.find(g => g.id === c.groupe_prix_id)?.nom : null;
+                return (
+                  <label key={c.id} className="flex items-center gap-3 px-3 min-h-[52px] cursor-pointer hover:bg-slate-50">
+                    <input type="checkbox" checked={dedans} disabled={enCours === c.id} onChange={() => basculer(c)}
+                      className="w-5 h-5 accent-secondary flex-shrink-0" />
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-sm font-semibold text-gray-800 truncate">{c.nom}</span>
+                      {autre && <span className="block text-xs text-amber-700">Dans « {autre} » : cocher le fera changer de groupe</span>}
+                    </span>
+                  </label>
+                );
+              })}
+            {clients.length === 0 && <p className="text-center text-sm text-gray-400 py-6">Aucun client enregistré</p>}
+          </div>
+          <Button onClick={() => { setMembres(null); load(); }} className="w-full justify-center">Terminé</Button>
+        </div>
+      </Modal>
     </>
   );
 }
