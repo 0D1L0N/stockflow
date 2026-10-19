@@ -111,7 +111,7 @@ export default function ModalAjustementPrix({ isOpen, onClose, onApplied, client
             </select>
           </div>
           <Input label={mode === "pourcentage" ? "Hausse en % (négatif = baisse)" : "Hausse par unité (négatif = baisse)"}
-            type="number" value={valeur} onChange={e => setValeur(e.target.value)}
+            type="number" inputMode="numeric" value={valeur} onChange={e => setValeur(e.target.value)}
             placeholder={mode === "pourcentage" ? "ex. : 10" : "ex. : 50"} />
           <div>
             <label className={labelCls}>Arrondi</label>

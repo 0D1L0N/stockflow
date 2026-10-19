@@ -161,7 +161,7 @@ export default function ModalCompteFournisseur({ fournisseur, onClose, onChange,
                   {emballages.map(e => (
                     <label key={e.id} className="flex items-center gap-2 text-xs text-gray-600">
                       <span className="flex-1 truncate">{e.nom}</span>
-                      <input type="number" min="0" placeholder="0" value={rendus[e.id] ?? ""} onChange={ev => setRendus(r => ({ ...r, [e.id]: ev.target.value }))}
+                      <input type="number" inputMode="numeric" min="0" placeholder="0" value={rendus[e.id] ?? ""} onChange={ev => setRendus(r => ({ ...r, [e.id]: ev.target.value }))}
                         className="w-16 h-8 rounded-lg border border-slate-300 px-2 text-sm text-right focus:outline-none focus:border-secondary" />
                     </label>
                   ))}

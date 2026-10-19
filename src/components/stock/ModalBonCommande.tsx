@@ -201,7 +201,7 @@ export default function ModalBonCommande({ isOpen, onClose }: { isOpen: boolean;
                     Stock {l.stock} · seuil {l.seuil}{l.emballage ? ` · ${l.emballage}` : ""}
                   </div>
                 </div>
-                <input type="number" min="0" placeholder="0" value={quantites[l.formatId] ?? ""} disabled={verrouille}
+                <input type="number" inputMode="numeric" min="0" placeholder="0" value={quantites[l.formatId] ?? ""} disabled={verrouille}
                   onChange={e => setQuantites(q => ({ ...q, [l.formatId]: e.target.value }))}
                   className="w-20 rounded-xl border border-slate-300 px-2.5 py-1.5 text-sm font-semibold text-right focus:outline-none focus:border-secondary disabled:bg-slate-50" />
               </div>

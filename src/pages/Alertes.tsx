@@ -152,7 +152,7 @@ export default function Alertes() {
                       Quantité à commander
                     </label>
                     <input
-                      type="number" min="1"
+                      type="number" inputMode="numeric" min="1"
                       value={quantites[a.id] ?? String(a.quantite_manquante || 1)}
                       onChange={e => setQuantites(prev => ({ ...prev, [a.id]: e.target.value }))}
                       className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold focus:outline-none focus:border-secondary"

@@ -195,7 +195,7 @@ export default function ModalPrixClient({ client, groupe, onClose, onChange }: P
                                 : libelleHerite(l)}
                             </div>
                           </div>
-                          <input type="number" min="0" placeholder={String(herite(l))} value={saisie}
+                          <input type="number" inputMode="numeric" min="0" placeholder={String(herite(l))} value={saisie}
                             onChange={e => setSaisies(s => ({ ...s, [l.format_id]: e.target.value }))}
                             onKeyDown={e => { if (e.key === "Enter" && modifie && saisie) enregistrer(l); }}
                             className={["w-[88px] sm:w-28 flex-shrink-0 rounded-lg border px-2.5 py-1.5 text-sm font-semibold text-right focus:outline-none focus:border-secondary",

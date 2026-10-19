@@ -201,7 +201,7 @@ export default function AjustementStock() {
                   {mode === "absolu" ? "Nouveau stock (valeur absolue)" : "Différence (+/-)"}
                 </label>
                 <input
-                  type="number"
+                  type="number" inputMode="numeric"
                   placeholder={mode === "absolu" ? "ex. : 50" : "ex. : +10 ou -5"}
                   value={valeur}
                   onChange={e => setValeur(e.target.value)}

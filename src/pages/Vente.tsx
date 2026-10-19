@@ -380,7 +380,7 @@ export default function Vente() {
                       </button>
                     </div>
                     {prixEdite === item.format_id ? (
-                      <input type="number" min="0" autoFocus value={prixSaisi} aria-label="Prix du casier"
+                      <input type="number" inputMode="numeric" min="0" autoFocus value={prixSaisi} aria-label="Prix du casier"
                         onChange={e => setPrixSaisi(e.target.value)}
                         onBlur={() => validerPrix(item)}
                         onKeyDown={e => { if (e.key === "Enter") validerPrix(item); if (e.key === "Escape") setPrixEdite(null); }}
@@ -426,7 +426,7 @@ export default function Vente() {
                   <button type="button" aria-label="Un casier rendu de moins"
                     onClick={() => setRendusSaisis(r => ({ ...r, [e]: String(Math.max(0, rendus[e] - 1)) }))}
                     className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center"><Minus size={13} /></button>
-                  <input type="number" min="0" value={rendusSaisis[e] ?? String(rendus[e])} aria-label={`Casiers rendus : ${nomEmballage(e)}`}
+                  <input type="number" inputMode="numeric" min="0" value={rendusSaisis[e] ?? String(rendus[e])} aria-label={`Casiers rendus : ${nomEmballage(e)}`}
                     onChange={ev => setRendusSaisis(r => ({ ...r, [e]: ev.target.value }))}
                     className="w-12 h-8 rounded-lg border border-slate-300 px-1 text-sm font-semibold text-center focus:outline-none focus:border-secondary" />
                   <button type="button" aria-label="Un casier rendu de plus"
@@ -465,7 +465,7 @@ export default function Vente() {
                 Montant payé maintenant
               </label>
               <div className="relative">
-                <input type="number" min="0" placeholder="0" value={montantPayeStr}
+                <input type="number" inputMode="numeric" min="0" placeholder="0" value={montantPayeStr}
                   onChange={e => setMontantPayeStr(e.target.value)}
                   className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm font-semibold focus:outline-none focus:border-secondary pr-14" />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-semibold">{symbole}</span>
@@ -496,7 +496,7 @@ export default function Vente() {
                 Montant reçu (optionnel)
               </label>
               <div className="relative">
-                <input type="number" min="0" placeholder={`Min. ${formatPrix(total)}`}
+                <input type="number" inputMode="numeric" min="0" placeholder={`Min. ${formatPrix(total)}`}
                   value={montantRecuStr} onChange={e => handleMontantChange(e.target.value)}
                   className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm font-semibold focus:outline-none focus:border-secondary pr-14" />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-semibold">{symbole}</span>

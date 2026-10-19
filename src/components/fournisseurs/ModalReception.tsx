@@ -252,7 +252,7 @@ export default function ModalReception({ isOpen, onClose, onDone, fournisseurId,
                     <div className="flex items-center border border-slate-200 rounded-lg overflow-hidden">
                       <button aria-label="Un de moins" onClick={() => modifier(l.formatId, { quantite: String(Math.max(1, q - 1)) })}
                         className="w-8 h-8 bg-slate-50 flex items-center justify-center hover:bg-gray-100"><Minus size={12} /></button>
-                      <input type="number" min="1" value={l.quantite} aria-label="Quantité reçue"
+                      <input type="number" inputMode="numeric" min="1" value={l.quantite} aria-label="Quantité reçue"
                         onChange={e => modifier(l.formatId, { quantite: e.target.value })}
                         className="w-12 h-8 text-center text-sm font-semibold focus:outline-none" />
                       <button aria-label="Un de plus" onClick={() => modifier(l.formatId, { quantite: String(q + 1) })}
@@ -260,7 +260,7 @@ export default function ModalReception({ isOpen, onClose, onDone, fournisseurId,
                     </div>
                     <div className="flex items-center gap-1.5">
                       <span className="text-xs text-gray-400">×</span>
-                      <input type="number" min="0" value={l.prixAchat} placeholder="Prix achat" aria-label="Prix d'achat unitaire"
+                      <input type="number" inputMode="numeric" min="0" value={l.prixAchat} placeholder="Prix achat" aria-label="Prix d'achat unitaire"
                         onChange={e => modifier(l.formatId, { prixAchat: e.target.value })}
                         className="w-24 h-8 rounded-lg border border-slate-300 px-2 text-sm font-semibold text-right focus:outline-none focus:border-secondary" />
                     </div>
@@ -290,7 +290,7 @@ export default function ModalReception({ isOpen, onClose, onDone, fournisseurId,
                       {net > 0 ? ` · ${net} à lui rendre plus tard` : net < 0 ? ` · ${-net} rendu${-net > 1 ? "s" : ""} en avance` : " · échange complet"}
                     </div>
                   </div>
-                  <input type="number" min="0" value={rendu(e)} aria-label={`Vides rendus ${nomEmballage(e)}`}
+                  <input type="number" inputMode="numeric" min="0" value={rendu(e)} aria-label={`Vides rendus ${nomEmballage(e)}`}
                     onChange={ev => setRendus(x => ({ ...x, [e]: ev.target.value }))}
                     className="w-20 h-9 rounded-lg border border-slate-300 px-2 text-sm font-semibold text-right focus:outline-none focus:border-secondary" />
                 </div>
@@ -309,7 +309,7 @@ export default function ModalReception({ isOpen, onClose, onDone, fournisseurId,
             <div className="chiffre text-[26px] font-extrabold text-secondary-400 leading-none">{formatPrix(total)}</div>
           </div>
           <div className="flex items-center gap-2">
-            <input type="number" min="0" value={paye} onChange={e => setPaye(e.target.value)} placeholder="Montant payé maintenant"
+            <input type="number" inputMode="numeric" min="0" value={paye} onChange={e => setPaye(e.target.value)} placeholder="Montant payé maintenant"
               className="flex-1 min-w-0 h-10 rounded-lg bg-white/10 border border-white/15 px-3 text-sm font-semibold placeholder:text-ink-400 focus:outline-none focus:border-secondary-400" />
             <button onClick={() => setPaye(String(total))} className="h-10 px-3 rounded-lg bg-white/10 hover:bg-white/15 text-xs font-semibold">Tout payé</button>
           </div>

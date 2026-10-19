@@ -142,7 +142,7 @@ export default function ModalCompteClient({ client, nomEmballage, onClose, onCha
                   </div>
                   <button type="button" aria-label="Un de moins" onClick={() => setRetours(r => ({ ...r, [e]: String(Math.max(0, q - 1)) }))}
                     className="w-9 h-9 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center"><Minus size={14} /></button>
-                  <input type="number" min="0" max={n} placeholder="0" value={retours[e] ?? ""} aria-label={`Casiers rapportés : ${nomEmballage(e)}`}
+                  <input type="number" inputMode="numeric" min="0" max={n} placeholder="0" value={retours[e] ?? ""} aria-label={`Casiers rapportés : ${nomEmballage(e)}`}
                     onChange={ev => setRetours(r => ({ ...r, [e]: ev.target.value }))}
                     className="w-12 h-9 rounded-lg border border-slate-300 text-sm font-semibold text-center focus:outline-none focus:border-secondary" />
                   <button type="button" aria-label="Un de plus" onClick={() => setRetours(r => ({ ...r, [e]: String(Math.min(n, q + 1)) }))}

@@ -8,6 +8,9 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 
 export default function Input({ label, error, icon, className = "", id, ...props }: InputProps) {
   const inputId = id ?? label?.toLowerCase().replace(/\s+/g, "-");
+  // Champ numérique : pavé numérique sur téléphone (avec virgule si le champ accepte des décimales)
+  const inputMode = props.inputMode
+    ?? (props.type === "number" ? (String(props.step ?? "").includes(".") ? "decimal" : "numeric") : undefined);
   return (
     <div className="flex flex-col gap-1.5">
       {label && (
@@ -31,6 +34,7 @@ export default function Input({ label, error, icon, className = "", id, ...props
             className,
           ].join(" ")}
           {...props}
+          inputMode={inputMode}
         />
       </div>
       {error && <p className="text-xs text-danger font-medium">{error}</p>}
