@@ -2,11 +2,11 @@ import { deleteApp, initializeApp } from "firebase/app";
 import { createUserWithEmailAndPassword, inMemoryPersistence, initializeAuth, sendPasswordResetEmail, signOut } from "firebase/auth";
 import { doc, setDoc, updateDoc } from "firebase/firestore";
 import { auth, config, db } from "@/lib/firebase";
-import type { Role } from "@/lib/roles";
+import { roleEffectif, type Role } from "@/lib/roles";
 import { messageErreurAuth } from "@/stores/authStore";
 import { col, lister, maintenant, parNom, type Commande, type Id } from "./outils";
 
-const ROLES: Role[] = ["gerant", "vendeur", "magasinier"];
+const ROLES: Role[] = ["admin", "gerant", "magasinier"];
 
 interface Utilisateur { id: Id; nom: string; email: string; role: Role; actif: boolean; date_creation?: string; }
 
@@ -20,7 +20,10 @@ function verifierRole(role: unknown): Role {
 }
 
 export const utilisateurs: Record<string, Commande> = {
-  get_utilisateurs: async () => (await lister<Utilisateur>(col("users"))).sort(parNom),
+  // Les anciens comptes « vendeur » s'affichent comme magasiniers
+  get_utilisateurs: async () => (await lister<Utilisateur>(col("users")))
+    .map(u => ({ ...u, role: roleEffectif(u.role) ?? u.role }))
+    .sort(parNom),
 
   /**
    * Crée le compte de connexion d'un employé puis son profil.
@@ -42,7 +45,7 @@ export const utilisateurs: Record<string, Commande> = {
         throw new Error(messageErreurAuth(e));
       }
       await signOut(authSecondaire);
-      // Écrit par le gérant (règles : seul un gérant crée le profil d'un autre)
+      // Écrit par l'admin (règles : seul un admin crée le profil d'un autre)
       await setDoc(doc(db, "users", uid), {
         nom: String(nom).trim(), email: String(email).trim(), role: r, actif: true, date_creation: maintenant(),
       });
@@ -56,8 +59,8 @@ export const utilisateurs: Record<string, Commande> = {
     exigerEnLigne();
     const soiMeme = uid === auth.currentUser?.uid;
     const r = verifierRole(role);
-    if (soiMeme && (r !== "gerant" || actif === false)) {
-      throw new Error("Vous ne pouvez pas retirer vos propres droits de gérant ni désactiver votre compte.");
+    if (soiMeme && (r !== "admin" || actif === false)) {
+      throw new Error("Vous ne pouvez pas retirer vos propres droits d'admin ni désactiver votre compte.");
     }
     await updateDoc(doc(db, "users", uid as Id), { nom: String(nom).trim(), role: r, actif: actif !== false });
   },

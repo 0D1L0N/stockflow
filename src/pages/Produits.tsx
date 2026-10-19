@@ -16,9 +16,9 @@ import ModalAjustementPrix from "@/components/prix/ModalAjustementPrix";
 import { CASIER_PAR_VOLUME } from "@/lib/api/emballages";
 import { volumeFr, casiers, sansAccent } from "@/lib/format";
 import Avatar from "@/components/ui/Avatar";
-import { useAuthStore } from "@/stores/authStore";
 import { useCatalogue } from "@/stores/catalogueStore";
 import { RAYONS, FAMILLES, familleDe, grouperParFamille, type Rayon, type CleFamille } from "@/lib/familles";
+import { usePeut } from "@/lib/droits";
 
 interface Format { casier?: number | null;
   id: string; produit_id: string; volume: number; unite: string;
@@ -58,7 +58,11 @@ function stockBadge(stock: number, seuil: number) {
 export default function Produits() {
   const { toast } = useToast();
   const formatPrix = useAppStore((s) => s.formatMontant);
-  const estGerant = useAuthStore((s) => s.profil?.role === "gerant");
+  const peutCatalogue = usePeut("catalogue");
+  const peutSupprimer = usePeut("supprimer");
+  const estAdmin = usePeut("parametres");
+  // Raccourci : les gestes de création et de modification
+  const estGerant = peutCatalogue;
   // Catalogue partagé : en mémoire et à jour en direct (y compris juste après un ajout ou une modification)
   const catalogue = useCatalogue();
   const data = catalogue.produits as ProduitAvecFormats[];
@@ -93,7 +97,7 @@ export default function Produits() {
   const load = async () => {};
 
   // Côté gérant : crée les casiers par défaut et complète les anciens formats (une fois)
-  useEffect(() => { if (estGerant) invoke("get_emballages").catch(() => {}); }, [estGerant]);
+  useEffect(() => { if (estAdmin) invoke("get_emballages").catch(() => {}); }, [estAdmin]);
 
   const enAlerte = (d: ProduitAvecFormats) => d.formats.some(f => f.stock <= f.seuil_alerte);
   const filtered = data.filter(d => sansAccent(d.produit.nom).includes(sansAccent(search)) && (filtre !== "alerte" || enAlerte(d)));
@@ -273,9 +277,9 @@ export default function Produits() {
                     <button onClick={() => openEditProduit(produit)} className="p-2.5 rounded-xl hover:bg-gray-100 text-gray-400 hover:text-primary transition-colors">
                       <Edit2 size={15} />
                     </button>
-                    <button onClick={() => deleteProduit(produit)} className="p-2.5 rounded-xl hover:bg-red-50 text-gray-400 hover:text-danger transition-colors">
+                    {peutSupprimer && <button onClick={() => deleteProduit(produit)} className="p-2.5 rounded-xl hover:bg-red-50 text-gray-400 hover:text-danger transition-colors">
                       <Trash2 size={15} />
-                    </button>
+                    </button>}
                   </div>}
                 </div>
 
@@ -302,10 +306,10 @@ export default function Produits() {
                               className="p-2.5 rounded-xl hover:bg-slate-100 text-gray-400 hover:text-primary transition-colors">
                               <Edit2 size={14} />
                             </button>
-                            <button onClick={() => deleteFormat(f)} aria-label="Supprimer le format"
+                            {peutSupprimer && <button onClick={() => deleteFormat(f)} aria-label="Supprimer le format"
                               className="p-2.5 rounded-xl hover:bg-red-50 text-gray-400 hover:text-danger transition-colors">
                               <Trash2 size={14} />
-                            </button>
+                            </button>}
                           </div>
                         )}
                       </div>

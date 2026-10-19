@@ -5,7 +5,6 @@ import ModalGroupesPrix, { type GroupePrixResume } from "@/components/clients/Mo
 import { useAppStore } from "@/stores/appStore";
 import Pastilles from "@/components/ui/Pastilles";
 import EtatVide from "@/components/ui/EtatVide";
-import { useAuthStore } from "@/stores/authStore";
 import { invoke } from "@/lib/db";
 import { useToast } from "@/components/ui/Toast";
 import Header from "@/components/layout/Header";
@@ -20,6 +19,7 @@ import ModalCompteClient from "@/components/clients/ModalCompteClient";
 import SoldesBandeau from "@/components/clients/SoldesBandeau";
 import Avatar from "@/components/ui/Avatar";
 import { useTempsReel } from "@/lib/tempsReel";
+import { usePeut } from "@/lib/droits";
 
 interface Client {
   id: string; nom: string; telephone: string | null;
@@ -44,7 +44,8 @@ export default function Clients() {
   const [saving, setSaving] = useState(false);
   const [prixClient, setPrixClient] = useState<Client | null>(null);
   const [compte, setCompte] = useState<Client | null>(null);
-  const estGerant = useAuthStore((s) => s.profil?.role === "gerant");
+  const peutPrix = usePeut("prix");
+  const peutSupprimer = usePeut("supprimer");
   const [seulementDebiteurs, setSeulementDebiteurs] = useState(false);
   const [nomsEmballages, setNomsEmballages] = useState<Record<string, string>>({});
   const nomEmballage = (id: string) => nomsEmballages[id] ?? "Casier";
@@ -90,7 +91,7 @@ export default function Clients() {
     if (!nom.trim()) return;
     setSaving(true);
     try {
-      const groupe = estGerant ? (groupePrixId || null) : undefined;
+      const groupe = peutPrix ? (groupePrixId || null) : undefined;
       if (edit) await invoke("update_client", { id: edit.id, nom: nom.trim(), telephone: telephone || null, adresse: adresse || null, groupePrixId: groupe });
       else await invoke("create_client", { nom: nom.trim(), telephone: telephone || null, adresse: adresse || null, groupePrixId: groupe });
       // Nouveau groupe pour un client existant : ses anciens prix propres masqueraient ceux du groupe
@@ -120,7 +121,7 @@ export default function Clients() {
     <div className="flex flex-col h-full overflow-hidden">
       <Header title="Clients" subtitle="Comptes, dettes et casiers à rendre" icone={<Users size={22} />}
         actions={<>
-          {estGerant && <Button variant="secondary" icon={<Layers size={16} />} onClick={() => setShowGroupes(true)}>Groupes de prix</Button>}
+          {peutPrix && <Button variant="secondary" icon={<Layers size={16} />} onClick={() => setShowGroupes(true)}>Groupes de prix</Button>}
           <Button icon={<Plus size={16} />} onClick={openNew}>Nouveau client</Button>
         </>}
         chiffres={loading ? undefined : [
@@ -184,20 +185,20 @@ export default function Clients() {
 
                   <SoldesBandeau client={c} nomEmballage={nomEmballage} className="mt-3" />
 
-                  {!defaut && estGerant && (
+                  {!defaut && (
                     <div className="flex items-center gap-1 mt-3 pt-2.5 border-t border-slate-100">
-                      <button onClick={action(() => setPrixClient(c))}
+                      {peutPrix && <button onClick={action(() => setPrixClient(c))}
                         className="flex items-center gap-1.5 px-2.5 h-8 rounded-lg text-xs font-semibold text-gray-600 hover:bg-slate-100 transition-colors">
                         <Tag size={13} /> Prix
-                      </button>
+                      </button>}
                       <button onClick={action(() => openEdit(c))}
                         className="flex items-center gap-1.5 px-2.5 h-8 rounded-lg text-xs font-semibold text-gray-600 hover:bg-slate-100 transition-colors">
                         <Edit2 size={13} /> Modifier
                       </button>
-                      <button onClick={action(() => deleteClient(c))} aria-label={`Supprimer ${c.nom}`}
+                      {peutSupprimer && <button onClick={action(() => deleteClient(c))} aria-label={`Supprimer ${c.nom}`}
                         className="ml-auto flex items-center justify-center w-8 h-8 rounded-lg text-gray-400 hover:bg-red-50 hover:text-danger transition-colors">
                         <Trash2 size={14} />
-                      </button>
+                      </button>}
                     </div>
                   )}
                 </Card>
@@ -212,7 +213,7 @@ export default function Clients() {
           <Input label="Nom" value={nom} onChange={e => setNom(e.target.value)} placeholder="ex. : Bar Le Central" />
           <Input label="Téléphone" type="tel" value={telephone} onChange={e => setTelephone(e.target.value)} placeholder="01 97 00 00 00" />
           <Input label="Adresse" value={adresse} onChange={e => setAdresse(e.target.value)} placeholder="ex. : Cotonou Centre" />
-          {estGerant && (
+          {peutPrix && (
             <div>
               <label className="text-[13px] font-medium text-gray-700 block mb-1.5">Groupe de prix</label>
               <select value={groupePrixId} onChange={e => setGroupePrixId(e.target.value)}

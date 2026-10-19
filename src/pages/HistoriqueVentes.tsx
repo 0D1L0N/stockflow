@@ -6,7 +6,6 @@ import Avatar from "@/components/ui/Avatar";
 import { invoke } from "@/lib/db";
 import { useToast } from "@/components/ui/Toast";
 import { useAppStore } from "@/stores/appStore";
-import { useAuthStore } from "@/stores/authStore";
 import Header from "@/components/layout/Header";
 import Badge from "@/components/ui/Badge";
 import Modal from "@/components/ui/Modal";
@@ -18,6 +17,7 @@ import { type FactureData } from "@/components/facture/FacturePDF";
 import { prepareVenteData, downloadFacture, printFacture, type ParametresRaw } from "@/lib/pdf";
 import { volumeFr } from "@/lib/format";
 import { useTempsReel } from "@/lib/tempsReel";
+import { usePeut } from "@/lib/droits";
 
 interface Vente {
   id: string; numero_facture: string; date: string | null;
@@ -58,7 +58,7 @@ export default function HistoriqueVentes() {
   const [detail, setDetail] = useState<{ vente: Vente; details: DetailVente[] } | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [annulerLoading, setAnnulerLoading] = useState(false);
-  const estGerant = useAuthStore((s) => s.profil?.role === "gerant");
+  const peutAnnuler = usePeut("annuler");
 
   // Modal réimpression
   const [factureData, setFactureData] = useState<FactureData | null>(null);
@@ -275,7 +275,7 @@ export default function HistoriqueVentes() {
                   Réimprimer
                 </Button>
               )}
-              {detail.vente.statut === "validée" && estGerant && (
+              {detail.vente.statut === "validée" && peutAnnuler && (
                 <Button variant="danger" icon={<XCircle size={15} />} onClick={annuler} loading={annulerLoading}>
                   Annuler cette vente
                 </Button>

@@ -8,6 +8,7 @@ import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import Skeleton from "@/components/ui/Skeleton";
 import { volumeFr, casiers } from "@/lib/format";
+import { usePeut } from "@/lib/droits";
 
 interface Ligne { casier?: number | null; format_id: string; produit_nom: string; volume: number; unite: string; quantite: number; prix_achat: number; sous_total: number; }
 interface Reception {
@@ -40,6 +41,7 @@ const dateCourte = (d: string) => new Date(d.replace(" ", "T")).toLocaleDateStri
 
 /** Compte d'un fournisseur : ce qu'on lui doit, règlement, livraisons et journal. */
 export default function ModalCompteFournisseur({ fournisseur, onClose, onChange, onReception }: Props) {
+  const peutPayer = usePeut("fournisseurs_gerer");
   const { toast } = useToast();
   const formatPrix = useAppStore((s) => s.formatMontant);
   const [compte, setCompte] = useState<Compte | null>(null);
@@ -151,11 +153,11 @@ export default function ModalCompteFournisseur({ fournisseur, onClose, onChange,
 
             {/* Règlement */}
             <section className="rounded-2xl border border-slate-200 p-4 flex flex-col gap-3">
-              <h3 className="text-[13px] font-bold uppercase tracking-wide text-ink-600 flex items-center gap-2"><Wallet size={14} /> Payer ou rendre des casiers</h3>
-              <div className="flex gap-2">
+              <h3 className="text-[13px] font-bold uppercase tracking-wide text-ink-600 flex items-center gap-2"><Wallet size={14} /> {peutPayer ? "Payer ou rendre des casiers" : "Rendre des casiers vides"}</h3>
+              {peutPayer && <div className="flex gap-2">
                 <div className="flex-1"><Input type="number" min="0" placeholder="Montant payé" value={montant} onChange={e => setMontant(e.target.value)} /></div>
                 {solde > 0 && <Button variant="secondary" onClick={() => setMontant(String(solde))}>Tout</Button>}
-              </div>
+              </div>}
               {emballages.length > 0 && (
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   {emballages.map(e => (

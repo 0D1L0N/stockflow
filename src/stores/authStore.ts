@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword, type User } from "firebase/auth";
 import { doc, getDoc, onSnapshot, writeBatch, type Unsubscribe } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
-import type { Role } from "@/lib/roles";
+import { roleEffectif, type Role } from "@/lib/roles";
 
 export interface Profil {
   uid: string;
@@ -41,7 +41,7 @@ export const useAuthStore = create<AuthStore>((set) => ({
       stopProfil = onSnapshot(
         doc(db, "users", user.uid),
         (snap) => set({
-          profil: snap.exists() ? ({ uid: user.uid, ...snap.data() } as Profil) : null,
+          profil: snap.exists() ? ({ uid: user.uid, ...snap.data(), role: roleEffectif(snap.data().role) } as Profil) : null,
           chargement: false,
         }),
         () => set({ profil: null, chargement: false }),
@@ -71,7 +71,7 @@ export const useAuthStore = create<AuthStore>((set) => ({
   creerGerant: async (nom, email, motDePasse) => {
     const { user } = await createUserWithEmailAndPassword(auth, email.trim(), motDePasse);
     const batch = writeBatch(db);
-    batch.set(doc(db, "users", user.uid), { nom: nom.trim(), email: email.trim(), role: "gerant", actif: true });
+    batch.set(doc(db, "users", user.uid), { nom: nom.trim(), email: email.trim(), role: "admin", actif: true });
     batch.set(doc(db, "config", "proprietaire"), { uid: user.uid });
     await batch.commit();
   },

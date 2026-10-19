@@ -21,6 +21,7 @@ import { familleDe, grouperParFamille, type CleFamille, type Rayon } from "@/lib
 import { useRetourFerme } from "@/lib/retour";
 import { useClavierOuvert } from "@/lib/clavier";
 import { useCatalogue } from "@/stores/catalogueStore";
+import { usePeut } from "@/lib/droits";
 
 interface Format { casier?: number | null; id: string; produit_id: string; volume: number; unite: string; prix: number; stock: number; seuil_alerte: number; emballage_id?: string | null; }
 interface ProduitAvecFormats { produit: { id: string; nom: string; rayon?: Rayon | null }; formats: Format[]; }
@@ -66,7 +67,7 @@ export default function Vente() {
   const loading = !catalogue.pret || !clientsCharges;
   const [search, setSearch] = useState("");
   const [famille, setFamille] = useState<"toutes" | CleFamille>("toutes");
-  const estGerant = useAuthStore((s) => s.profil?.role === "gerant");
+  const peutPrix = usePeut("prix");
   // Prix modifié dans le panier (gérant) : format en cours d'édition et saisie
   const [prixEdite, setPrixEdite] = useState<string | null>(null);
   const [prixSaisi, setPrixSaisi] = useState("");
@@ -385,7 +386,7 @@ export default function Vente() {
                         onBlur={() => validerPrix(item)}
                         onKeyDown={e => { if (e.key === "Enter") validerPrix(item); if (e.key === "Escape") setPrixEdite(null); }}
                         className="w-24 h-7 rounded-lg border border-secondary-600 px-2 text-xs font-semibold text-right focus:outline-none" />
-                    ) : estGerant ? (
+                    ) : peutPrix ? (
                       <button onClick={() => { setPrixEdite(item.format_id); setPrixSaisi(String(item.prix)); }}
                         title="Modifier le prix" className="text-xs text-gray-500 underline decoration-dotted underline-offset-2 hover:text-ink-900">
                         × {formatPrix(item.prix)}

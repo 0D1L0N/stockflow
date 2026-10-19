@@ -3,7 +3,6 @@ import { Plus, Truck, Phone, MapPin, Edit2, Trash2, PackageCheck, Wallet, Chevro
 import { invoke } from "@/lib/db";
 import { useToast } from "@/components/ui/Toast";
 import { useAppStore } from "@/stores/appStore";
-import { useAuthStore } from "@/stores/authStore";
 import Header from "@/components/layout/Header";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
@@ -15,6 +14,7 @@ import Avatar from "@/components/ui/Avatar";
 import ModalReception from "@/components/fournisseurs/ModalReception";
 import ModalCompteFournisseur from "@/components/fournisseurs/ModalCompteFournisseur";
 import { casiers } from "@/lib/format";
+import { usePeut } from "@/lib/droits";
 
 interface Fournisseur {
   id: string; nom: string; telephone: string | null; adresse: string | null;
@@ -29,7 +29,8 @@ const dateCourte = (d: string) => new Date(d.replace(" ", "T")).toLocaleDateStri
 export default function Fournisseurs() {
   const { toast } = useToast();
   const formatPrix = useAppStore((s) => s.formatMontant);
-  const estGerant = useAuthStore((s) => s.profil?.role === "gerant");
+  const peutGerer = usePeut("fournisseurs_gerer");
+  const peutSupprimer = usePeut("supprimer");
   const [fournisseurs, setFournisseurs] = useState<Fournisseur[]>([]);
   const [receptions, setReceptions] = useState<ReceptionResume[]>([]);
   const [commandes, setCommandes] = useState<CommandeAttente[]>([]);
@@ -161,11 +162,11 @@ export default function Fournisseurs() {
                       className="flex items-center gap-1.5 px-2.5 h-8 rounded-lg text-xs font-semibold text-secondary-700 hover:bg-secondary-50">
                       <PackageCheck size={13} /> Livraison reçue
                     </button>
-                    {estGerant && <button onClick={action(() => openEdit(f))}
+                    {peutGerer && <button onClick={action(() => openEdit(f))}
                       className="flex items-center gap-1.5 px-2.5 h-8 rounded-lg text-xs font-semibold text-gray-600 hover:bg-slate-100">
                       <Edit2 size={13} /> Modifier
                     </button>}
-                    {estGerant && (
+                    {peutSupprimer && (
                       <button onClick={action(() => supprimer(f))} aria-label={`Supprimer ${f.nom}`}
                         className="ml-auto flex items-center justify-center w-8 h-8 rounded-lg text-gray-400 hover:bg-red-50 hover:text-danger">
                         <Trash2 size={14} />

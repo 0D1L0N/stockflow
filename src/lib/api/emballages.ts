@@ -35,7 +35,7 @@ async function associerCasiersManquants(types: TypeEmballage[]) {
 }
 
 export async function listerEmballages(): Promise<TypeEmballage[]> {
-  const gerant = useAuthStore.getState().profil?.role === "gerant";
+  const gerant = useAuthStore.getState().profil?.role === "admin";
   let liste = await lister<TypeEmballage>(col("emballages"));
   if (liste.length === 0 && gerant) {
     const batch = writeBatch(db);

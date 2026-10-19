@@ -4,7 +4,7 @@ import Avatar from "@/components/ui/Avatar";
 import { invoke } from "@/lib/db";
 import { useToast } from "@/components/ui/Toast";
 import { useAuthStore } from "@/stores/authStore";
-import { ROLE_LABELS, ROLES_PROPOSES, type Role } from "@/lib/roles";
+import { ROLE_DESCRIPTIONS, ROLE_LABELS, ROLES_PROPOSES, type Role } from "@/lib/roles";
 import Header from "@/components/layout/Header";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
@@ -15,14 +15,10 @@ import Card from "@/components/ui/Card";
 
 interface Utilisateur { id: string; nom: string; email: string; role: Role; actif: boolean; }
 
-const DESCRIPTIONS: Record<Role, string> = {
-  gerant: "Tous les droits : prix, rapports, paramètres, comptes",
-  vendeur: "Ventes, clients, ses propres ventes, et gestion du stock (réappro, ajustements, alertes, mouvements)",
-  magasinier: "Réappro, ajustements, alertes et mouvements de stock",
-};
+const DESCRIPTIONS = ROLE_DESCRIPTIONS;
 
 const ROLE_BADGE: Record<Role, "info" | "success" | "warning"> = {
-  gerant: "info", vendeur: "success", magasinier: "warning",
+  admin: "info", gerant: "success", magasinier: "warning",
 };
 
 const selectCls = "w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-secondary/40 focus:border-secondary";
@@ -37,7 +33,7 @@ export default function Utilisateurs() {
   const [nom, setNom] = useState("");
   const [email, setEmail] = useState("");
   const [motDePasse, setMotDePasse] = useState("");
-  const [role, setRole] = useState<Role>("vendeur");
+  const [role, setRole] = useState<Role>("magasinier");
   const [saving, setSaving] = useState(false);
 
   const load = async () => {
@@ -49,7 +45,7 @@ export default function Utilisateurs() {
   useEffect(() => { load(); }, []);
 
   const openNew = () => {
-    setEdit(null); setNom(""); setEmail(""); setMotDePasse(""); setRole("vendeur"); setModal(true);
+    setEdit(null); setNom(""); setEmail(""); setMotDePasse(""); setRole("magasinier"); setModal(true);
   };
   const openEdit = (u: Utilisateur) => {
     setEdit(u); setNom(u.nom); setEmail(u.email); setMotDePasse(""); setRole(u.role); setModal(true);
@@ -92,8 +88,9 @@ export default function Utilisateurs() {
       <Header title="Utilisateurs" subtitle="Comptes et droits d'accès" icone={<UserCog size={22} />}
         chiffres={loading ? undefined : [
           { label: "Comptes actifs", valeur: actifs, ton: "succes" },
+          { label: "Admins", valeur: liste.filter(u => u.actif && u.role === "admin").length },
           { label: "Gérants", valeur: liste.filter(u => u.actif && u.role === "gerant").length },
-          { label: "Vendeurs", valeur: liste.filter(u => u.actif && u.role !== "gerant").length },
+          { label: "Magasiniers", valeur: liste.filter(u => u.actif && u.role === "magasinier").length },
           { label: "Désactivés", valeur: liste.length - actifs, ton: liste.length - actifs > 0 ? "alerte" : "neutre" },
         ]}
         actions={<Button icon={<Plus size={16} />} onClick={openNew}>Nouvel utilisateur</Button>} />

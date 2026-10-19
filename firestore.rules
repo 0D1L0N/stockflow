@@ -4,7 +4,11 @@ rules_version = '2';
 // Ce sont elles qui protègent les données : l'interface ne fait que masquer
 // ce qu'un rôle ne peut pas faire. Garder cohérent avec src/lib/roles.ts.
 //
-// Principe pour le vendeur : toute modification sensible (stock, soldes d'un
+// Rôles : admin (tout), gerant (ventes, clients, prix, catalogue, stock, fournisseurs),
+// magasinier (ventes au prix affiché, stock, réceptions, commandes). Les anciens comptes
+// « vendeur » sont des magasiniers. Le propriétaire du dépôt est toujours admin.
+//
+// Principe pour l'équipe : toute modification sensible (stock, soldes d'un
 // client, totaux du jour) doit citer sa « preuve » — la vente, le mouvement
 // de stock ou l'opération du journal — créée DANS LE MÊME BATCH, par lui,
 // horodatée par le serveur (cree_le == request.time). Impossible donc de
@@ -18,8 +22,23 @@ service cloud.firestore {
     function actif()      { return connecte()
                                    && exists(/databases/$(database)/documents/users/$(request.auth.uid))
                                    && profil().actif == true; }
-    function aRole(roles) { return actif() && profil().role in roles; }
-    function gerant()     { return aRole(['gerant']); }
+    // Anciens comptes « vendeur » = magasinier
+    function roleActuel() { return profil().role == 'vendeur' ? 'magasinier' : profil().role; }
+    function aRole(roles) { return actif() && roleActuel() in roles; }
+    function estProprietaire() {
+      return exists(/databases/$(database)/documents/config/proprietaire)
+        && get(/databases/$(database)/documents/config/proprietaire).data.uid == request.auth.uid;
+    }
+    // admin : le rôle admin, ou le propriétaire (il ne peut jamais perdre la main sur son dépôt)
+    function admin()       { return aRole(['admin']) || (actif() && estProprietaire()); }
+    // responsable : admin ou gérant (le propriétaire en fait toujours partie)
+    function responsable() { return aRole(['admin', 'gerant']) || (actif() && estProprietaire()); }
+    // equipe : tout compte actif qui travaille au dépôt
+    function equipe()      { return aRole(['admin', 'gerant', 'magasinier']) || (actif() && estProprietaire()); }
+    // La modification touche-t-elle l'un de ces champs ?
+    function touche(champs) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny(champs);
+    }
     function seulementChamps(champs) {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(champs);
     }
@@ -65,151 +84,160 @@ service cloud.firestore {
       allow get: if true;
       allow create: if connecte()
         && request.resource.data.uid == request.auth.uid
-        && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'gerant';
+        && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'gerant'];
       allow update, delete: if false;
     }
     // app : version minimale exigée (force la mise à jour des appareils)
     match /config/app {
       allow read: if connecte();
-      allow write: if gerant();
+      allow write: if admin();
     }
 
     // ── Utilisateurs ─────────────────────────────────────────────────────
     match /users/{uid} {
-      allow read: if connecte() && (request.auth.uid == uid || gerant());
-      // Le gérant crée les comptes ; exception : le tout premier gérant.
-      allow create: if gerant()
+      allow read: if connecte() && (request.auth.uid == uid || admin());
+      // L'admin crée les comptes ; exception : le tout premier compte (le propriétaire).
+      allow create: if admin()
         || (connecte() && request.auth.uid == uid
-            && request.resource.data.role == 'gerant'
+            && request.resource.data.role in ['admin', 'gerant']
             && !exists(/databases/$(database)/documents/config/proprietaire)
             && getAfter(/databases/$(database)/documents/config/proprietaire).data.uid == uid);
-      // Personne ne peut changer son propre rôle ; le gérant ne peut pas se désactiver.
-      allow update: if gerant()
-        && (uid != request.auth.uid
-            || (request.resource.data.role == 'gerant' && request.resource.data.actif == true));
+      // Un admin ne peut pas se retirer ses droits ni se désactiver ; le propriétaire reste admin et actif.
+      allow update: if admin()
+        && (uid != request.auth.uid || (request.resource.data.role == 'admin' && request.resource.data.actif == true))
+        && (!exists(/databases/$(database)/documents/config/proprietaire)
+            || get(/databases/$(database)/documents/config/proprietaire).data.uid != uid
+            || (request.resource.data.role == 'admin' && request.resource.data.actif == true));
       allow delete: if false;
     }
 
     // ── Catalogue ────────────────────────────────────────────────────────
     match /produits/{id} {
       allow read: if actif();
-      allow write: if gerant();
+      allow create, update: if responsable();
+      allow delete: if admin();
     }
     match /formats/{formatId} {
       allow read: if actif();
-      allow create, delete: if gerant();
-      allow update: if gerant()
-        // Vente : le stock baisse et la vente du batch contient ce format
-        || (aRole(['vendeur', 'magasinier'])
-            && seulementChamps(['stock', 'derniere_vente'])
+      allow create: if responsable();
+      allow delete: if admin();
+      allow update: if responsable()
+        || (equipe() && (
+          // Vente : le stock baisse et la vente du batch contient ce format
+          (seulementChamps(['stock', 'derniere_vente'])
             && request.resource.data.stock < resource.data.stock
             && venteDuBatch(request.resource.data.derniere_vente)
             && formatId in getAfter(/databases/$(database)/documents/ventes/$(request.resource.data.derniere_vente)).data.format_ids)
-        // Réception fournisseur : le stock monte et la réception du batch contient ce format
-        || (aRole(['vendeur', 'magasinier'])
-            && seulementChamps(['stock', 'derniere_reception'])
+          // Réception fournisseur : le stock monte et la réception du batch contient ce format
+          || (seulementChamps(['stock', 'derniere_reception'])
             && request.resource.data.stock > resource.data.stock
             && receptionDuBatch(request.resource.data.derniere_reception)
             && formatId in getAfter(/databases/$(database)/documents/receptions/$(request.resource.data.derniere_reception)).data.format_ids)
-        // Réappro ou inventaire : un mouvement de stock du batch l'explique
-        || (aRole(['vendeur', 'magasinier'])
-            && seulementChamps(['stock', 'dernier_mouvement'])
-            && mouvementDuBatch(request.resource.data.dernier_mouvement, formatId));
+          // Réappro ou inventaire : un mouvement de stock du batch l'explique
+          || (seulementChamps(['stock', 'dernier_mouvement'])
+            && mouvementDuBatch(request.resource.data.dernier_mouvement, formatId))));
     }
     match /clients/{clientId} {
-      allow read: if aRole(['gerant', 'vendeur']);
-      // Le vendeur crée une fiche sans dette (la dette arrive avec la vente, tracée)
-      allow create: if gerant()
-        || (aRole(['vendeur'])
+      allow read: if equipe();
+      // Une fiche se crée sans dette (la dette arrive avec la vente, tracée) ; le magasinier
+      // crée seulement la fiche rapide d'un client qui repart avec une dette
+      allow create: if admin()
+        || (equipe()
             && !('solde_argent' in request.resource.data)
             && !('emballages_dus' in request.resource.data)
-            && (request.resource.data.est_defaut == 0 || clientId == 'defaut'));
-      // Le vendeur ne touche qu'aux soldes, et chaque variation cite son entrée de journal
-      allow update: if gerant()
-        || (aRole(['vendeur'])
+            && (request.resource.data.est_defaut == 0 || clientId == 'defaut')
+            && (responsable() || !('groupe_prix_id' in request.resource.data)));
+      // Le gérant modifie la fiche (nom, téléphone, groupe) mais pas les soldes à la main ;
+      // toute variation de solde cite son entrée de journal
+      allow update: if admin()
+        || (responsable() && !touche(['solde_argent', 'emballages_dus', 'derniere_operation']))
+        || (equipe()
             && seulementChamps(['solde_argent', 'emballages_dus', 'derniere_operation'])
             && operationDuBatch(request.resource.data.derniere_operation, clientId));
-      allow delete: if gerant();
+      allow delete: if admin();
     }
     // Journal des comptes clients : on ajoute, on ne modifie ni ne supprime jamais.
     match /operations_client/{id} {
-      allow read: if aRole(['gerant', 'vendeur']);
-      allow create: if aRole(['gerant', 'vendeur'])
+      allow read: if responsable();
+      allow create: if equipe()
         && request.resource.data.utilisateur_uid == request.auth.uid
         && horodate();
       allow update, delete: if false;
     }
-    // Le vendeur ne touche qu'aux vides au magasin, et chaque variation cite son mouvement
+    // L'équipe ne touche qu'aux vides au magasin, et chaque variation cite son mouvement
     match /emballages/{id} {
       allow read: if actif();
-      allow create, delete: if gerant();
-      allow update: if gerant()
-        || (aRole(['vendeur'])
+      allow create, delete: if admin();
+      allow update: if admin()
+        || (equipe()
             && seulementChamps(['stock_vides', 'dernier_mouvement_vides', 'dernier_comptage'])
             && mouvementVidesDuBatch(request.resource.data.dernier_mouvement_vides, id))
         // Comptage sans écart : seule la date du comptage change
-        || (aRole(['vendeur']) && seulementChamps(['dernier_comptage']));
+        || (equipe() && seulementChamps(['dernier_comptage']));
     }
     // Journal des casiers vides : on ajoute, on ne modifie ni ne supprime jamais.
     match /mouvements_vides/{id} {
-      allow read: if aRole(['gerant', 'vendeur']);
-      allow create: if aRole(['gerant', 'vendeur'])
+      allow read: if equipe();
+      allow create: if equipe()
         && request.resource.data.utilisateur_uid == request.auth.uid
         && horodate();
       allow update, delete: if false;
     }
+    // Prix : lus par toute l'équipe (pour vendre), fixés par les responsables
     match /prix_clients/{id} {
-      allow read: if aRole(['gerant', 'vendeur']);
-      allow write: if gerant();
+      allow read: if equipe();
+      allow write: if responsable();
     }
     // Groupes de prix : grilles partagées par plusieurs clients
     match /groupes_prix/{id} {
-      allow read: if aRole(['gerant', 'vendeur']);
-      allow write: if gerant();
+      allow read: if equipe();
+      allow create, update: if responsable();
+      allow delete: if admin();
     }
     match /prix_groupes/{id} {
-      allow read: if aRole(['gerant', 'vendeur']);
-      allow write: if gerant();
+      allow read: if equipe();
+      allow write: if responsable();
     }
 
     // ── Ventes ───────────────────────────────────────────────────────────
     match /ventes/{id} {
-      allow read: if gerant()
-        || (aRole(['vendeur']) && resource.data.vendeur_uid == request.auth.uid);
-      allow create: if aRole(['gerant', 'vendeur'])
+      allow read: if responsable()
+        || (equipe() && resource.data.vendeur_uid == request.auth.uid);
+      allow create: if equipe()
         && request.resource.data.vendeur_uid == request.auth.uid
         && request.resource.data.statut == 'validée'
         && horodate();
-      // Seul le gérant annule une vente (statut uniquement).
-      allow update: if gerant() && seulementChamps(['statut', 'date_annulation']);
+      // Seul l'admin annule une vente (statut uniquement).
+      allow update: if admin() && seulementChamps(['statut', 'date_annulation']);
       allow delete: if false;
     }
 
     // ── Fournisseurs ─────────────────────────────────────────────────────
-    // Le vendeur réceptionne les livraisons ; chaque variation de compte cite son opération.
+    // Toute l'équipe réceptionne les livraisons ; chaque variation de compte cite son opération.
     match /fournisseurs/{fournisseurId} {
-      allow read: if aRole(['gerant', 'vendeur']);
-      allow create: if gerant()
-        || (aRole(['vendeur'])
+      allow read: if equipe();
+      allow create: if admin()
+        || (equipe()
             && !('solde_argent' in request.resource.data)
             && !('emballages_dus' in request.resource.data));
-      allow update: if gerant()
-        || (aRole(['vendeur'])
+      allow update: if admin()
+        || (responsable() && !touche(['solde_argent', 'emballages_dus', 'derniere_operation']))
+        || (equipe()
             && seulementChamps(['solde_argent', 'emballages_dus', 'derniere_operation'])
             && operationFournisseurDuBatch(request.resource.data.derniere_operation, fournisseurId));
-      allow delete: if gerant();
+      allow delete: if admin();
     }
     // Bons de réception et journal fournisseur : on ajoute, on ne modifie ni ne supprime jamais.
     match /receptions/{id} {
-      allow read: if aRole(['gerant', 'vendeur']);
-      allow create: if aRole(['gerant', 'vendeur'])
+      allow read: if equipe();
+      allow create: if equipe()
         && request.resource.data.utilisateur_uid == request.auth.uid
         && horodate();
       allow update, delete: if false;
     }
     match /operations_fournisseur/{id} {
-      allow read: if aRole(['gerant', 'vendeur']);
-      allow create: if aRole(['gerant', 'vendeur'])
+      allow read: if equipe();
+      allow create: if equipe()
         && request.resource.data.utilisateur_uid == request.auth.uid
         && horodate();
       allow update, delete: if false;
@@ -217,13 +245,13 @@ service cloud.firestore {
     // Bons de commande : créés « envoyée » ; ne passent « reçue » qu'avec la réception
     // du même batch, chez le même fournisseur. Les quantités commandées ne changent jamais.
     match /commandes_fournisseur/{id} {
-      allow read: if aRole(['gerant', 'vendeur']);
-      allow create: if aRole(['gerant', 'vendeur'])
+      allow read: if equipe();
+      allow create: if equipe()
         && request.resource.data.utilisateur_uid == request.auth.uid
         && request.resource.data.statut == 'envoyée'
         && request.resource.data.reception_id == null
         && horodate();
-      allow update: if aRole(['gerant', 'vendeur'])
+      allow update: if equipe()
         && seulementChamps(['statut', 'reception_id'])
         && resource.data.statut == 'envoyée'
         && request.resource.data.statut == 'reçue'
@@ -234,23 +262,22 @@ service cloud.firestore {
 
     // ── Stock ────────────────────────────────────────────────────────────
     match /mouvements_stock/{id} {
-      // Le vendeur cumule pour l'instant les tâches de magasinier
-      allow read: if aRole(['gerant', 'vendeur', 'magasinier']);
+      allow read: if equipe();
       allow create: if actif() && request.resource.data.utilisateur_uid == request.auth.uid && horodate();
       allow update, delete: if false;
     }
 
     // ── Statistiques pré-calculées (dashboard) ───────────────────────────
-    // Le vendeur ne peut qu'ajouter exactement le montant de la vente du batch.
+    // Une vente ne peut qu'ajouter exactement son montant ; seul l'admin corrige (annulation).
     match /stats_jour/{jour} {
-      allow read: if gerant();
-      allow create: if gerant()
-        || (aRole(['vendeur'])
+      allow read: if responsable();
+      allow create: if admin()
+        || (equipe()
             && venteDuBatch(request.resource.data.derniere_vente)
             && request.resource.data.nb_ventes == 1
             && request.resource.data.ca == getAfter(/databases/$(database)/documents/ventes/$(request.resource.data.derniere_vente)).data.total);
-      allow update: if gerant()
-        || (aRole(['vendeur'])
+      allow update: if admin()
+        || (equipe()
             && venteDuBatch(request.resource.data.derniere_vente)
             && request.resource.data.nb_ventes == resource.data.get('nb_ventes', 0) + 1
             && request.resource.data.ca == resource.data.get('ca', 0)
@@ -261,7 +288,7 @@ service cloud.firestore {
     // ── Paramètres du commerce ───────────────────────────────────────────
     match /parametres/{id} {
       allow read: if actif();
-      allow write: if gerant();
+      allow write: if admin();
     }
   }
 }

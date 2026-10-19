@@ -11,6 +11,7 @@ import Skeleton from "@/components/ui/Skeleton";
 import EtatVide from "@/components/ui/EtatVide";
 import Avatar from "@/components/ui/Avatar";
 import ModalPrixClient from "./ModalPrixClient";
+import { usePeut } from "@/lib/droits";
 
 interface ClientGroupe { id: string; nom: string; telephone?: string | null; est_defaut?: number; groupe_prix_id?: string | null; }
 
@@ -25,6 +26,8 @@ interface Props {
 
 /** Liste des groupes de prix : création, renommage, suppression, grille de prix. */
 export default function ModalGroupesPrix({ isOpen, onClose, onChange }: Props) {
+  const peutSupprimer = usePeut("supprimer");
+  const estAdmin = usePeut("parametres");
   const { toast } = useToast();
   const [groupes, setGroupes] = useState<GroupePrixResume[]>([]);
   const [loading, setLoading] = useState(true);
@@ -183,10 +186,10 @@ export default function ModalGroupesPrix({ isOpen, onClose, onChange }: Props) {
                         className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:bg-slate-100 hover:text-gray-700">
                         <Edit2 size={14} />
                       </button>
-                      <button onClick={() => supprimer(g)} aria-label={`Supprimer ${g.nom}`}
+                      {peutSupprimer && <button onClick={() => supprimer(g)} aria-label={`Supprimer ${g.nom}`}
                         className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:bg-red-50 hover:text-danger">
                         <Trash2 size={14} />
-                      </button>
+                      </button>}
                     </div>
                   )}
                 </div>
@@ -195,7 +198,7 @@ export default function ModalGroupesPrix({ isOpen, onClose, onChange }: Props) {
           )}
 
           {/* Prix comptoir rattaché à un groupe */}
-          {groupes.length > 0 && (
+          {groupes.length > 0 && estAdmin && (
             <section className="rounded-2xl border border-slate-200 p-4 flex flex-col gap-3">
               <h3 className="text-[13px] font-bold uppercase tracking-wide text-ink-600 flex items-center gap-2"><Store size={14} /> Prix du client standard (comptoir)</h3>
               <p className="text-xs text-gray-500">

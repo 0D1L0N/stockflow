@@ -30,10 +30,16 @@ beforeEach(async () => {
   await env.clearFirestore();
   await env.withSecurityRulesDisabled(async ctx => {
     const db = ctx.firestore();
-    await setDoc(doc(db, "users/gerant"), { nom: "G", role: "gerant", actif: true });
-    await setDoc(doc(db, "users/vendeur"), { nom: "V", role: "vendeur", actif: true });
-    await setDoc(doc(db, "users/autre"), { nom: "A", role: "vendeur", actif: true });
-    await setDoc(doc(db, "users/ancien"), { nom: "X", role: "vendeur", actif: false });
+    await setDoc(doc(db, "users/admin"), { nom: "Ad", role: "admin", actif: true });
+    await setDoc(doc(db, "users/chef"), { nom: "G", role: "gerant", actif: true });
+    await setDoc(doc(db, "users/vendeur"), { nom: "M", role: "magasinier", actif: true });
+    await setDoc(doc(db, "users/autre"), { nom: "A", role: "magasinier", actif: true });
+    await setDoc(doc(db, "users/ancien"), { nom: "X", role: "magasinier", actif: false });
+    // Compte « vendeur » d'avant les nouveaux rôles : traité comme magasinier
+    await setDoc(doc(db, "users/vieux"), { nom: "V", role: "vendeur", actif: true });
+    // Propriétaire pas encore passé admin
+    await setDoc(doc(db, "users/proprio"), { nom: "P", role: "gerant", actif: true });
+    await setDoc(doc(db, "config/proprietaire"), { uid: "proprio" });
     await setDoc(doc(db, "formats/f1"), { produit_id: "p1", volume: 0.33, unite: "L", prix: 6000, stock: 10, seuil_alerte: 2 });
     await setDoc(doc(db, "formats/f9"), { produit_id: "p9", volume: 0.33, unite: "L", prix: 6000, stock: 10, seuil_alerte: 2 });
     await setDoc(doc(db, "clients/c1"), { nom: "Client", est_defaut: 0, solde_argent: 5000, emballages_dus: { "casier-24": 2 } });
@@ -91,7 +97,7 @@ function batchVides(b: ReturnType<typeof writeBatch>, db: Firestore, uid: string
   b.set(doc(db, `emballages/${emballage}`), { stock_vides: increment(variation), dernier_mouvement_vides: id, ...extra }, { merge: true });
 }
 
-describe("vendeur — usage normal", () => {
+describe("magasinier — usage normal", () => {
   it("vend en récupérant des vides de deux types (vides au magasin tracés)", async () => {
     const db = en("vendeur");
     const b = batchVente(db, "vendeur");
@@ -183,7 +189,7 @@ describe("vendeur — usage normal", () => {
   });
 });
 
-describe("vendeur — tentatives refusées", () => {
+describe("magasinier — tentatives refusées", () => {
   it("monter le stock d'un produit absent de la réception", async () => {
     await assertFails(batchReception(en("vendeur"), "vendeur", ["f1"], { autreFormat: "f9" }).commit());
   });
@@ -245,8 +251,8 @@ describe("vendeur — tentatives refusées", () => {
     await assertFails(batchReception(en("vendeur"), "vendeur", ["f1"], { commande: "cmd-recue" }).commit());
   });
 
-  it("supprimer une commande, même le gérant", async () => {
-    await assertFails(deleteDoc(doc(en("gerant"), "commandes_fournisseur/cmd1")));
+  it("supprimer une commande, même l'admin", async () => {
+    await assertFails(deleteDoc(doc(en("admin"), "commandes_fournisseur/cmd1")));
   });
 
   it("modifier un bon de réception", async () => {
@@ -319,25 +325,110 @@ describe("vendeur — tentatives refusées", () => {
   });
 });
 
-describe("comptes désactivés et gérant", () => {
+describe("comptes désactivés et admin", () => {
   it("un compte désactivé ne peut plus vendre", async () => {
     await assertFails(batchVente(en("ancien"), "ancien").commit());
   });
 
-  it("le gérant corrige un stock directement", async () => {
-    await assertSucceeds(updateDoc(doc(en("gerant"), "formats/f1"), { stock: 7 }));
+  it("l'admin corrige un stock directement", async () => {
+    await assertSucceeds(updateDoc(doc(en("admin"), "formats/f1"), { stock: 7 }));
   });
 
-  it("le gérant crée un groupe de prix et sa grille", async () => {
-    await assertSucceeds(setDoc(doc(en("gerant"), "groupes_prix/g2"), { nom: "Bars" }));
-    await assertSucceeds(setDoc(doc(en("gerant"), "prix_groupes/g2_f1"), { groupe_id: "g2", format_id: "f1", prix: 5750 }));
+  it("l'admin crée un groupe de prix et sa grille", async () => {
+    await assertSucceeds(setDoc(doc(en("admin"), "groupes_prix/g2"), { nom: "Bars" }));
+    await assertSucceeds(setDoc(doc(en("admin"), "prix_groupes/g2_f1"), { groupe_id: "g2", format_id: "f1", prix: 5750 }));
   });
 
-  it("le vendeur lit les prix d'un groupe", async () => {
+  it("le magasinier lit les prix d'un groupe", async () => {
     await assertSucceeds(getDoc(doc(en("vendeur"), "prix_groupes/g2_f1")));
   });
 
-  it("le gérant fixe la version minimale", async () => {
-    await assertSucceeds(setDoc(doc(en("gerant"), "config/app"), { version_min: "1.2.0" }));
+  it("l'admin fixe la version minimale", async () => {
+    await assertSucceeds(setDoc(doc(en("admin"), "config/app"), { version_min: "1.2.0" }));
+  });
+});
+
+describe("gérant", () => {
+  it("vend (stock, journal, dette et totaux du jour tracés)", async () => {
+    await assertSucceeds(batchVente(en("chef"), "chef").commit());
+  });
+
+  it("fixe le prix d'un groupe et range un client dedans", async () => {
+    await assertSucceeds(setDoc(doc(en("chef"), "prix_groupes/g2_f1"), { groupe_id: "g2", format_id: "f1", prix: 5750 }));
+    await assertSucceeds(updateDoc(doc(en("chef"), "clients/c2"), { groupe_prix_id: "g2" }));
+  });
+
+  it("crée un produit et change un prix comptoir", async () => {
+    await assertSucceeds(setDoc(doc(en("chef"), "produits/p2"), { nom: "Nouvelle bière" }));
+    await assertSucceeds(updateDoc(doc(en("chef"), "formats/f1"), { prix: 6200 }));
+  });
+
+  it("lit les ventes de tout le monde", async () => {
+    await assertSucceeds(getDoc(doc(en("chef"), "ventes/v-autre")));
+  });
+
+  it("ne peut pas annuler une vente", async () => {
+    await assertFails(updateDoc(doc(en("chef"), "ventes/v-autre"), { statut: "annulée", date_annulation: JOUR }));
+  });
+
+  it("ne peut pas supprimer un client, un produit ou un format", async () => {
+    await assertFails(deleteDoc(doc(en("chef"), "clients/c2")));
+    await assertFails(deleteDoc(doc(en("chef"), "formats/f9")));
+  });
+
+  it("ne peut pas effacer une dette à la main", async () => {
+    await assertFails(updateDoc(doc(en("chef"), "clients/c1"), { solde_argent: 0 }));
+  });
+
+  it("ne peut pas gérer les comptes ni les paramètres", async () => {
+    await assertFails(setDoc(doc(en("chef"), "users/nouveau"), { nom: "N", role: "admin", actif: true }));
+    await assertFails(getDoc(doc(en("chef"), "users/vendeur")));
+    await assertFails(setDoc(doc(en("chef"), "config/app"), { version_min: "0.0.1" }));
+    await assertFails(setDoc(doc(en("chef"), "parametres/general"), { nom_commerce: "X" }, { merge: true }));
+  });
+});
+
+describe("magasinier — limites des nouveaux rôles", () => {
+  it("ne peut pas changer un prix comptoir", async () => {
+    await assertFails(updateDoc(doc(en("vendeur"), "formats/f1"), { prix: 1 }));
+  });
+
+  it("ne peut pas créer un client rangé dans un groupe de prix", async () => {
+    await assertFails(setDoc(doc(en("vendeur"), "clients/c5"), { nom: "X", est_defaut: 0, groupe_prix_id: "g2" }));
+  });
+
+  it("ne lit pas le journal des comptes clients", async () => {
+    await env.withSecurityRulesDisabled(async ctx => {
+      await setDoc(doc(ctx.firestore(), "operations_client/o0"), { client_id: "c1", utilisateur_uid: "admin", type: "paiement" });
+    });
+    await assertFails(getDoc(doc(en("vendeur"), "operations_client/o0")));
+  });
+
+  it("un ancien compte « vendeur » vend toujours (comme magasinier)", async () => {
+    await assertSucceeds(batchVente(en("vieux"), "vieux").commit());
+  });
+});
+
+describe("admin et propriétaire", () => {
+  it("le propriétaire est admin même avant de changer de rôle", async () => {
+    await assertSucceeds(setDoc(doc(en("proprio"), "config/app"), { version_min: "1.16.0" }));
+  });
+
+  it("le propriétaire passe lui-même son rôle à admin", async () => {
+    await assertSucceeds(updateDoc(doc(en("proprio"), "users/proprio"), { role: "admin" }));
+  });
+
+  it("personne ne retire ses droits au propriétaire", async () => {
+    await assertFails(updateDoc(doc(en("admin"), "users/proprio"), { role: "magasinier" }));
+    await assertFails(updateDoc(doc(en("admin"), "users/proprio"), { actif: false }));
+  });
+
+  it("l'admin change le rôle d'un employé et annule une vente", async () => {
+    await assertSucceeds(updateDoc(doc(en("admin"), "users/vieux"), { role: "magasinier" }));
+    await assertSucceeds(updateDoc(doc(en("admin"), "ventes/v-autre"), { statut: "annulée", date_annulation: JOUR }));
+  });
+
+  it("un admin ne se retire pas ses propres droits", async () => {
+    await assertFails(updateDoc(doc(en("admin"), "users/admin"), { role: "gerant" }));
   });
 });

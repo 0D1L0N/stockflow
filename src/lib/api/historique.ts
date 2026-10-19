@@ -49,7 +49,7 @@ export const historique: Record<string, Commande> = {
     // Un vendeur ne peut lire que ses propres ventes (règles Firestore) : la requête
     // doit donc filtrer sur vendeur_uid. Les dates sont alors filtrées ici, pour
     // éviter un index composite.
-    const ventes = profil?.role === "gerant"
+    const ventes = profil?.role === "admin" || profil?.role === "gerant"
       ? await lister<VenteDoc>(query(col("ventes"),
           where("date", ">=", debut), where("date", "<=", fin), orderBy("date", "desc")))
       : await lister<VenteDoc>(query(col("ventes"), where("vendeur_uid", "==", auth.currentUser?.uid ?? "")));
