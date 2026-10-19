@@ -1,7 +1,8 @@
 import { useEffect, useRef } from "react";
-import { collection, doc, onSnapshot } from "firebase/firestore";
+import { doc, onSnapshot } from "firebase/firestore";
 import { create } from "zustand";
 import { db } from "@/lib/firebase";
+import { useCatalogueStore } from "@/stores/catalogueStore";
 
 // ── Mises à jour en direct entre appareils ──────────────────────────────────
 
@@ -17,11 +18,9 @@ export type Signal = "stock" | "clients" | "prix" | "ventes_du_jour";
  * (produits, formats, types de casiers) : un produit ajouté ou renommé sur un
  * téléphone apparaît sur les autres sans recharger.
  */
-const COLLECTIONS: Record<Exclude<Signal, "ventes_du_jour">, string[]> = {
-  stock: ["formats", "produits", "emballages"],
-  clients: ["clients"],
-  prix: ["prix_clients", "prix_groupes", "groupes_prix"],
-};
+// Catalogue, clients et prix sont écoutés une seule fois par le catalogue partagé
+// (stores/catalogueStore) ; chaque signal suit ici son compteur de changements.
+const COMPTEURS = { stock: "version", clients: "versionClients", prix: "versionPrix" } as const;
 
 function jourLocal(): string {
   const d = new Date();
@@ -50,9 +49,12 @@ export function useTempsReel(signaux: Signal[], recharger: () => void) {
       let premier = true;
       return abonner(() => { if (premier) { premier = false; return; } declencher(); });
     };
-    const arrets = signaux.flatMap(s => s === "ventes_du_jour"
-      ? [ecouter(suivant => onSnapshot(doc(db, "stats_jour", jourLocal()), suivant, surErreur))]
-      : COLLECTIONS[s].map(nom => ecouter(suivant => onSnapshot(collection(db, nom), suivant, surErreur))));
+    const arrets = signaux.map(s => {
+      if (s === "ventes_du_jour") return ecouter(suivant => onSnapshot(doc(db, "stats_jour", jourLocal()), suivant, surErreur));
+      const cle = COMPTEURS[s];
+      // Pour le catalogue, le chargement initial (avant « prêt ») n'est pas un changement
+      return useCatalogueStore.subscribe((n, a) => { if (n[cle] !== a[cle] && (s !== "stock" || a.pret)) declencher(); });
+    });
     return () => { clearTimeout(minuterie); arrets.forEach(a => a()); };
   }, [signaux.join("|")]);
 }

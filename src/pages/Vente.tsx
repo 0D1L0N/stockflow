@@ -18,6 +18,7 @@ import { useAuthStore } from "@/stores/authStore";
 import Pastilles from "@/components/ui/Pastilles";
 import { familleDe, grouperParFamille, type CleFamille, type Rayon } from "@/lib/familles";
 import { useRetourFerme } from "@/lib/retour";
+import { useCatalogue } from "@/stores/catalogueStore";
 
 interface Format { casier?: number | null; id: string; produit_id: string; volume: number; unite: string; prix: number; stock: number; seuil_alerte: number; emballage_id?: string | null; }
 interface ProduitAvecFormats { produit: { id: string; nom: string; rayon?: Rayon | null }; formats: Format[]; }
@@ -55,9 +56,12 @@ export default function Vente() {
   const formatPrix = formatMontant;
 
   // UI locale
-  const [produits, setProduits] = useState<ProduitAvecFormats[]>([]);
+  // Catalogue partagé : déjà en mémoire, tenu à jour en direct (aucune requête à l'affichage)
+  const catalogue = useCatalogue();
+  const produits = catalogue.produits as ProduitAvecFormats[];
   const [clients, setClients] = useState<Client[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [clientsCharges, setClientsCharges] = useState(false);
+  const loading = !catalogue.pret || !clientsCharges;
   const [search, setSearch] = useState("");
   const [famille, setFamille] = useState<"toutes" | CleFamille>("toutes");
   const estGerant = useAuthStore((s) => s.profil?.role === "gerant");
@@ -75,7 +79,7 @@ export default function Vente() {
   const [showConfirm, setShowConfirm] = useState(false);
 
   // Casiers et paiement partiel
-  const [emballages, setEmballages] = useState<{ id: string; nom: string }[]>([]);
+  const emballages = catalogue.emballages;
   const [rendusSaisis, setRendusSaisis] = useState<Record<string, string>>({});
   const [paiementPartiel, setPaiementPartiel] = useState(false);
   const [montantPayeStr, setMontantPayeStr] = useState("");
@@ -86,18 +90,9 @@ export default function Vente() {
 
   const chargerClients = async () => { setClients(await invoke<Client[]>("get_clients")); };
 
-  const chargerProduits = async () => {
-    const ps = await invoke<{ id: string; nom: string }[]>("get_produits");
-    setProduits(await Promise.all(ps.map(p => invoke<ProduitAvecFormats>("get_produit", { id: p.id }))));
-  };
+  useEffect(() => { chargerClients().catch(() => {}).finally(() => setClientsCharges(true)); }, []);
 
-  useEffect(() => {
-    Promise.all([chargerProduits(), chargerClients()]).finally(() => setLoading(false));
-    invoke<{ id: string; nom: string }[]>("get_emballages").then(setEmballages).catch(() => {});
-  }, []);
-
-  // Stock et soldes clients à jour quand un autre appareil vend
-  useTempsReel(["stock"], () => { chargerProduits().catch(() => {}); });
+  // Soldes clients à jour quand un autre appareil vend (le stock suit le catalogue partagé)
   useTempsReel(["clients"], () => { chargerClients().catch(() => {}); });
   // Prix par client ou par groupe modifiés par le gérant sur un autre appareil
   useTempsReel(["prix"], () => { setVersionPrix(v => v + 1); chargerClients().catch(() => {}); });

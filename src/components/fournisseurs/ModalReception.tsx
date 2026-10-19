@@ -8,7 +8,8 @@ import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import Avatar from "@/components/ui/Avatar";
 import { volumeFr, casiers } from "@/lib/format";
-import { familleDe, FAMILLES, type Rayon } from "@/lib/familles";
+import { familleDe, FAMILLES } from "@/lib/familles";
+import { catalogueCharge, produitsAvecFormats } from "@/stores/catalogueStore";
 
 interface Fournisseur { id: string; nom: string; }
 interface FormatChoix { casier?: number | null;
@@ -57,12 +58,12 @@ export default function ModalReception({ isOpen, onClose, onDone, fournisseurId,
     setFid(fournisseurId ?? ""); setNouveauNom(""); setBl(""); setLignes([]); setRecherche(""); setCommande(null);
     setRendus({}); setPaye(""); setCommentaire("");
     invoke<Fournisseur[]>("get_fournisseurs").then(setFournisseurs).catch(() => {});
-    invoke<{ id: string; nom: string }[]>("get_emballages").then(setEmballages).catch(() => {});
     (async () => {
-      const ps = await invoke<{ id: string; nom: string; rayon?: Rayon | null }[]>("get_produits");
-      const details = await Promise.all(ps.map(p => invoke<{ formats: Omit<FormatChoix, "produit_nom" | "famille">[] }>("get_produit", { id: p.id })));
+      // Catalogue partagé (déjà en mémoire) au lieu d'une requête par produit
+      const catalogue = await catalogueCharge();
+      setEmballages(catalogue.emballages);
       const ordre = (cle: string) => FAMILLES.findIndex(f => f.cle === cle);
-      setFormats(ps.flatMap((p, i) => details[i].formats.map(f => ({
+      setFormats(produitsAvecFormats(catalogue).flatMap(({ produit: p, formats }) => formats.map(f => ({
         ...f, emballage_id: f.emballage_id ?? null, produit_nom: p.nom, famille: familleDe(f.emballage_id, p.rayon),
       }))).sort((a, b) => ordre(a.famille) - ordre(b.famille) || a.produit_nom.localeCompare(b.produit_nom, "fr")));
     })().catch(e => toast(String(e), "error"));

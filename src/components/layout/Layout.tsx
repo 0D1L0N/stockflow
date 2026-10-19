@@ -1,4 +1,4 @@
-import { type ReactNode } from "react";
+import { type ReactNode, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Plus } from "lucide-react";
 import Sidebar from "./Sidebar";
@@ -6,7 +6,7 @@ import BottomNav from "./BottomNav";
 import { useAppStore } from "@/stores/appStore";
 import { useAuthStore } from "@/stores/authStore";
 import { peutAcceder } from "@/lib/roles";
-import { useTempsReel } from "@/lib/tempsReel";
+import { demarrerCatalogue, useCatalogueStore } from "@/stores/catalogueStore";
 import IndicateurConnexion from "./IndicateurConnexion";
 
 interface LayoutProps {
@@ -22,7 +22,10 @@ export default function Layout({ children }: LayoutProps) {
   // ailleurs (formulaires, paramètres) il masquerait des champs
   // Badge d'alertes à jour quand un autre appareil vend ou réapprovisionne
   const loadAlertes = useAppStore((s) => s.loadAlertes);
-  useTempsReel(["stock"], () => { loadAlertes().catch(() => {}); });
+  // Catalogue partagé : chargé une fois, tenu à jour en direct pour toutes les pages
+  useEffect(() => demarrerCatalogue(), []);
+  const versionCatalogue = useCatalogueStore((s) => s.version);
+  useEffect(() => { if (useCatalogueStore.getState().pret) loadAlertes().catch(() => {}); }, [versionCatalogue]);
 
   const showFab = ["/clients", "/historique", "/produits"].includes(pathname) && peutAcceder(role, "/vente");
 

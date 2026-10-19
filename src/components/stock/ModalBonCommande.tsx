@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Send, FileDown, Share2, Copy, Loader, CheckCircle2 } from "lucide-react";
 import { invoke } from "@/lib/db";
 import { numeroWhatsApp, volumeFr } from "@/lib/format";
+import { catalogueCharge, produitsAvecFormats } from "@/stores/catalogueStore";
 import { useToast } from "@/components/ui/Toast";
 import Modal from "@/components/ui/Modal";
 import Button from "@/components/ui/Button";
@@ -42,17 +43,17 @@ export default function ModalBonCommande({ isOpen, onClose }: { isOpen: boolean;
     if (!isOpen) return;
     setLoading(true); setCommande(null); setNouveau({ nom: "", telephone: "" });
     (async () => {
-      const [produits, emballages, params, fs] = await Promise.all([
-        invoke<{ id: string; nom: string }[]>("get_produits"),
-        invoke<{ id: string; nom: string }[]>("get_emballages").catch(() => []),
+      // Catalogue partagé (déjà en mémoire) au lieu d'une requête par produit
+      const [catalogue, params, fs] = await Promise.all([
+        catalogueCharge(),
         invoke<{ nom_commerce: string; adresse_commerce: string | null; telephone_commerce: string | null }>("get_parametres"),
         invoke<Fournisseur[]>("get_fournisseurs").catch(() => []),
       ]);
       setCommerce({ nom: params.nom_commerce, adresse: params.adresse_commerce ?? "", telephone: params.telephone_commerce ?? "" });
       setFournisseurs(fs);
       setFid(fs.length === 1 ? fs[0].id : "");
-      const details = await Promise.all(produits.map(p => invoke<{ formats: Format[] }>("get_produit", { id: p.id })));
-      const toutes: Ligne[] = produits.flatMap((p, i) => details[i].formats.map(f => ({
+      const emballages = catalogue.emballages;
+      const toutes: Ligne[] = produitsAvecFormats(catalogue).flatMap(({ produit: p, formats }) => (formats as Format[]).map(f => ({
         formatId: f.id, produit: p.nom, format: volumeFr(f.volume, f.unite, f.casier),
         emballage: emballages.find(e => e.id === f.emballage_id)?.nom ?? null,
         stock: f.stock, seuil: f.seuil_alerte, enAlerte: f.stock <= f.seuil_alerte,

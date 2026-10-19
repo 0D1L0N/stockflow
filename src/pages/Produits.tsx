@@ -17,7 +17,7 @@ import { CASIER_PAR_VOLUME } from "@/lib/api/emballages";
 import { volumeFr, casiers } from "@/lib/format";
 import Avatar from "@/components/ui/Avatar";
 import { useAuthStore } from "@/stores/authStore";
-import { useTempsReel } from "@/lib/tempsReel";
+import { useCatalogue } from "@/stores/catalogueStore";
 import { RAYONS, FAMILLES, familleDe, grouperParFamille, type Rayon, type CleFamille } from "@/lib/familles";
 
 interface Format { casier?: number | null;
@@ -59,8 +59,10 @@ export default function Produits() {
   const { toast } = useToast();
   const formatPrix = useAppStore((s) => s.formatMontant);
   const estGerant = useAuthStore((s) => s.profil?.role === "gerant");
-  const [data, setData] = useState<ProduitAvecFormats[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Catalogue partagé : en mémoire et à jour en direct (y compris juste après un ajout ou une modification)
+  const catalogue = useCatalogue();
+  const data = catalogue.produits as ProduitAvecFormats[];
+  const loading = !catalogue.pret;
   const [search, setSearch] = useState("");
   // « tous », « alerte » ou une famille (Casier 12, Eaux…)
   const [filtre, setFiltre] = useState<string>("tous");
@@ -85,23 +87,13 @@ export default function Produits() {
   const [fStock, setFStock] = useState("");
   const [fSeuil, setFSeuil] = useState("5");
   const [fEmballage, setFEmballage] = useState("");
-  const [emballages, setEmballages] = useState<{ id: string; nom: string }[]>([]);
+  const emballages = catalogue.emballages;
 
-  const load = async (silencieux = false) => {
-    if (!silencieux) setLoading(true);
-    const produits = await invoke<Produit[]>("get_produits");
-    const all = await Promise.all(produits.map(p => invoke<ProduitAvecFormats>("get_produit", { id: p.id })));
-    setData(all);
-    setLoading(false);
-  };
+  // Le catalogue se met à jour tout seul après chaque écriture : rien à recharger
+  const load = async () => {};
 
-  useEffect(() => {
-    load();
-    invoke<{ id: string; nom: string }[]>("get_emballages").then(setEmballages).catch(() => {});
-  }, []);
-
-  // Stock modifié depuis un autre appareil : liste rafraîchie sans clignotement
-  useTempsReel(["stock"], () => { load(true); });
+  // Côté gérant : crée les casiers par défaut et complète les anciens formats (une fois)
+  useEffect(() => { if (estGerant) invoke("get_emballages").catch(() => {}); }, [estGerant]);
 
   const enAlerte = (d: ProduitAvecFormats) => d.formats.some(f => f.stock <= f.seuil_alerte);
   const filtered = data.filter(d => d.produit.nom.toLowerCase().includes(search.toLowerCase()) && (filtre !== "alerte" || enAlerte(d)));

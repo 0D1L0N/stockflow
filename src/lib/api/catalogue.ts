@@ -1,4 +1,4 @@
-import { doc, getDoc, getDocs, limit, query, setDoc, updateDoc, where, writeBatch } from "firebase/firestore";
+import { doc, getDoc, getDocs, getDocsFromCache, limit, query, setDoc, updateDoc, where, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { Rayon } from "@/lib/familles";
 import { col, ecrire, lister, maintenant, parNom, type Commande, type Id } from "./outils";
@@ -23,14 +23,21 @@ export async function listerProduits(): Promise<Produit[]> {
   return (await lister<Produit>(col("produits"))).sort(parNom);
 }
 
-type EmballageNom = { id: Id; nom: string };
-const listerNomsEmballages = () => lister<EmballageNom>(col("emballages")).catch(() => [] as EmballageNom[]);
+export type EmballageNom = { id: Id; nom: string };
+/** Les types de casiers changent rarement : lus sur l'appareil d'abord, sur le serveur seulement s'il n'en a pas. */
+async function listerNomsEmballages(): Promise<EmballageNom[]> {
+  try {
+    const cache = await getDocsFromCache(col("emballages"));
+    if (!cache.empty) return cache.docs.map(d => ({ id: d.id, ...d.data() }) as EmballageNom);
+  } catch { /* pas encore en cache */ }
+  return lister<EmballageNom>(col("emballages")).catch(() => [] as EmballageNom[]);
+}
 
 /**
  * Bouteilles du casier quand le format n'est pas dans le casier habituel de son volume
  * (ex. Doppel noir 0,5 L en casier de 12 au lieu de 20), sinon null.
  */
-function casierInhabituel(f: { volume: number; unite: string; emballage_id?: Id | null }, emballages: EmballageNom[]): number | null {
+export function casierInhabituel(f: { volume: number; unite: string; emballage_id?: Id | null }, emballages: EmballageNom[]): number | null {
   const habituel = CASIER_PAR_VOLUME[f.volume];
   if (!f.emballage_id || f.unite === "pack" || f.unite === "canette" || !habituel || f.emballage_id === habituel) return null;
   const nom = emballages.find(e => e.id === f.emballage_id)?.nom ?? f.emballage_id;

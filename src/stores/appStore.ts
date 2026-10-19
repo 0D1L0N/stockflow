@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { invoke } from "@/lib/db";
 import { nombreFr } from "@/lib/format";
+import { useCatalogueStore, formatsActifs } from "@/stores/catalogueStore";
 
 export interface FormatAlerte { casier?: number | null;
   id: string; produit_id: string; produit_nom: string;
@@ -40,7 +41,17 @@ export const useAppStore = create<AppStore>((set, get) => ({
   },
 
   loadAlertes: async () => {
-    const alertes = await invoke<FormatAlerte[]>("get_formats_en_alerte");
+    const catalogue = useCatalogueStore.getState();
+    const alertes = catalogue.pret ? alertesDuCatalogue(catalogue) : await invoke<FormatAlerte[]>("get_formats_en_alerte");
     set({ alertes, nombreAlertes: alertes.length });
   },
 }));
+
+/** Formats sous leur seuil, les plus vides d'abord (même résultat que get_formats_en_alerte). */
+function alertesDuCatalogue(c: ReturnType<typeof useCatalogueStore.getState>): FormatAlerte[] {
+  const noms = new Map(c.produits.map(p => [p.id, p.nom]));
+  return formatsActifs(c)
+    .filter(f => f.stock <= f.seuil_alerte)
+    .map(f => ({ ...f, produit_nom: noms.get(f.produit_id) ?? "?", en_alerte: 1, quantite_manquante: Math.max(0, f.seuil_alerte - f.stock) }))
+    .sort((a, b) => a.stock - b.stock);
+}
