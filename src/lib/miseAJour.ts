@@ -25,3 +25,24 @@ export function surveillerMisesAJour() {
     },
   });
 }
+
+/**
+ * « Recharger » de l'écran Mise à jour requise : on va chercher la nouvelle version,
+ * on jette l'ancienne copie gardée pour le hors-ligne, puis on recharge.
+ * Les données saisies hors ligne (base locale Firestore) ne sont pas touchées.
+ */
+export async function forcerMiseAJour(): Promise<void> {
+  try {
+    const enregistrements = await navigator.serviceWorker?.getRegistrations?.() ?? [];
+    await Promise.all(enregistrements.map(e => e.update().catch(() => {})));
+    await Promise.all(enregistrements.map(e => e.unregister().catch(() => false)));
+    if ("caches" in window) {
+      const cles = await caches.keys();
+      await Promise.all(cles.map(c => caches.delete(c)));
+    }
+  } catch { /* on recharge quand même */ }
+  // Paramètre unique : passe outre une page d'accueil gardée en cache par le navigateur
+  const url = new URL(location.href);
+  url.searchParams.set("maj", String(Date.now()));
+  location.replace(url.toString());
+}

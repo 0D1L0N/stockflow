@@ -22,3 +22,10 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
 );
 
 surveillerMisesAJour();
+
+// Retire le paramètre ajouté par « Mettre à jour maintenant »
+if (new URLSearchParams(location.search).has("maj")) {
+  const url = new URL(location.href);
+  url.searchParams.delete("maj");
+  history.replaceState(history.state, "", url.toString());
+}

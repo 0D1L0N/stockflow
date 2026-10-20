@@ -6,6 +6,7 @@ import { useAuthStore } from "@/stores/authStore";
 import Connexion from "@/pages/Connexion";
 import Button from "@/components/ui/Button";
 import Logo from "./Logo";
+import { forcerMiseAJour } from "@/lib/miseAJour";
 
 /** Compare deux versions "1.2.3". Renvoie < 0 si a < b. */
 function comparerVersions(a: string, b: string): number {
@@ -15,6 +16,17 @@ function comparerVersions(a: string, b: string): number {
     if (d !== 0) return d;
   }
   return 0;
+}
+
+/** Met à jour pour de bon (voir forcerMiseAJour), avec un retour visible pendant le téléchargement. */
+function BoutonMiseAJour() {
+  const [enCours, setEnCours] = useState(false);
+  return (
+    <Button icon={<RefreshCw size={16} className={enCours ? "animate-spin" : ""} />} disabled={enCours}
+      onClick={() => { setEnCours(true); forcerMiseAJour(); }}>
+      {enCours ? "Mise à jour en cours…" : "Mettre à jour maintenant"}
+    </Button>
+  );
 }
 
 function EcranMessage({ icon, titre, texte, action }: { icon: ReactNode; titre: string; texte: string; action: ReactNode }) {
@@ -68,8 +80,8 @@ export default function AuthGate({ children }: { children: ReactNode }) {
   if (versionMin && comparerVersions(__APP_VERSION__, versionMin) < 0) {
     return (
       <EcranMessage icon={<RefreshCw size={36} />} titre="Mise à jour requise"
-        texte={`Cette version (${__APP_VERSION__}) n'est plus prise en charge. Rechargez l'application pour obtenir la dernière version.`}
-        action={<Button icon={<RefreshCw size={16} />} onClick={() => location.reload()}>Recharger</Button>} />
+        texte={`Cette version (${__APP_VERSION__}) n'est plus prise en charge. Restez connecté à Internet et touchez le bouton : la nouvelle version s'installe en quelques secondes.`}
+        action={<BoutonMiseAJour />} />
     );
   }
 
