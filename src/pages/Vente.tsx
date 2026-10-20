@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Search, ShoppingCart, Plus, Minus, Trash2, Check, User, ChevronDown, X, FileText, Mic } from "lucide-react";
+import { Search, ShoppingCart, Plus, Minus, Trash2, Check, User, ChevronDown, X, FileText, Mic, Wallet, Truck } from "lucide-react";
 import { sansAccent } from "@/lib/format";
 import { invoke } from "@/lib/db";
 import { useToast } from "@/components/ui/Toast";
@@ -44,6 +44,8 @@ interface VenteResult {
   reste_du: number;
   emballages_livres: Record<string, number>;
   emballages_rendus: Record<string, number>;
+  /** Partie en livraison avec ces livreurs */
+  livreurs?: string[] | null;
   soldes: SoldesClient | null;
   solde_avant: { argent: number; emballages: Record<string, number> } | null;
   client_nom: string;
@@ -54,8 +56,8 @@ export default function Vente() {
   const { toast } = useToast();
 
   // Store
-  const { client_id, items, total, montant_recu, monnaie_rendue,
-    setClient, addItem, removeItem, updateQuantite, updatePrix, setMontantRecu, resetPanier } = useVenteStore();
+  const { client_id, items, total,
+    setClient, addItem, removeItem, updateQuantite, updatePrix, resetPanier } = useVenteStore();
   const { loadAlertes, formatMontant, symbole, position } = useAppStore();
   const formatPrix = formatMontant;
 
@@ -77,7 +79,6 @@ export default function Vente() {
   const [showCart, setShowCart] = useState(false);
   useRetourFerme(showCart, () => setShowCart(false));
   const clavierOuvert = useClavierOuvert();
-  const [montantRecuStr, setMontantRecuStr] = useState(montant_recu > 0 ? String(montant_recu) : "");
   const [validating, setValidating] = useState(false);
   const [showApercu, setShowApercu] = useState(false);
   const [showDictee, setShowDictee] = useState(false);
@@ -87,8 +88,27 @@ export default function Vente() {
   // Casiers et paiement partiel
   const emballages = catalogue.emballages;
   const [rendusSaisis, setRendusSaisis] = useState<Record<string, string>>({});
-  const [paiementPartiel, setPaiementPartiel] = useState(false);
-  const [montantPayeStr, setMontantPayeStr] = useState("");
+  // Encaissement : saisi au moment où le client remet l'argent et les vides, juste avant la facture
+  const [showEncaissement, setShowEncaissement] = useState(false);
+  const [remisStr, setRemisStr] = useState("");
+  const [garderPourDette, setGarderPourDette] = useState(false);
+  // Livraison : la facture part avec le ou les livreurs, on encaisse à leur retour.
+  // Les livreurs choisis restent d'une vente à l'autre (une tournée couvre plusieurs clients)
+  const [modeLivraison, setModeLivraison] = useState(false);
+  const [listeLivreurs, setListeLivreurs] = useState<string[]>([]);
+  const [livreursChoisis, setLivreursChoisis] = useState<string[]>([]);
+  const [autreLivreur, setAutreLivreur] = useState("");
+  useEffect(() => {
+    invoke<{ livreurs?: string[] }>("get_parametres").then(p => setListeLivreurs(p.livreurs ?? [])).catch(() => {});
+  }, []);
+  const basculerLivreur = (nom: string) =>
+    setLivreursChoisis(l => l.includes(nom) ? l.filter(n => n !== nom) : [...l, nom]);
+  const ajouterAutreLivreur = () => {
+    const nom = autreLivreur.trim();
+    if (!nom) return;
+    setLivreursChoisis(l => l.includes(nom) ? l : [...l, nom]);
+    setAutreLivreur("");
+  };
   // Fiche rapide quand un client de passage repart avec une dette
   const [clientRapide, setClientRapide] = useState(false);
   const [rapideNom, setRapideNom] = useState("");
@@ -208,11 +228,6 @@ export default function Vente() {
     updateQuantite(format_id, newQty);
   };
 
-  const handleMontantChange = (val: string) => {
-    setMontantRecuStr(val);
-    const parsed = parseFloat(val);
-    setMontantRecu(isNaN(parsed) ? 0 : parsed);
-  };
 
   // ── Casiers : livrés (1 par casier vendu) et rendus sur place ─────────────
   const emballageDuFormat = new Map(produits.flatMap(p => p.formats.map(f => [f.id, f.emballage_id ?? null] as const)));
@@ -231,6 +246,8 @@ export default function Vente() {
   const rendus: Record<string, number> = Object.fromEntries(typesCasiers.map(e => {
     const saisi = rendusSaisis[e];
     const max = (livres[e] ?? 0) + (dusClient[e] ?? 0);
+    // En livraison, rien n'est rendu tant que le livreur n'est pas revenu
+    if (modeLivraison) return [e, 0];
     return [e, saisi === undefined ? (livres[e] ?? 0) : Math.min(max, Math.max(0, parseInt(saisi) || 0))];
   }));
   const casiersNonRendus = typesCasiers.reduce((s, e) => s + Math.max(0, (livres[e] ?? 0) - rendus[e]), 0);
@@ -239,7 +256,14 @@ export default function Vente() {
   // Ce que le client devait déjà : il peut le régler en même temps que son achat
   const ancienSolde = selectedClient && selectedClient.est_defaut !== 1 ? Math.max(0, selectedClient.solde_argent ?? 0) : 0;
   const totalGeneral = total + ancienSolde;
-  const montantPaye = paiementPartiel ? Math.min(totalGeneral, Math.max(0, parseFloat(montantPayeStr) || 0)) : total;
+  // Vide = tout est payé. Au-delà de l'achat : monnaie rendue, ou règlement de l'ancienne dette si demandé
+  const remis = remisStr.trim() === "" ? null : Math.max(0, parseFloat(remisStr) || 0);
+  const regleDette = ancienSolde > 0 && remis !== null && remis > total && garderPourDette;
+  const montantPaye = modeLivraison ? 0 : remis === null ? total : regleDette ? Math.min(remis, totalGeneral) : Math.min(remis, total);
+  const monnaieARendre = remis === null ? 0 : Math.max(0, remis - montantPaye);
+  // Montants envoyés à la vente : « reçu » (monnaie) quand tout l'achat est payé, sinon « payé »
+  const recuEnvoye = !modeLivraison && remis !== null && !regleDette && montantPaye === total ? remis : null;
+  const payeEnvoye = modeLivraison ? 0 : remis !== null && (regleDette || montantPaye < total) ? montantPaye : null;
   // Positif : nouvelle dette ; négatif : le client rembourse une partie de l'ancienne
   const resteDu = total - montantPaye;
   const laisseUneDette = resteDu > 0 || casiersNonRendus > 0;
@@ -247,7 +271,7 @@ export default function Vente() {
   // ── Aperçu de la facture : mêmes chiffres que ceux que la vente enregistrera ──
   const clientNomme = !!selectedClient && selectedClient.est_defaut !== 1;
   const apercuFacture = () => {
-    const recu = !paiementPartiel && montant_recu > 0 ? montant_recu : null;
+    const recu = recuEnvoye;
     return {
       date: new Date().toLocaleString("fr-FR", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }),
       client: { nom: selectedClient?.nom ?? "Client", telephone: selectedClient?.telephone ?? "", adresse: "" },
@@ -260,6 +284,7 @@ export default function Vente() {
       monnaie_rendue: recu === null ? null : Math.max(0, recu - total),
       devise: { symbole, position },
       vendeur: useAuthStore.getState().profil?.nom || undefined,
+      livraison: modeLivraison && livreursChoisis.length ? { livreurs: livreursChoisis, ouverte: true } : null,
       compte: construireCompte({
         total, montant_paye: montantPaye, emballages_livres: livres,
         emballages_rendus: Object.fromEntries(Object.entries(rendus).filter(([, n]) => n > 0)),
@@ -299,6 +324,7 @@ export default function Vente() {
         return;
       }
     }
+    if (modeLivraison && livreursChoisis.length === 0) { toast("Choisissez qui part livrer", "warning"); return; }
     const client = clientForce ?? selectedClient;
     // Une dette doit toujours avoir un nom : on crée une fiche rapide pour le client de passage
     if (laisseUneDette && (!client || client.est_defaut === 1)) {
@@ -312,17 +338,21 @@ export default function Vente() {
         {
           clientId: client?.id ?? client_id,
           items: items.map(i => ({ formatId: i.format_id, quantite: i.quantite, prixUtilise: i.prix })),
-          montantRecu: !paiementPartiel && montant_recu > 0 ? montant_recu : null,
-          montantPaye: paiementPartiel ? montantPaye : null,
+          montantRecu: recuEnvoye,
+          montantPaye: payeEnvoye,
           emballagesRendus: rendus,
+          livreurs: modeLivraison ? livreursChoisis : null,
         }
       );
       // Capturer les données avant reset pour le modal
       setVenteResult({
-        ...result, items: [...items], montant_recu: paiementPartiel ? 0 : montant_recu,
+        ...result, items: [...items], montant_recu: recuEnvoye ?? 0,
         client_nom: client?.nom ?? "Client", client_telephone: client?.telephone ?? null,
+        livreurs: modeLivraison ? [...livreursChoisis] : null,
       });
       setShowCart(false);
+      setShowEncaissement(false);
+      setModeLivraison(false);
       setShowConfirm(true);
       loadAlertes();
       chargerClients().catch(() => {});
@@ -344,16 +374,15 @@ export default function Vente() {
 
   const handleNouvelleVente = () => {
     resetPanier();
-    setMontantRecuStr("");
+
     setRendusSaisis({});
-    setPaiementPartiel(false);
-    setMontantPayeStr("");
+    setRemisStr("");
+    setGarderPourDette(false);
+    setModeLivraison(false);
     setVenteResult(null);
     setShowConfirm(false);
   };
 
-  // Affichage monnaie à rendre (live)
-  const monnaieDisplay = montant_recu > 0 ? monnaie_rendue : null;
 
   // Fonction de rendu (et non composant) : sinon React remonte le panier à chaque
   // frappe et les champs de saisie perdent le focus.
@@ -432,38 +461,6 @@ export default function Vente() {
 
       {items.length > 0 && (
         <div className="border-t border-slate-200 p-4 flex flex-col gap-3">
-          {/* Casiers consignés : livrés / rendus sur place */}
-          {typesCasiers.length > 0 && (
-            <div className="flex flex-col gap-1.5">
-              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Casiers vides rendus</span>
-              {typesCasiers.map(e => (
-                <div key={e} className="flex items-center gap-2 text-sm">
-                  <div className="flex-1 min-w-0">
-                    <div className="truncate text-gray-700">{nomEmballage(e)}</div>
-                    <div className="text-[11px] text-gray-400">
-                      {livres[e] ? `${livres[e]} livré${livres[e] > 1 ? "s" : ""}` : "aucun livré"}
-                      {dusClient[e] ? ` · ${dusClient[e]} déjà dû${dusClient[e] > 1 ? "s" : ""}` : ""}
-                    </div>
-                  </div>
-                  <button type="button" aria-label="Un casier rendu de moins"
-                    onClick={() => setRendusSaisis(r => ({ ...r, [e]: String(Math.max(0, rendus[e] - 1)) }))}
-                    className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center"><Minus size={13} /></button>
-                  <input type="number" inputMode="numeric" min="0" value={rendusSaisis[e] ?? String(rendus[e])} aria-label={`Casiers rendus : ${nomEmballage(e)}`}
-                    onChange={ev => setRendusSaisis(r => ({ ...r, [e]: ev.target.value }))}
-                    className="w-12 h-8 rounded-lg border border-slate-300 px-1 text-sm font-semibold text-center focus:outline-none focus:border-secondary" />
-                  <button type="button" aria-label="Un casier rendu de plus"
-                    onClick={() => setRendusSaisis(r => ({ ...r, [e]: String(Math.min((livres[e] ?? 0) + (dusClient[e] ?? 0), rendus[e] + 1)) }))}
-                    className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center"><Plus size={13} /></button>
-                </div>
-              ))}
-              {casiersNonRendus > 0 && (
-                <div className="text-xs text-orange-700 bg-orange-50 rounded-lg px-3 py-1.5">
-                  {casiersNonRendus} casier{casiersNonRendus > 1 ? "s" : ""} à rendre plus tard
-                </div>
-              )}
-            </div>
-          )}
-
           <div className="flex items-center justify-between">
             <span className="font-bold text-gray-800">{ancienSolde > 0 ? "Achat du jour" : "Total"}</span>
             <span className="chiffre font-extrabold text-2xl text-ink-900">{formatPrix(total)}</span>
@@ -474,78 +471,22 @@ export default function Vente() {
               <div className="flex justify-between font-bold"><span>Total général</span><span>{formatPrix(totalGeneral)}</span></div>
             </div>
           )}
-
-          <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
-            <input type="checkbox" checked={paiementPartiel} onChange={e => setPaiementPartiel(e.target.checked)}
-              className="w-4 h-4 accent-secondary" />
-            {ancienSolde > 0 ? "Paiement partiel ou règlement de la dette" : "Le client ne paie pas tout maintenant"}
-          </label>
-
-          {paiementPartiel ? (
-            <div>
-              <label className="text-[13px] font-medium text-gray-700 block mb-1.5">
-                Montant payé maintenant
-              </label>
-              <div className="relative">
-                <input type="number" inputMode="numeric" min="0" placeholder="0" value={montantPayeStr}
-                  onChange={e => setMontantPayeStr(e.target.value)}
-                  className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm font-semibold focus:outline-none focus:border-secondary pr-14" />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-semibold">{symbole}</span>
-              </div>
-              {ancienSolde > 0 && (
-                <div className="flex gap-2 mt-2">
-                  <button type="button" onClick={() => setMontantPayeStr(String(total))}
-                    className="flex-1 text-xs font-semibold py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50">Achat seul</button>
-                  <button type="button" onClick={() => setMontantPayeStr(String(totalGeneral))}
-                    className="flex-1 text-xs font-semibold py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50">Tout régler</button>
-                </div>
-              )}
-              {ancienSolde + resteDu > 0 ? (
-                <div className="mt-2 flex justify-between items-center bg-orange-50 rounded-lg px-3 py-2">
-                  <span className="text-xs text-orange-700 font-medium">Le client devra encore</span>
-                  <span className="font-extrabold text-orange-700 text-sm">{formatPrix(ancienSolde + resteDu)}</span>
-                </div>
-              ) : (
-                <div className="mt-2 flex justify-between items-center bg-emerald-50 rounded-lg px-3 py-2">
-                  <span className="text-xs text-emerald-700 font-medium">Compte soldé</span>
-                  <span className="font-extrabold text-emerald-700 text-sm">✓</span>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div>
-              <label className="text-[13px] font-medium text-gray-700 block mb-1.5">
-                Montant reçu (optionnel)
-              </label>
-              <div className="relative">
-                <input type="number" inputMode="numeric" min="0" placeholder={`Min. ${formatPrix(total)}`}
-                  value={montantRecuStr} onChange={e => handleMontantChange(e.target.value)}
-                  className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm font-semibold focus:outline-none focus:border-secondary pr-14" />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-semibold">{symbole}</span>
-              </div>
-              {monnaieDisplay !== null && (
-                <div className="mt-2 flex justify-between items-center bg-green-50 rounded-lg px-3 py-2">
-                  <span className="text-xs text-green-700 font-medium">Monnaie à rendre</span>
-                  <span className="font-extrabold text-secondary text-sm">{formatPrix(monnaieDisplay)}</span>
-                </div>
-              )}
-            </div>
-          )}
-
-          {laisseUneDette && selectedClient?.est_defaut === 1 && (
-            <p className="text-xs text-gray-500">
-              Le client repart avec une dette : son nom et son téléphone seront demandés à la validation.
-            </p>
-          )}
           <button onClick={() => setShowApercu(true)}
             className="w-full h-11 rounded-lg border border-slate-300 text-gray-700 font-semibold flex items-center justify-center gap-2 text-[14px] hover:bg-slate-50">
-            <FileText size={16} /> Voir la facture avant de valider
+            <FileText size={16} /> Voir la facture
           </button>
-          <button onClick={() => validerVente()} disabled={validating}
-            className="w-full h-12 bg-secondary-600 text-white font-semibold rounded-lg flex items-center justify-center gap-2 text-[15px] shadow-sm hover:bg-secondary-700 active:translate-y-px transition-colors disabled:opacity-60">
-            <Check size={16} strokeWidth={2.5} />
-            {validating ? "Validation…" : "Valider la vente"}
-          </button>
+          {/* L'argent et les vides se notent quand le client les remet, juste avant la facture */}
+          <div className="grid grid-cols-[1fr_auto] gap-2">
+            <button onClick={() => { setModeLivraison(false); setShowCart(false); setShowEncaissement(true); }}
+              className="h-12 bg-secondary-600 text-white font-semibold rounded-lg flex items-center justify-center gap-2 text-[15px] shadow-sm hover:bg-secondary-700 active:translate-y-px transition-colors">
+              <Wallet size={17} /> Encaisser · {formatPrix(total)}
+            </button>
+            {/* Livraison : la facture part avec le livreur, on encaisse à son retour */}
+            <button onClick={() => { setModeLivraison(true); setShowCart(false); }}
+              className="h-12 px-4 bg-ink-900 text-white font-semibold rounded-lg flex items-center justify-center gap-2 text-[15px] shadow-sm hover:bg-ink-800 active:translate-y-px transition-colors">
+              <Truck size={17} /> Livrer
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -739,6 +680,166 @@ export default function Vente() {
         </>
       )}
 
+
+
+      {/* Livraison : qui part livrer, puis la facture à emporter */}
+      <Modal isOpen={modeLivraison && !showConfirm && !clientRapide && !showApercu} onClose={() => setModeLivraison(false)} title="Livraison" size="lg">
+        <div className="p-4 sm:p-6 flex flex-col gap-5">
+          <div className="rounded-2xl bg-ink-900 text-white p-4 flex flex-col gap-1">
+            <div className="flex justify-between items-end">
+              <span className="text-[11px] uppercase tracking-[0.14em] text-ink-400">À encaisser à la livraison</span>
+              <span className="chiffre text-[26px] font-extrabold text-secondary-400 leading-none">{formatPrix(totalGeneral)}</span>
+            </div>
+            {ancienSolde > 0 && <div className="flex justify-between text-xs text-ink-300"><span>dont ancienne dette</span><span>{formatPrix(ancienSolde)}</span></div>}
+            <div className="text-xs text-ink-300">{clientNomme ? selectedClient?.nom : "Client à préciser"} · {casiers(items.reduce((t, i) => t + i.quantite, 0))}</div>
+          </div>
+
+          <section className="flex flex-col gap-2">
+            <label className="text-[13px] font-bold uppercase tracking-wide text-ink-600">Qui part livrer ?</label>
+            <div className="flex flex-wrap gap-2">
+              {[...new Set([...listeLivreurs, ...livreursChoisis])].map(nom => {
+                const choisi = livreursChoisis.includes(nom);
+                return (
+                  <button key={nom} type="button" onClick={() => basculerLivreur(nom)} aria-pressed={choisi}
+                    className={["h-11 px-4 rounded-full text-[14px] font-semibold border flex items-center gap-1.5",
+                      choisi ? "bg-ink-900 text-white border-ink-900" : "bg-white text-gray-700 border-slate-300"].join(" ")}>
+                    {choisi && <Check size={15} strokeWidth={2.5} />}{nom}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex gap-2">
+              <input value={autreLivreur} onChange={e => setAutreLivreur(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") ajouterAutreLivreur(); }}
+                placeholder="Autre personne (hors entreprise)" aria-label="Nom d'un autre livreur"
+                className="flex-1 h-11 rounded-xl border border-slate-300 px-3 text-sm focus:outline-none focus:border-secondary" />
+              <button type="button" onClick={ajouterAutreLivreur} disabled={!autreLivreur.trim()}
+                className="h-11 px-4 rounded-xl border border-slate-300 font-semibold text-sm text-gray-700 disabled:opacity-40">Ajouter</button>
+            </div>
+            <p className="text-xs text-gray-500">On choisit un ou plusieurs livreurs. Ils restent choisis pour les ventes suivantes de la tournée.</p>
+          </section>
+
+          {!clientNomme && (
+            <p className="text-xs text-gray-500">Une livraison se fait pour un client nommé : son nom et son téléphone seront demandés.</p>
+          )}
+          <div className="grid grid-cols-1 gap-2">
+            <button onClick={() => setShowApercu(true)} disabled={livreursChoisis.length === 0}
+              className="w-full h-11 rounded-lg border border-slate-300 text-gray-700 font-semibold flex items-center justify-center gap-2 text-[14px] hover:bg-slate-50 disabled:opacity-40">
+              <FileText size={16} /> Voir la facture de livraison
+            </button>
+            <button onClick={() => validerVente()} disabled={validating || livreursChoisis.length === 0}
+              className="w-full h-12 bg-secondary-600 text-white font-semibold rounded-lg flex items-center justify-center gap-2 text-[15px] shadow-sm hover:bg-secondary-700 active:translate-y-px transition-colors disabled:opacity-50">
+              <Truck size={16} /> {validating ? "Validation…" : livreursChoisis.length === 0 ? "Choisissez le livreur" : "Valider et faire la facture"}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Ce que le client remet : argent et casiers vides, puis la facture */}
+      <Modal isOpen={showEncaissement} onClose={() => setShowEncaissement(false)} title="Ce que le client remet" size="lg">
+        <div className="p-4 sm:p-6 flex flex-col gap-5">
+          <div className="rounded-2xl bg-ink-900 text-white p-4 flex flex-col gap-1">
+            <div className="flex justify-between items-end">
+              <span className="text-[11px] uppercase tracking-[0.14em] text-ink-400">{ancienSolde > 0 ? "Achat du jour" : "À payer"}</span>
+              <span className="chiffre text-[26px] font-extrabold text-secondary-400 leading-none">{formatPrix(total)}</span>
+            </div>
+            {ancienSolde > 0 && <div className="flex justify-between text-xs text-ink-300"><span>Ancienne dette de {selectedClient?.nom}</span><span>{formatPrix(ancienSolde)}</span></div>}
+            <div className="text-xs text-ink-300">{selectedClient && selectedClient.est_defaut !== 1 ? selectedClient.nom : "Vente au comptoir"} · {casiers(items.reduce((t, i) => t + i.quantite, 0))}</div>
+          </div>
+
+          {/* Argent */}
+          <section className="flex flex-col gap-2">
+            <label className="text-[13px] font-bold uppercase tracking-wide text-ink-600">Argent remis</label>
+            <div className="relative">
+              <input type="number" inputMode="numeric" min="0" value={remisStr} onChange={e => setRemisStr(e.target.value)}
+                placeholder={`${formatPrix(total)} (tout payé)`} aria-label="Argent remis par le client"
+                className="w-full h-14 rounded-xl border border-slate-300 px-4 pr-16 text-xl font-bold focus:outline-none focus:border-secondary" />
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-gray-400 font-semibold">{symbole}</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={() => { setRemisStr(""); setGarderPourDette(false); }}
+                className={["h-10 px-3 rounded-full text-[13px] font-semibold border", remis === null ? "bg-ink-900 text-white border-ink-900" : "bg-white text-gray-700 border-slate-300"].join(" ")}>Tout payé</button>
+              {ancienSolde > 0 && (
+                <button type="button" onClick={() => { setRemisStr(String(totalGeneral)); setGarderPourDette(true); }}
+                  className="h-10 px-3 rounded-full text-[13px] font-semibold border bg-white text-gray-700 border-slate-300">+ ancienne dette ({formatPrix(totalGeneral)})</button>
+              )}
+              <button type="button" onClick={() => { setRemisStr("0"); setGarderPourDette(false); }}
+                className={["h-10 px-3 rounded-full text-[13px] font-semibold border", remis === 0 ? "bg-ink-900 text-white border-ink-900" : "bg-white text-gray-700 border-slate-300"].join(" ")}>Rien (à crédit)</button>
+            </div>
+            {ancienSolde > 0 && remis !== null && remis > total && (
+              <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
+                <input type="checkbox" checked={garderPourDette} onChange={e => setGarderPourDette(e.target.checked)} className="w-5 h-5 accent-secondary" />
+                Garder le surplus pour l'ancienne dette (au lieu de rendre la monnaie)
+              </label>
+            )}
+            {monnaieARendre > 0 && (
+              <div className="flex justify-between items-center bg-emerald-50 rounded-xl px-3 py-2.5">
+                <span className="text-sm text-emerald-800 font-medium">Monnaie à rendre</span>
+                <span className="chiffre font-extrabold text-emerald-700">{formatPrix(monnaieARendre)}</span>
+              </div>
+            )}
+            {ancienSolde + resteDu > 0 ? (
+              <div className="flex justify-between items-center bg-orange-50 rounded-xl px-3 py-2.5">
+                <span className="text-sm text-orange-800 font-medium">{resteDu > 0 ? "Reste à payer sur cet achat" : "Le client devra encore"}</span>
+                <span className="chiffre font-extrabold text-orange-700">{formatPrix(resteDu > 0 ? resteDu : ancienSolde + resteDu)}</span>
+              </div>
+            ) : remis !== null && (
+              <div className="flex justify-between items-center bg-emerald-50 rounded-xl px-3 py-2.5">
+                <span className="text-sm text-emerald-800 font-medium">Compte soldé</span><span className="text-emerald-700 font-extrabold">✓</span>
+              </div>
+            )}
+          </section>
+
+          {/* Casiers vides */}
+            {/* Casiers consignés : livrés / rendus sur place */}
+            {typesCasiers.length > 0 && (
+              <div className="flex flex-col gap-1.5">
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Casiers vides rendus</span>
+                {typesCasiers.map(e => (
+                  <div key={e} className="flex items-center gap-2 text-sm">
+                    <div className="flex-1 min-w-0">
+                      <div className="truncate text-gray-700">{nomEmballage(e)}</div>
+                      <div className="text-[11px] text-gray-400">
+                        {livres[e] ? `${livres[e]} livré${livres[e] > 1 ? "s" : ""}` : "aucun livré"}
+                        {dusClient[e] ? ` · ${dusClient[e]} déjà dû${dusClient[e] > 1 ? "s" : ""}` : ""}
+                      </div>
+                    </div>
+                    <button type="button" aria-label="Un casier rendu de moins"
+                      onClick={() => setRendusSaisis(r => ({ ...r, [e]: String(Math.max(0, rendus[e] - 1)) }))}
+                      className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center"><Minus size={13} /></button>
+                    <input type="number" inputMode="numeric" min="0" value={rendusSaisis[e] ?? String(rendus[e])} aria-label={`Casiers rendus : ${nomEmballage(e)}`}
+                      onChange={ev => setRendusSaisis(r => ({ ...r, [e]: ev.target.value }))}
+                      className="w-12 h-8 rounded-lg border border-slate-300 px-1 text-sm font-semibold text-center focus:outline-none focus:border-secondary" />
+                    <button type="button" aria-label="Un casier rendu de plus"
+                      onClick={() => setRendusSaisis(r => ({ ...r, [e]: String(Math.min((livres[e] ?? 0) + (dusClient[e] ?? 0), rendus[e] + 1)) }))}
+                      className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center"><Plus size={13} /></button>
+                  </div>
+                ))}
+                {casiersNonRendus > 0 && (
+                  <div className="text-xs text-orange-700 bg-orange-50 rounded-lg px-3 py-1.5">
+                    {casiersNonRendus} casier{casiersNonRendus > 1 ? "s" : ""} à rendre plus tard
+                  </div>
+                )}
+              </div>
+            )}
+  
+  
+          {laisseUneDette && selectedClient?.est_defaut === 1 && (
+            <p className="text-xs text-gray-500">Le client repart avec une dette : son nom et son téléphone seront demandés.</p>
+          )}
+          <div className="grid grid-cols-1 gap-2">
+            <button onClick={() => setShowApercu(true)}
+              className="w-full h-11 rounded-lg border border-slate-300 text-gray-700 font-semibold flex items-center justify-center gap-2 text-[14px] hover:bg-slate-50">
+              <FileText size={16} /> Voir la facture avec ce règlement
+            </button>
+            <button onClick={() => validerVente()} disabled={validating}
+              className="w-full h-12 bg-secondary-600 text-white font-semibold rounded-lg flex items-center justify-center gap-2 text-[15px] shadow-sm hover:bg-secondary-700 active:translate-y-px transition-colors disabled:opacity-60">
+              <Check size={16} strokeWidth={2.5} /> {validating ? "Validation…" : "Valider et faire la facture"}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
       {/* Commande dictée : rédigée par l'app, vérifiée puis ajoutée au panier */}
       <ModalDictee isOpen={showDictee} onClose={() => setShowDictee(false)}
         produits={produits as never} clients={clients.filter(c => c.est_defaut !== 1)} prixDe={prixDe as never} onAjouter={ajouterDicte} />
@@ -769,6 +870,7 @@ export default function Vente() {
           emballagesRendus={venteResult.emballages_rendus}
           soldeAvant={venteResult.solde_avant}
           nomEmballage={nomEmballage}
+          livreurs={venteResult.livreurs}
           onNouvelleVente={handleNouvelleVente}
         />
       )}

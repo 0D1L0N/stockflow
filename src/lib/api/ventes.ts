@@ -39,7 +39,7 @@ function prochainNumeroFacture(jour: string): string {
 }
 
 export const ventes: Record<string, Commande> = {
-  create_vente: async ({ clientId, items, montantRecu, montantPaye, emballagesRendus }) => {
+  create_vente: async ({ clientId, items, montantRecu, montantPaye, emballagesRendus, livreurs }) => {
     const lignes = items as VenteItemArg[];
     if (!lignes?.length) throw new Error("La vente doit contenir au moins un article.");
     const uid = auth.currentUser?.uid;
@@ -62,6 +62,11 @@ export const ventes: Record<string, Commande> = {
     });
 
     const total = lignes.reduce((s, l) => s + l.quantite * l.prixUtilise, 0);
+    // Livraison : le livreur part avec la facture, on encaisse à son retour (cloturer_livraison)
+    const equipeLivraison = Array.isArray(livreurs)
+      ? [...new Set((livreurs as unknown[]).map(n => String(n ?? "").trim()).filter(Boolean))] : [];
+    const enLivraison = equipeLivraison.length > 0;
+    if (enLivraison) { montantRecu = null; montantPaye = 0; emballagesRendus = {}; }
     const recu = montantRecu == null ? null : Number(montantRecu);
     const monnaieRendue = recu == null ? null : Math.max(0, recu - total);
 
@@ -98,6 +103,7 @@ export const ventes: Record<string, Commande> = {
     }
 
     const laisseUneDette = resteDu > 0 || Object.values(ecartEmballages).some(d => d > 0);
+    if (enLivraison && !clientNomme) throw new Error("Une livraison doit être rattachée à un client nommé.");
     if (laisseUneDette && !clientNomme) {
       throw new Error("Un reste à payer ou des casiers non rendus doivent être rattachés à un client nommé.");
     }
@@ -137,6 +143,7 @@ export const ventes: Record<string, Commande> = {
       solde_avant: soldeAvant,
       cree_le: serverTimestamp(),
       statut: "validée",
+      ...(enLivraison ? { livraison: { statut: "en_cours", livreurs: equipeLivraison, date_cloture: null } } : {}),
       vendeur_uid: uid,
       vendeur_nom: profil?.nom ?? "",
       items: articles,
@@ -183,7 +190,8 @@ export const ventes: Record<string, Commande> = {
         type: "vente", vente_id: venteRef.id, numero_facture: numeroFacture,
         montant_total: total, montant_paye: paye, montant: resteDu,
         emballages: ecartEmballages, emballages_livres: livres, emballages_rendus: rendus,
-        commentaire: null, date, utilisateur_uid: uid, utilisateur_nom: profil?.nom ?? "",
+        commentaire: enLivraison ? `En livraison : ${equipeLivraison.join(", ")}` : null,
+        date, utilisateur_uid: uid, utilisateur_nom: profil?.nom ?? "",
       });
     }
 
@@ -195,6 +203,7 @@ export const ventes: Record<string, Commande> = {
       id: venteRef.id, numero_facture: numeroFacture, total, monnaie_rendue: monnaieRendue,
       montant_paye: paye, reste_du: resteDu, emballages_livres: livres, emballages_rendus: rendus,
       solde_avant: soldeAvant, soldes,
+      livraison: enLivraison ? { statut: "en_cours", livreurs: equipeLivraison } : null,
     };
   },
 };

@@ -356,6 +356,21 @@ export const suivis: Record<string, Suivi> = {
     avant: async a => lire(`clients/${a.clientId}`),
     apres: async (a, _r, c: Doc | null) => ({ categorie: "comptes", action: "encaisser_paiement", libelle: `Paiement encaissé : ${c?.nom ?? "?"}`, details: [fcfa(Number(a.montant))], restauration: null }),
   },
+  regler_vente: {
+    avant: async a => lire(`ventes/${a.venteId}`),
+    apres: async (a, _r, v: Doc | null) => v && ({ categorie: "comptes", action: "regler_vente", libelle: `Facture réglée : ${v.numero_facture} · ${v.client_nom}`,
+      details: [Number(a.montant) > 0 ? `Payé ${fcfa(Number(a.montant))}` : "",
+        ...Object.entries((a.emballages ?? {}) as Record<string, number>).filter(([, n]) => Number(n) > 0).map(([e, n]) => `${casiers(Number(n))} rendus (${e})`)].filter(Boolean),
+      restauration: null }),
+  },
+  cloturer_livraison: {
+    avant: async a => lire(`ventes/${a.venteId}`),
+    apres: async (a, _r, v: Doc | null) => v && ({ categorie: "comptes", action: "cloturer_livraison",
+      libelle: `Retour de livraison : ${v.numero_facture} · ${v.client_nom}`,
+      details: [`Reçu ${fcfa(Number(a.montant) || 0)}`,
+        ...Object.entries((a.emballages ?? {}) as Record<string, number>).filter(([, n]) => Number(n) > 0).map(([e, n]) => `${casiers(Number(n))} rendus (${e})`)],
+      restauration: null }),
+  },
   retour_emballages: {
     avant: async a => lire(`clients/${a.clientId}`),
     apres: async (a, _r, c: Doc | null) => ({ categorie: "comptes", action: "retour_emballages", libelle: `Casiers rapportés : ${c?.nom ?? "?"}`,

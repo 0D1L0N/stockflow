@@ -17,6 +17,8 @@ const DEFAUTS = {
   notifications_son: 1,
   mode_sombre: 0,
   langue: "fr",
+  /** Proposés à la vente en livraison (on peut aussi écrire un autre nom) */
+  livreurs: ["Donatien", "Ignace", "Ezekiel", "Herman"] as string[],
 };
 
 export const parametres: Record<string, Commande> = {
@@ -37,6 +39,8 @@ export const parametres: Record<string, Commande> = {
       notifications_son: Number(a.notificationsSon ?? 1),
       mode_sombre: Number(a.modeSombre ?? 0),
       langue: a.langue ?? "fr",
+      livreurs: Array.isArray(a.livreurs)
+        ? [...new Set((a.livreurs as unknown[]).map(n => String(n ?? "").trim()).filter(Boolean))] : DEFAUTS.livreurs,
     }, { merge: true })); // merge : ne pas effacer les autres champs (date de sauvegarde…)
   },
 };

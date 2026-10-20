@@ -201,14 +201,35 @@ service cloud.firestore {
 
     // ── Ventes ───────────────────────────────────────────────────────────
     match /ventes/{id} {
+      // Les livraisons en cours se lisent par toute l'équipe : n'importe qui note le retour du livreur
       allow read: if responsable()
-        || (equipe() && resource.data.vendeur_uid == request.auth.uid);
+        || (equipe() && resource.data.vendeur_uid == request.auth.uid)
+        || (equipe() && resource.data.livraison.statut == 'en_cours');
       allow create: if equipe()
         && request.resource.data.vendeur_uid == request.auth.uid
         && request.resource.data.statut == 'validée'
+        && (!('livraison' in request.resource.data) || request.resource.data.livraison.statut == 'en_cours')
         && horodate();
       // Seul l'admin annule une vente (statut uniquement).
-      allow update: if admin() && seulementChamps(['statut', 'date_annulation']);
+      allow update: if (admin() && seulementChamps(['statut', 'date_annulation']))
+        // Règlement après coup (gérant, admin) : seuls les cumuls réglés bougent, ils ne font que monter,
+        // et l'entrée du journal client du même batch porte cette vente
+        || (responsable()
+            && resource.data.statut == 'validée'
+            && seulementChamps(['regle_apres', 'rendus_apres', 'dernier_reglement'])
+            && request.resource.data.get('regle_apres', 0) >= resource.data.get('regle_apres', 0)
+            && operationDuBatch(request.resource.data.dernier_reglement, resource.data.client_id)
+            && getAfter(/databases/$(database)/documents/operations_client/$(request.resource.data.dernier_reglement)).data.vente_id == id)
+        // Retour du livreur (toute l'équipe) : une seule fois, mêmes livreurs, preuve dans le journal client
+        || (equipe()
+            && resource.data.statut == 'validée'
+            && resource.data.livraison.statut == 'en_cours'
+            && request.resource.data.livraison.statut == 'livrée'
+            && request.resource.data.livraison.livreurs == resource.data.livraison.livreurs
+            && seulementChamps(['regle_apres', 'rendus_apres', 'dernier_reglement', 'livraison'])
+            && request.resource.data.get('regle_apres', 0) >= resource.data.get('regle_apres', 0)
+            && operationDuBatch(request.resource.data.dernier_reglement, resource.data.client_id)
+            && getAfter(/databases/$(database)/documents/operations_client/$(request.resource.data.dernier_reglement)).data.vente_id == id);
       allow delete: if false;
     }
 

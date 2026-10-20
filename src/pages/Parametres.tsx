@@ -19,6 +19,7 @@ interface Parametres {
   derniere_sauvegarde?: string | null;
   derniere_sauvegarde_auto?: string | null;
   sauvegarde_auto?: boolean;
+  livreurs?: string[];
 }
 
 export default function Parametres() {
@@ -27,6 +28,13 @@ export default function Parametres() {
   const [params, setParams] = useState<Parametres | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [nouveauLivreur, setNouveauLivreur] = useState("");
+  const ajouterLivreur = () => {
+    const nom = nouveauLivreur.trim();
+    if (!nom) return;
+    setParams(p => p && { ...p, livreurs: [...new Set([...(p.livreurs ?? []), nom])] });
+    setNouveauLivreur("");
+  };
 
   useEffect(() => {
     invoke<Parametres>("get_parametres").then(p => { setParams(p); setLoading(false); });
@@ -47,6 +55,7 @@ export default function Parametres() {
         notificationsSon: params.notifications_son,
         modeSombre: params.mode_sombre,
         langue: params.langue,
+        livreurs: params.livreurs ?? [],
       });
       setDevise(params.devise, params.symbole_devise, params.symbole_position as "before" | "after");
       toast("Paramètres enregistrés", "success");
@@ -88,6 +97,25 @@ export default function Parametres() {
                   <Input label="Symbole" value={params.symbole_devise}
                     onChange={e => set("symbole_devise", e.target.value)} placeholder="FCFA" />
                 </div>
+              </div>
+            </Card>
+
+            <Card className="flex flex-col gap-3">
+              <h3 className="font-semibold text-gray-700 text-sm">Livreurs</h3>
+              <p className="text-xs text-gray-500">Proposés quand on fait une vente en livraison. À la vente, on peut aussi écrire le nom d'une autre personne.</p>
+              <div className="flex flex-wrap gap-2">
+                {(params.livreurs ?? []).map(n => (
+                  <span key={n} className="inline-flex items-center gap-1 h-9 pl-3 pr-1 rounded-full bg-slate-100 text-sm font-semibold text-gray-700">
+                    {n}
+                    <button type="button" aria-label={`Retirer ${n}`} onClick={() => setParams(p => p && { ...p, livreurs: (p.livreurs ?? []).filter(x => x !== n) })}
+                      className="w-7 h-7 rounded-full hover:bg-slate-200 text-gray-500">×</button>
+                  </span>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <div className="flex-1"><Input placeholder="Nom du livreur" value={nouveauLivreur} onChange={e => setNouveauLivreur(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter") ajouterLivreur(); }} /></div>
+                <Button variant="secondary" onClick={ajouterLivreur} disabled={!nouveauLivreur.trim()}>Ajouter</Button>
               </div>
             </Card>
 

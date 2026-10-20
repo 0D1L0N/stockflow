@@ -36,6 +36,8 @@ interface Props {
   /** Soldes du client juste avant la vente (null pour le client de comptoir) */
   soldeAvant?: { argent: number; emballages: Record<string, number> } | null;
   nomEmballage?: (id: string) => string;
+  /** Vente partie en livraison avec ces livreurs */
+  livreurs?: string[] | null;
   onNouvelleVente: () => void;
 }
 
@@ -44,7 +46,7 @@ export default function ModalConfirmationVente({
   isOpen, onClose, numeroFacture, clientNom, clientTelephone,
   items, total, montantRecu, monnaieRendue, onNouvelleVente,
   montantPaye = total, emballagesLivres = {}, emballagesRendus = {}, soldeAvant = null,
-  nomEmballage = () => "Casier",
+  nomEmballage = () => "Casier", livreurs = null,
 }: Props) {
   const compte = construireCompte(
     { total, montant_paye: montantPaye, emballages_livres: emballagesLivres, emballages_rendus: emballagesRendus, solde_avant: soldeAvant },
@@ -94,6 +96,7 @@ export default function ModalConfirmationVente({
     devise: { symbole, position },
     compte,
     vendeur: profilNom || undefined,
+    livraison: livreurs?.length ? { livreurs, ouverte: true } : null,
   });
 
   const handleImprimer = async () => {
@@ -141,8 +144,10 @@ export default function ModalConfirmationVente({
             <CheckCircle size={36} className="text-secondary" strokeWidth={1.8} />
           </div>
           <div>
-            <h2 className="font-extrabold text-xl text-gray-800">Vente enregistrée !</h2>
-            <p className="text-gray-500 text-sm mt-0.5">La vente a été créée avec succès.</p>
+            <h2 className="font-extrabold text-xl text-gray-800">{livreurs?.length ? "Livraison enregistrée !" : "Vente enregistrée !"}</h2>
+            <p className="text-gray-500 text-sm mt-0.5">{livreurs?.length
+              ? `Imprimez la facture pour ${livreurs.join(", ")}. On encaisse à son retour, dans Livraisons.`
+              : "La vente a été créée avec succès."}</p>
           </div>
         </div>
 
@@ -186,7 +191,12 @@ export default function ModalConfirmationVente({
               <span className="font-extrabold text-secondary">{formatPrix(monnaieRendue)}</span>
             </div>
           )}
-          {compte && (
+          {livreurs?.length ? (
+            <div className="flex justify-between rounded-xl px-3 py-2.5 -mx-1 bg-blue-50 text-blue-900 font-bold">
+              <span>À encaisser à la livraison</span>
+              <span>{formatPrix(compte?.argent?.total_general ?? total)}</span>
+            </div>
+          ) : compte && (
             <div className={["flex flex-col gap-1.5 rounded-xl px-3 py-2.5 -mx-1 text-xs",
               soldeOk ? "bg-emerald-50 text-emerald-900" : "bg-orange-50 text-orange-900"].join(" ")}>
               {compte.argent && (

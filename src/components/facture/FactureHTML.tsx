@@ -16,8 +16,10 @@ function initials(nom: string): string {
 /** apercu : vente pas encore enregistrée (rien n'est « acquitté » ni « réglé » à ce stade). */
 export function FactureHTML({ data, apercu = false }: { data: FactureData; apercu?: boolean }) {
   const { numero_facture, date, client, items, total, montant_recu, monnaie_rendue, commerce, devise, compte } = data;
-  const acquittee = !compte?.argent || compte.argent.nouveau <= 0;
+  const enLivraison = !!data.livraison?.ouverte;
+  const acquittee = !enLivraison && (!compte?.argent || compte.argent.nouveau <= 0);
   const telClient = telephoneFr(client.telephone) ?? "";
+  const ligneVide = { flex: 1, borderBottom: "1px dotted #1f2937", marginLeft: 8, height: 14 };
 
   return (
     <div style={{ fontFamily: "Inter, Arial, sans-serif", fontSize: 11, color: "#1f2937", background: "#fff", padding: "20px 22px", lineHeight: 1.5 }}>
@@ -39,8 +41,8 @@ export function FactureHTML({ data, apercu = false }: { data: FactureData; aperc
             <div><strong style={{ color: "#1f2937" }}>N° {numero_facture}</strong></div>
             <div>Date : <strong style={{ color: "#1f2937" }}>{date}</strong></div>
           </div>
-          <div style={{ display: "inline-flex", alignItems: "center", gap: 4, background: apercu ? "#fef3c7" : acquittee ? "#d1fae5" : "#ffedd5", color: apercu ? "#92400e" : acquittee ? "#065f46" : "#9a3412", fontSize: 7.5, fontWeight: 800, padding: "2px 8px", borderRadius: 20, marginTop: 4, textTransform: "uppercase" }}>
-            {apercu ? "Aperçu — non enregistrée" : acquittee ? "Facture acquittée" : "Reste à payer"}
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 4, background: apercu ? "#fef3c7" : enLivraison ? "#dbeafe" : acquittee ? "#d1fae5" : "#ffedd5", color: apercu ? "#92400e" : enLivraison ? "#1e3a5f" : acquittee ? "#065f46" : "#9a3412", fontSize: 7.5, fontWeight: 800, padding: "2px 8px", borderRadius: 20, marginTop: 4, textTransform: "uppercase" }}>
+            {apercu ? "Aperçu — non enregistrée" : enLivraison ? "À encaisser à la livraison" : acquittee ? "Facture acquittée" : "Reste à payer"}
           </div>
         </div>
       </div>
@@ -63,6 +65,10 @@ export function FactureHTML({ data, apercu = false }: { data: FactureData; aperc
           {data.vendeur && <>
             <div style={{ fontSize: 7.5, fontWeight: 800, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 3 }}>Vendeur</div>
             <div style={{ fontSize: 9, fontWeight: 600, color: "#1f2937" }}>{data.vendeur}</div>
+          </>}
+          {data.livraison && <>
+            <div style={{ fontSize: 7.5, fontWeight: 800, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.08em", marginTop: 6, marginBottom: 3 }}>{data.livraison.livreurs.length > 1 ? "Livreurs" : "Livreur"}</div>
+            <div style={{ fontSize: 9, fontWeight: 600, color: "#1f2937" }}>{data.livraison.livreurs.join(", ")}</div>
           </>}
         </div>
       </div>
@@ -136,19 +142,23 @@ export function FactureHTML({ data, apercu = false }: { data: FactureData; aperc
           <div style={{ fontSize: 8, fontWeight: 700, color: "#9a3412", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>Compte client</div>
           {compte.argent && (
             <div style={{ marginBottom: compte.casiers.length ? 8 : 0 }}>
-              {([
+              {((enLivraison ? [
+                ["Ancien solde dû", compte.argent.ancien],
+                ["Achat de ce jour", compte.argent.achat],
+              ] : [
                 ["Ancien solde dû", compte.argent.ancien],
                 ["Achat de ce jour", compte.argent.achat],
                 ["Total à payer", compte.argent.total_general],
                 ["Payé", compte.argent.paye],
-              ] as [string, number][]).map(([libelle, val]) => (
+                ...((compte.argent.regle_apres ?? 0) > 0 ? [["Réglé depuis", compte.argent.regle_apres ?? 0]] : []),
+              ]) as [string, number][]).map(([libelle, val]) => (
                 <div key={libelle} style={{ display: "flex", justifyContent: "space-between" }}>
                   <span>{libelle}</span><span>{fmt(val, devise)}</span>
                 </div>
               ))}
               <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4, paddingTop: 4, borderTop: "1px solid #fed7aa", fontWeight: 700, color: "#9a3412" }}>
-                <span>{compte.argent.nouveau >= 0 ? "Reste dû" : "Avoir du client"}</span>
-                <span>{fmt(Math.abs(compte.argent.nouveau), devise)}</span>
+                <span>{enLivraison ? "Total à encaisser" : compte.argent.nouveau >= 0 ? "Reste dû" : "Avoir du client"}</span>
+                <span>{fmt(Math.abs(enLivraison ? compte.argent.total_general : compte.argent.nouveau), devise)}</span>
               </div>
             </div>
           )}
@@ -157,7 +167,7 @@ export function FactureHTML({ data, apercu = false }: { data: FactureData; aperc
               <thead>
                 <tr style={{ color: "#9a3412", fontSize: 8, textTransform: "uppercase" }}>
                   <th style={{ textAlign: "left", paddingBottom: 3, borderBottom: "1px solid #fed7aa" }}>Emballage</th>
-                  {["Dû avant", "Livrés", "Rendus", "Dû après"].map(h => (
+                  {(enLivraison ? ["Dû avant", "Livrés", "Dû en tout"] : ["Dû avant", "Livrés", "Rendus", "Dû après"]).map(h => (
                     <th key={h} style={{ textAlign: "right", paddingBottom: 3, borderBottom: "1px solid #fed7aa" }}>{h}</th>
                   ))}
                 </tr>
@@ -168,13 +178,32 @@ export function FactureHTML({ data, apercu = false }: { data: FactureData; aperc
                     <td style={{ paddingTop: 3 }}>{c.nom}</td>
                     <td style={{ textAlign: "right" }}>{c.avant}</td>
                     <td style={{ textAlign: "right" }}>+{c.livres}</td>
-                    <td style={{ textAlign: "right" }}>−{c.rendus}</td>
+                    {!enLivraison && <td style={{ textAlign: "right" }}>−{c.rendus}</td>}
                     <td style={{ textAlign: "right", fontWeight: 700, color: c.apres > 0 ? "#9a3412" : undefined }}>{c.apres}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           )}
+        </div>
+      )}
+
+      {/* À REMPLIR PAR LE LIVREUR : ce que le client remet, signé sur place */}
+      {enLivraison && (
+        <div style={{ border: "1.5px solid #1e3a5f", borderRadius: 7, padding: "9px 12px", marginBottom: 12, fontSize: 10 }}>
+          <div style={{ fontSize: 8, fontWeight: 700, color: "#1e3a5f", textTransform: "uppercase", letterSpacing: "0.04em" }}>À remplir à la livraison</div>
+          <div style={{ display: "flex", alignItems: "flex-end", marginTop: 8 }}>
+            <strong>Montant reçu</strong><span style={ligneVide} /><span style={{ marginLeft: 4 }}>{devise.symbole}</span>
+          </div>
+          {(compte?.casiers ?? []).map((c, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "flex-end", marginTop: 10 }}>
+              <span>Casiers vides rendus · {c.nom}</span><span style={ligneVide} />
+            </div>
+          ))}
+          <div style={{ display: "flex", gap: 20, marginTop: 18 }}>
+            <div style={{ flex: 1, display: "flex", alignItems: "flex-end" }}><span>Signature du client</span><span style={ligneVide} /></div>
+            <div style={{ flex: 1, display: "flex", alignItems: "flex-end" }}><span>Signature du livreur</span><span style={ligneVide} /></div>
+          </div>
         </div>
       )}
 
@@ -187,7 +216,9 @@ export function FactureHTML({ data, apercu = false }: { data: FactureData; aperc
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 7.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 3 }}>Conditions & mentions légales</div>
             <div style={{ fontSize: 7.5, color: "#6b7280", lineHeight: 1.7 }}>
-              {apercu
+              {enLivraison
+                ? `À encaisser à la livraison : ${fmt(compte?.argent?.total_general ?? total, devise)}. Le livreur note ici l'argent et les casiers reçus.`
+                : apercu
                 ? (acquittee ? "Aperçu : à régler en entier à la validation de la vente." : `Aperçu : resterait dû par le client ${fmt(compte!.argent!.nouveau, devise)}.`)
                 : acquittee
                 ? `Facture acquittée, réglée en espèces le ${date.split(" à")[0]}.`

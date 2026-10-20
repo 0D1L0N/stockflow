@@ -19,6 +19,15 @@ interface VenteDoc {
   montant_paye?: number; reste_du?: number;
   emballages_livres?: Record<string, number>; emballages_rendus?: Record<string, number>;
   solde_avant?: { argent: number; emballages: Record<string, number> };
+  /** Réglé après la vente (argent, casiers) */
+  regle_apres?: number; rendus_apres?: Record<string, number>;
+  livraison?: Livraison | null;
+}
+
+/** Vente livrée chez le client : encaissée au retour du livreur. */
+export interface Livraison {
+  statut: "en_cours" | "livrée"; livreurs: string[];
+  date_cloture?: string | null; cloture_par?: string; recu?: number; casiers_rendus?: Record<string, number>;
 }
 
 /** Champs renvoyés aux pages, comme l'ancienne commande Rust. */
@@ -29,6 +38,8 @@ const resume = (v: VenteDoc) => ({
   montant_paye: v.montant_paye ?? v.total, reste_du: v.reste_du ?? 0,
   emballages_livres: v.emballages_livres ?? {}, emballages_rendus: v.emballages_rendus ?? {},
   solde_avant: v.solde_avant ?? null,
+  regle_apres: v.regle_apres ?? 0, rendus_apres: v.rendus_apres ?? {},
+  livraison: v.livraison ?? null,
   vendeur_nom: (v as { vendeur_nom?: string }).vendeur_nom ?? "",
 });
 
@@ -60,6 +71,13 @@ export const historique: Record<string, Commande> = {
       .sort((a, b) => b.date.localeCompare(a.date))
       .map(resume);
   },
+
+  /** Livraisons pas encore clôturées (toute l'équipe les voit, pour noter le retour du livreur). */
+  get_livraisons: async () =>
+    (await lister<VenteDoc>(query(col("ventes"), where("livraison.statut", "==", "en_cours"))))
+      .filter(v => v.statut === "validée")
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map(resume),
 
   get_vente_details: async ({ venteId }) => {
     const snap = await getDoc(doc(db, "ventes", venteId as Id));
@@ -107,10 +125,12 @@ export const historique: Record<string, Commande> = {
 
     // Annule aussi ce que la vente avait ajouté au compte du client
     // (les ventes antérieures à la gestion des comptes n'ont pas ces champs)
-    const resteDu = v.reste_du ?? 0;
+    // Ce qui a été réglé après coup (regle_apres, rendus_apres) est déjà sorti du compte
+    const resteDu = (v.reste_du ?? 0) - (v.regle_apres ?? 0);
+    const tousRendus = (e: string) => (v.emballages_rendus?.[e] ?? 0) + (v.rendus_apres?.[e] ?? 0);
     const casiers: Record<string, number> = {};
-    for (const e of new Set([...Object.keys(v.emballages_livres ?? {}), ...Object.keys(v.emballages_rendus ?? {})])) {
-      const d = (v.emballages_livres?.[e] ?? 0) - (v.emballages_rendus?.[e] ?? 0);
+    for (const e of new Set([...Object.keys(v.emballages_livres ?? {}), ...Object.keys(v.emballages_rendus ?? {}), ...Object.keys(v.rendus_apres ?? {})])) {
+      const d = (v.emballages_livres?.[e] ?? 0) - tousRendus(e);
       if (d !== 0) casiers[e] = -d;
     }
     const client = await getDoc(doc(db, "clients", v.client_id));
@@ -128,7 +148,7 @@ export const historique: Record<string, Commande> = {
 
     // Les vides que le client avait rapportés ressortent du magasin
     await mouvementsVides(batch,
-      Object.fromEntries(Object.entries(v.emballages_rendus ?? {}).map(([e, n]) => [e, -n])),
+      Object.fromEntries([...new Set([...Object.keys(v.emballages_rendus ?? {}), ...Object.keys(v.rendus_apres ?? {})])].map(e => [e, -((v.emballages_rendus?.[e] ?? 0) + (v.rendus_apres?.[e] ?? 0))])),
       { source: "annulation", reference_id: v.id, commentaire: v.numero_facture });
 
     await ecrire(batch.commit());

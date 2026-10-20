@@ -12,7 +12,7 @@ import {
   assertFails, assertSucceeds, initializeTestEnvironment, type RulesTestEnvironment,
 } from "@firebase/rules-unit-testing";
 import {
-  deleteDoc, doc, getDoc, increment, serverTimestamp, setDoc, updateDoc, writeBatch, type Firestore,
+  collection, deleteDoc, doc, getDoc, getDocs, increment, query, serverTimestamp, setDoc, updateDoc, where, writeBatch, type Firestore,
 } from "firebase/firestore";
 
 let env: RulesTestEnvironment;
@@ -467,5 +467,93 @@ describe("journal des actions", () => {
   it("personne n'efface le journal", async () => {
     await env.withSecurityRulesDisabled(async ctx => { await setDoc(doc(ctx.firestore(), "journal/j0"), { ...entree("admin"), cree_le: null }); });
     await assertFails(deleteDoc(doc(en("admin"), "journal/j0")));
+  });
+});
+
+describe("règlement d'une facture après coup", () => {
+  async function venteACredit() {
+    await env.withSecurityRulesDisabled(async ctx => {
+      await setDoc(doc(ctx.firestore(), "ventes/vc"), { vendeur_uid: "vendeur", client_id: "c1", total: 12000, reste_du: 12000, statut: "validée", format_ids: [] });
+    });
+  }
+  function batchReglement(db: Firestore, uid: string, opts: { venteOp?: string; montant?: number } = {}) {
+    const b = writeBatch(db);
+    b.set(doc(db, "operations_client/or1"), { client_id: "c1", utilisateur_uid: uid, type: "paiement", vente_id: opts.venteOp ?? "vc", cree_le: serverTimestamp() });
+    b.set(doc(db, "clients/c1"), { solde_argent: increment(-(opts.montant ?? 5000)), derniere_operation: "or1" }, { merge: true });
+    b.update(doc(db, "ventes/vc"), { regle_apres: increment(opts.montant ?? 5000), dernier_reglement: "or1" });
+    return b;
+  }
+
+  it("le gérant règle une partie de la facture", async () => {
+    await venteACredit();
+    await assertSucceeds(batchReglement(en("chef"), "chef").commit());
+  });
+
+  it("le magasinier ne règle pas une facture après coup", async () => {
+    await venteACredit();
+    await assertFails(batchReglement(en("vendeur"), "vendeur").commit());
+  });
+
+  it("le règlement doit citer une entrée de journal de cette vente", async () => {
+    await venteACredit();
+    await assertFails(batchReglement(en("chef"), "chef", { venteOp: "autre-vente" }).commit());
+  });
+
+  it("on ne fait pas baisser ce qui a été réglé", async () => {
+    await venteACredit();
+    await assertFails(batchReglement(en("chef"), "chef", { montant: -3000 }).commit());
+  });
+
+  it("ni le total ni les articles ne changent", async () => {
+    await venteACredit();
+    await assertFails(updateDoc(doc(en("chef"), "ventes/vc"), { total: 1 }));
+  });
+});
+
+describe("retour de livraison", () => {
+  async function venteEnLivraison() {
+    await env.withSecurityRulesDisabled(async ctx => {
+      await setDoc(doc(ctx.firestore(), "ventes/vl"), { vendeur_uid: "chef", client_id: "c1", total: 30000, reste_du: 30000, statut: "validée",
+        livraison: { statut: "en_cours", livreurs: ["Ignace", "Herman"], date_cloture: null }, format_ids: [] });
+      await setDoc(doc(ctx.firestore(), "ventes/vc"), { vendeur_uid: "chef", client_id: "c1", total: 12000, reste_du: 12000, statut: "validée", format_ids: [] });
+    });
+  }
+  function batchRetour(db: Firestore, uid: string, opts: { vente?: string; livreurs?: string[]; statut?: string } = {}) {
+    const v = opts.vente ?? "vl";
+    const b = writeBatch(db);
+    b.set(doc(db, "operations_client/ol1"), { client_id: "c1", utilisateur_uid: uid, type: "paiement", vente_id: v, cree_le: serverTimestamp() });
+    b.set(doc(db, "clients/c1"), { solde_argent: increment(-20000), derniere_operation: "ol1" }, { merge: true });
+    b.update(doc(db, `ventes/${v}`), {
+      regle_apres: increment(20000), dernier_reglement: "ol1",
+      "livraison.statut": opts.statut ?? "livrée", "livraison.recu": 20000,
+      ...(opts.livreurs ? { "livraison.livreurs": opts.livreurs } : {}),
+    });
+    return b;
+  }
+
+  it("le magasinier voit les livraisons en cours des autres", async () => {
+    await venteEnLivraison();
+    await assertSucceeds(getDocs(query(collection(en("vendeur"), "ventes"), where("livraison.statut", "==", "en_cours"))));
+  });
+
+  it("le magasinier note le retour du livreur", async () => {
+    await venteEnLivraison();
+    await assertSucceeds(batchRetour(en("vendeur"), "vendeur").commit());
+  });
+
+  it("une vente qui n'est pas une livraison ne se clôt pas ainsi", async () => {
+    await venteEnLivraison();
+    await assertFails(batchRetour(en("vendeur"), "vendeur", { vente: "vc" }).commit());
+  });
+
+  it("on ne change pas les livreurs", async () => {
+    await venteEnLivraison();
+    await assertFails(batchRetour(en("vendeur"), "vendeur", { livreurs: ["Quelqu'un"] }).commit());
+  });
+
+  it("une livraison clôturée ne se rouvre pas", async () => {
+    await venteEnLivraison();
+    await assertSucceeds(batchRetour(en("vendeur"), "vendeur").commit());
+    await assertFails(batchRetour(en("vendeur"), "vendeur", { statut: "en_cours" }).commit());
   });
 });

@@ -2,8 +2,7 @@ import { useState } from "react";
 import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, ShoppingCart, Package, MoreHorizontal, X, Users, RefreshCw, AlertTriangle,
-  History, TrendingUp, Settings, SlidersHorizontal, LogOut, UserCog, Truck, Boxes, ScrollText,
-} from "lucide-react";
+  History, TrendingUp, Settings, SlidersHorizontal, LogOut, UserCog, Truck, Boxes, ScrollText, PackageCheck } from "lucide-react";
 import { useAppStore } from "@/stores/appStore";
 import { useAuthStore } from "@/stores/authStore";
 import { peutAcceder, ROLE_LABELS } from "@/lib/roles";
@@ -27,6 +26,7 @@ export default function BottomNav() {
     { to: "/vente",       icon: t => <ShoppingCart size={t} />,      label: "Vente" },
     { to: "/clients",     icon: t => <Users size={t} />,             label: "Clients" },
     { to: "/produits",    icon: t => <Package size={t} />,           label: "Produits" },
+    { to: "/livraisons",  icon: t => <PackageCheck size={t} />,      label: "Livraisons" },
     { to: "/historique",  icon: t => <History size={t} />,           label: "Historique" },
     { to: "/alertes",     icon: t => <AlertTriangle size={t} />,     label: "Alertes", badge: nombreAlertes },
     { to: "/reappro",     icon: t => <RefreshCw size={t} />,         label: "Réappro" },

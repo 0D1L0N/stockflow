@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { XCircle, Filter, Printer, Download, Loader, History, Receipt } from "lucide-react";
+import { XCircle, Filter, Printer, Download, Loader, History, Receipt, Wallet } from "lucide-react";
 import Pastilles from "@/components/ui/Pastilles";
 import EtatVide from "@/components/ui/EtatVide";
 import Avatar from "@/components/ui/Avatar";
@@ -18,13 +18,33 @@ import { prepareVenteData, downloadFacture, printFacture, type ParametresRaw } f
 import { volumeFr } from "@/lib/format";
 import { useTempsReel } from "@/lib/tempsReel";
 import { usePeut } from "@/lib/droits";
+import { useNavigate } from "react-router-dom";
 
 interface Vente {
   id: string; numero_facture: string; date: string | null;
   client_id: string; client_nom: string | null;
   total: number; montant_recu: number | null; monnaie_rendue: number | null; statut: string;
   reste_du?: number;
+  emballages_livres?: Record<string, number>; emballages_rendus?: Record<string, number>;
+  /** Réglé après la vente (argent, casiers) */
+  regle_apres?: number; rendus_apres?: Record<string, number>;
+  livraison?: { statut: string; livreurs: string[] } | null;
 }
+const enLivraison = (v: Vente) => v.statut === "validée" && v.livraison?.statut === "en_cours";
+
+/** Ce qu'il reste à payer sur la facture, après les règlements faits depuis. */
+const resteArgent = (v: Vente) => v.statut === "validée" ? Math.max(0, (v.reste_du ?? 0) - (v.regle_apres ?? 0)) : 0;
+/** Casiers encore dus sur la facture, par type d'emballage. */
+function casiersDus(v: Vente): Record<string, number> {
+  if (v.statut !== "validée") return {};
+  const dus: Record<string, number> = {};
+  for (const [e, n] of Object.entries(v.emballages_livres ?? {})) {
+    const d = n - (v.emballages_rendus?.[e] ?? 0) - (v.rendus_apres?.[e] ?? 0);
+    if (d > 0) dus[e] = d;
+  }
+  return dus;
+}
+const totalCasiers = (c: Record<string, number>) => Object.values(c).reduce((t, n) => t + n, 0);
 interface DetailVente { casier?: number | null;
   id: string; vente_id: string; format_id: string;
   produit_nom: string | null; volume: number | null; unite: string | null;
@@ -48,6 +68,7 @@ export default function HistoriqueVentes() {
   const formatPrix = formatMontant;
   const [ventes, setVentes] = useState<Vente[]>([]);
   const [statut, setStatut] = useState<"toutes" | "payees" | "credit" | "annulees">("toutes");
+  const [comptoirId, setComptoirId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [dateDebut, setDateDebut] = useState("");
   const [dateFin, setDateFin] = useState("");
@@ -59,6 +80,14 @@ export default function HistoriqueVentes() {
   const [modalOpen, setModalOpen] = useState(false);
   const [annulerLoading, setAnnulerLoading] = useState(false);
   const peutAnnuler = usePeut("annuler");
+
+  // Règlement après coup (gérant, admin) : l'argent et les casiers remis plus tard sur cette facture
+  const peutRegler = usePeut("clients");
+  const navigate = useNavigate();
+  const [regler, setRegler] = useState<Vente | null>(null);
+  const [reglerMontant, setReglerMontant] = useState("");
+  const [reglerCasiers, setReglerCasiers] = useState<Record<string, string>>({});
+  const [reglerLoading, setReglerLoading] = useState(false);
 
   // Modal réimpression
   const [factureData, setFactureData] = useState<FactureData | null>(null);
@@ -83,6 +112,8 @@ export default function HistoriqueVentes() {
   useEffect(() => {
     load();
     invoke<ParametresRaw>("get_parametres").then(setParametres);
+    invoke<{ id: string; est_defaut?: number }[]>("get_clients")
+      .then(l => setComptoirId(l.find(c => c.est_defaut === 1)?.id ?? null)).catch(() => {});
     invoke<{ id: string; nom: string }[]>("get_emballages")
       .then(l => setNomsEmballages(Object.fromEntries(l.map(e => [e.id, e.nom])))).catch(() => {});
   }, []);
@@ -124,6 +155,26 @@ export default function HistoriqueVentes() {
     setAnnulerLoading(false);
   };
 
+  const ouvrirRegler = (v: Vente) => {
+    setReglerMontant(String(resteArgent(v) || ""));
+    setReglerCasiers(Object.fromEntries(Object.entries(casiersDus(v)).map(([e, n]) => [e, String(n)])));
+    setModalOpen(false);
+    setRegler(v);
+  };
+
+  const validerReglement = async () => {
+    if (!regler) return;
+    setReglerLoading(true);
+    try {
+      const emballages = Object.fromEntries(Object.entries(reglerCasiers).map(([e, n]) => [e, parseInt(n) || 0]));
+      await invoke("regler_vente", { venteId: regler.id, montant: parseFloat(reglerMontant) || 0, emballages });
+      toast(`Règlement enregistré sur ${regler.numero_facture}`, "success");
+      setRegler(null);
+      await load(dateDebut, dateFin, true);
+    } catch (e) { toast(e instanceof Error ? e.message : String(e), "error"); }
+    setReglerLoading(false);
+  };
+
   const handleImprimer = async () => {
     if (!factureData) return;
     setPdfLoading(true);
@@ -139,7 +190,8 @@ export default function HistoriqueVentes() {
   };
 
   const nbValidees = ventes.filter(v => v.statut === "validée").length;
-  const estCredit = (v: Vente) => v.statut === "validée" && (v.reste_du ?? 0) > 0;
+  // « À encaisser » : il reste de l'argent ou des casiers dus sur la facture (hors comptoir)
+  const estCredit = (v: Vente) => v.client_id !== comptoirId && (resteArgent(v) > 0 || totalCasiers(casiersDus(v)) > 0);
   const nbCredit = ventes.filter(estCredit).length;
   const nbAnnulees = ventes.filter(v => v.statut !== "validée").length;
   const ventesAffichees = ventes.filter(v =>
@@ -155,7 +207,7 @@ export default function HistoriqueVentes() {
         chiffres={loading ? undefined : [
           { label: "Ventes", valeur: nbValidees },
           { label: "Montant total", valeur: formatPrix(totalJour), ton: "succes" },
-          { label: "À crédit", valeur: nbCredit, ton: nbCredit > 0 ? "alerte" : "neutre" },
+          { label: "À encaisser", valeur: nbCredit, ton: nbCredit > 0 ? "alerte" : "neutre" },
           { label: "Annulées", valeur: nbAnnulees, ton: nbAnnulees > 0 ? "danger" : "neutre" },
         ]} />
 
@@ -181,7 +233,7 @@ export default function HistoriqueVentes() {
         <Pastilles valeur={statut} onChange={setStatut} options={[
           { valeur: "toutes", label: "Toutes", compte: ventes.length },
           { valeur: "payees", label: "Payées", compte: nbValidees - nbCredit },
-          { valeur: "credit", label: "À crédit", compte: nbCredit },
+          { valeur: "credit", label: "À encaisser", compte: nbCredit },
           { valeur: "annulees", label: "Annulées", compte: nbAnnulees },
         ]} />
 
@@ -194,7 +246,8 @@ export default function HistoriqueVentes() {
           <Card padding="none" className="overflow-hidden divide-y divide-slate-100">
             {ventesAffichees.map(v => {
               const annulee = v.statut !== "validée";
-              const credit = !annulee && (v.reste_du ?? 0) > 0;
+              const reste = v.client_id !== comptoirId ? resteArgent(v) : 0;
+              const dus = v.client_id !== comptoirId ? totalCasiers(casiersDus(v)) : 0;
               return (
                 <div key={v.id} onClick={() => openDetail(v)}
                   className="flex items-center gap-3 px-4 py-3.5 cursor-pointer hover:bg-slate-50 active:bg-slate-100 transition-colors">
@@ -213,8 +266,13 @@ export default function HistoriqueVentes() {
                         <span className="font-mono">{v.numero_facture}</span> · {dateCourte(v.date)}
                       </span>
                       {annulee ? <Badge variant="danger">Annulée</Badge>
-                        : credit ? <Badge variant="warning">Crédit</Badge>
-                        : <Badge variant="success">Payée</Badge>}
+                        : enLivraison(v) ? <Badge variant="info">En livraison · {v.livraison?.livreurs.join(", ")}</Badge>
+                        : reste > 0 || dus > 0 ? (
+                          <span className="flex gap-1 flex-shrink-0">
+                            {reste > 0 && <Badge variant="warning">Reste {formatPrix(reste)}</Badge>}
+                            {dus > 0 && <Badge variant="info">{dus} {dus > 1 ? "casiers dus" : "casier dû"}</Badge>}
+                          </span>
+                        ) : <Badge variant="success">Payée</Badge>}
                     </div>
                   </div>
                   {!annulee && (
@@ -237,6 +295,11 @@ export default function HistoriqueVentes() {
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div><span className="text-gray-500">Client : </span><span className="font-medium">{detail.vente.client_nom}</span></div>
               <div><span className="text-gray-500">Date : </span><span className="font-medium">{formatDate(detail.vente.date)}</span></div>
+              {detail.vente.livraison && (
+                <div className="col-span-2"><span className="text-gray-500">Livraison : </span>
+                  <span className="font-medium">{detail.vente.livraison.livreurs.join(", ")} · {enLivraison(detail.vente) ? "en cours" : "livrée"}</span>
+                </div>
+              )}
               <div><span className="text-gray-500">Statut : </span>
                 <Badge variant={detail.vente.statut === "validée" ? "success" : "danger"}>{detail.vente.statut}</Badge>
               </div>
@@ -268,7 +331,31 @@ export default function HistoriqueVentes() {
               <span className="font-extrabold text-xl text-primary">{formatPrix(detail.vente.total)}</span>
             </div>
 
-            <div className="flex gap-2">
+            {detail.vente.client_id !== comptoirId && (resteArgent(detail.vente) > 0 || totalCasiers(casiersDus(detail.vente)) > 0 || (detail.vente.regle_apres ?? 0) > 0) && (
+              <div className="flex flex-col gap-1 bg-orange-50 rounded-xl px-3 py-2.5 text-sm text-orange-900">
+                {(detail.vente.regle_apres ?? 0) > 0 && (
+                  <div className="flex justify-between"><span>Réglé après la vente</span><span className="font-semibold">{formatPrix(detail.vente.regle_apres ?? 0)}</span></div>
+                )}
+                {resteArgent(detail.vente) > 0 && (
+                  <div className="flex justify-between font-bold"><span>Reste à payer</span><span>{formatPrix(resteArgent(detail.vente))}</span></div>
+                )}
+                {Object.entries(casiersDus(detail.vente)).map(([e, n]) => (
+                  <div key={e} className="flex justify-between"><span>{nomsEmballages[e] ?? "Casiers"} dus</span><span className="font-semibold">{n}</span></div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex flex-wrap gap-2">
+              {enLivraison(detail.vente) && (
+                <Button size="sm" icon={<Wallet size={14} />} onClick={() => { setModalOpen(false); navigate("/livraisons"); }}>
+                  Noter le retour du livreur
+                </Button>
+              )}
+              {peutRegler && !enLivraison(detail.vente) && detail.vente.client_id !== comptoirId && (resteArgent(detail.vente) > 0 || totalCasiers(casiersDus(detail.vente)) > 0) && (
+                <Button size="sm" icon={<Wallet size={14} />} onClick={() => ouvrirRegler(detail.vente)}>
+                  Régler
+                </Button>
+              )}
               {detail.vente.statut === "validée" && (
                 <Button variant="secondary" size="sm" icon={<Printer size={14} />}
                   onClick={() => { setModalOpen(false); openReimprimer(detail.vente); }}>
@@ -281,6 +368,51 @@ export default function HistoriqueVentes() {
                 </Button>
               )}
             </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Règlement après coup */}
+      <Modal isOpen={!!regler} onClose={() => setRegler(null)} title={regler ? `Régler ${regler.numero_facture}` : ""} size="md">
+        {regler && (
+          <div className="p-4 sm:p-6 flex flex-col gap-4">
+            <div className="text-sm text-gray-600">{regler.client_nom} · facture du {formatDate(regler.date)}</div>
+            {resteArgent(regler) > 0 && (
+              <section className="flex flex-col gap-2">
+                <div className="flex justify-between items-baseline">
+                  <label className="text-[13px] font-bold uppercase tracking-wide text-ink-600">Argent remis</label>
+                  <span className="text-xs text-gray-500">reste {formatPrix(resteArgent(regler))}</span>
+                </div>
+                <div className="relative">
+                  <input type="number" inputMode="numeric" min="0" max={resteArgent(regler)} value={reglerMontant}
+                    onChange={e => setReglerMontant(e.target.value)} aria-label="Argent remis"
+                    className="w-full h-14 rounded-xl border border-slate-300 px-4 pr-16 text-xl font-bold focus:outline-none focus:border-secondary" />
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-gray-400 font-semibold">{symbole}</span>
+                </div>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => setReglerMontant(String(resteArgent(regler)))}
+                    className="h-10 px-3 rounded-full text-[13px] font-semibold border bg-white text-gray-700 border-slate-300">Tout le reste</button>
+                  <button type="button" onClick={() => setReglerMontant("0")}
+                    className="h-10 px-3 rounded-full text-[13px] font-semibold border bg-white text-gray-700 border-slate-300">Rien</button>
+                </div>
+              </section>
+            )}
+            {Object.keys(casiersDus(regler)).length > 0 && (
+              <section className="flex flex-col gap-2">
+                <label className="text-[13px] font-bold uppercase tracking-wide text-ink-600">Casiers vides rendus</label>
+                {Object.entries(casiersDus(regler)).map(([e, n]) => (
+                  <div key={e} className="flex items-center justify-between gap-3">
+                    <span className="text-sm text-gray-700">{nomsEmballages[e] ?? "Casiers"} <span className="text-gray-400">({n} {n > 1 ? "dus" : "dû"})</span></span>
+                    <input type="number" inputMode="numeric" min="0" max={n} value={reglerCasiers[e] ?? ""}
+                      onChange={ev => setReglerCasiers(c => ({ ...c, [e]: ev.target.value }))} aria-label={`Casiers ${nomsEmballages[e] ?? ""} rendus`}
+                      className="w-24 h-11 rounded-xl border border-slate-300 px-3 text-lg font-bold text-center focus:outline-none focus:border-secondary" />
+                  </div>
+                ))}
+              </section>
+            )}
+            <Button onClick={validerReglement} loading={reglerLoading} icon={<Wallet size={15} />}>
+              Enregistrer le règlement
+            </Button>
           </div>
         )}
       </Modal>

@@ -17,6 +17,7 @@ import Casiers from "@/pages/Casiers";
 import Journal from "@/pages/Journal";
 import Utilisateurs from "@/pages/Utilisateurs";
 import Fournisseurs from "@/pages/Fournisseurs";
+import Livraisons from "@/pages/Livraisons";
 import { useAppStore } from "@/stores/appStore";
 import { useAuthStore } from "@/stores/authStore";
 import { peutAcceder, routeAccueil } from "@/lib/roles";
@@ -34,6 +35,7 @@ const ROUTES: { path: string; element: ReactNode }[] = [
   { path: "/produits",   element: <Produits /> },
   { path: "/clients",    element: <Clients /> },
   { path: "/historique", element: <HistoriqueVentes /> },
+  { path: "/livraisons", element: <Livraisons /> },
   { path: "/reappro",    element: <Reappro /> },
   { path: "/fournisseurs", element: <Fournisseurs /> },
   { path: "/alertes",    element: <Alertes /> },

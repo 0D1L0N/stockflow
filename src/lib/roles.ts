@@ -68,6 +68,7 @@ export const ROUTE_ROLES: Record<string, Role[]> = {
   "/produits":     TOUS,
   "/clients":      RESPONSABLES,
   "/historique":   TOUS,
+  "/livraisons":   TOUS,
   "/reappro":      TOUS,
   "/fournisseurs": TOUS,
   "/casiers":      TOUS,

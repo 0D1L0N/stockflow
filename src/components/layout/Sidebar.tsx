@@ -1,8 +1,7 @@
 import { NavLink } from "react-router-dom";
 import {
   LayoutDashboard, ShoppingCart, Package, Users,
-  RefreshCw, AlertTriangle, History, TrendingUp, Settings, SlidersHorizontal, LogOut, UserCog, Truck, Boxes, ScrollText,
-} from "lucide-react";
+  RefreshCw, AlertTriangle, History, TrendingUp, Settings, SlidersHorizontal, LogOut, UserCog, Truck, Boxes, ScrollText, PackageCheck } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
 import { peutAcceder, ROLE_LABELS } from "@/lib/roles";
 import Logo from "./Logo";
@@ -28,6 +27,7 @@ export default function Sidebar({ alertCount = 0 }: SidebarProps) {
         { to: "/",           icon: <LayoutDashboard size={18} />, label: "Tableau de bord" },
         { to: "/vente",      icon: <ShoppingCart    size={18} />, label: "Nouvelle vente" },
         { to: "/historique", icon: <History         size={18} />, label: "Historique des ventes" },
+        { to: "/livraisons", icon: <PackageCheck    size={18} />, label: "Livraisons" },
         { to: "/clients",    icon: <Users           size={18} />, label: "Clients" },
       ],
     },

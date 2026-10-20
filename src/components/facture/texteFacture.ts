@@ -3,6 +3,7 @@ import type { FactureData } from "./FacturePDF";
 /** Mode de paiement réel : comptant, paiement partiel ou à crédit. */
 export function modePaiement(data: FactureData): string {
   const a = data.compte?.argent;
+  if (data.livraison?.ouverte) return "À la livraison";
   if (!a || a.nouveau <= 0) return "Espèces";
   return a.paye > 0 ? "Espèces · paiement partiel" : "À crédit";
 }

@@ -13,6 +13,9 @@ export interface VenteRaw {
   emballages_livres?: Record<string, number>; emballages_rendus?: Record<string, number>;
   solde_avant?: { argent: number; emballages: Record<string, number> } | null;
   vendeur_nom?: string;
+  /** Réglé après la vente (argent, casiers) : la réimpression montre l'état à jour */
+  regle_apres?: number; rendus_apres?: Record<string, number>;
+  livraison?: { statut: string; livreurs: string[] } | null;
 }
 
 export interface DetailRaw { casier?: number | null;
@@ -79,11 +82,13 @@ export function prepareVenteData(
     },
     devise,
     vendeur: vente.vendeur_nom || undefined,
+    livraison: vente.livraison ? { livreurs: vente.livraison.livreurs, ouverte: vente.livraison.statut === "en_cours" } : null,
     // Réimpression : la vente garde les soldes du client tels qu'ils étaient avant elle
     compte: construireCompte({
       total: vente.total, montant_paye: vente.montant_paye ?? vente.total,
       emballages_livres: vente.emballages_livres ?? {}, emballages_rendus: vente.emballages_rendus ?? {},
       solde_avant: vente.solde_avant ?? null,
+      regle_apres: vente.regle_apres ?? 0, rendus_apres: vente.rendus_apres ?? {},
     }, nomEmballage),
   };
 }
@@ -184,21 +189,25 @@ export function construireCompte(
     total: number; montant_paye: number;
     emballages_livres: Record<string, number>; emballages_rendus: Record<string, number>;
     solde_avant?: { argent: number; emballages: Record<string, number> } | null;
+    regle_apres?: number; rendus_apres?: Record<string, number>;
   },
   nomEmballage: (id: string) => string,
 ): FactureCompte | null {
   const ancien = v.solde_avant?.argent ?? 0;
+  const apres = v.regle_apres ?? 0;
   const argent = ancien !== 0 || v.montant_paye !== v.total
-    ? { ancien, achat: v.total, total_general: ancien + v.total, paye: v.montant_paye, nouveau: ancien + v.total - v.montant_paye }
+    ? { ancien, achat: v.total, total_general: ancien + v.total, paye: v.montant_paye, regle_apres: apres, nouveau: ancien + v.total - v.montant_paye - apres }
     : null;
+  const rendusApres = v.rendus_apres ?? {};
 
   const avant = v.solde_avant?.emballages ?? {};
   const types = [...new Set([
-    ...Object.keys(v.emballages_livres), ...Object.keys(v.emballages_rendus),
+    ...Object.keys(v.emballages_livres), ...Object.keys(v.emballages_rendus), ...Object.keys(rendusApres),
     ...Object.keys(avant).filter(e => avant[e] !== 0),
   ])];
   const casiers = types.map(e => {
-    const a = avant[e] ?? 0, l = v.emballages_livres[e] ?? 0, r = v.emballages_rendus[e] ?? 0;
+    // Les casiers rendus après la vente comptent avec ceux rendus sur place
+    const a = avant[e] ?? 0, l = v.emballages_livres[e] ?? 0, r = (v.emballages_rendus[e] ?? 0) + (rendusApres[e] ?? 0);
     // Au comptoir (pas de solde) on ne garde pas de casiers « en trop »
     return { nom: nomEmballage(e), avant: a, livres: l, rendus: r, apres: v.solde_avant ? a + l - r : Math.max(0, l - r) };
   });

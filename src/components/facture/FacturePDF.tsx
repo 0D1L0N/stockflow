@@ -33,12 +33,15 @@ export interface FactureData {
   vendeur?: string;
   /** Paiement partiel, casiers et soldes du client (absent pour un client de comptoir) */
   compte?: FactureCompte | null;
+  /** Vente livrée : ouverte = le livreur part avec la facture et note dessus ce que le client remet */
+  livraison?: { livreurs: string[]; ouverte: boolean } | null;
 }
 
 /** L'addition du compte client : ce qu'il devait + cette facture − ce qu'il a réglé = ce qu'il doit. */
 export interface FactureCompte {
   /** null quand il n'y a rien à signaler (achat payé comptant, aucune dette) */
-  argent: { ancien: number; achat: number; total_general: number; paye: number; nouveau: number } | null;
+  /** regle_apres : payé après la vente, sur cette facture (réimpression) */
+  argent: { ancien: number; achat: number; total_general: number; paye: number; regle_apres?: number; nouveau: number } | null;
   casiers: { nom: string; avant: number; livres: number; rendus: number; apres: number }[];
 }
 
@@ -132,8 +135,10 @@ const s = StyleSheet.create({
 
 export function FacturePDF({ data }: { data: FactureData }) {
   const { numero_facture, date, client, items, total, montant_recu, monnaie_rendue, commerce, devise, compte } = data;
-  const acquittee = !compte?.argent || compte.argent.nouveau <= 0;
+  const enLivraison = !!data.livraison?.ouverte;
+  const acquittee = !enLivraison && (!compte?.argent || compte.argent.nouveau <= 0);
   const logoInitials = initials(commerce.nom);
+  const ligneVide = { borderBottomWidth: 1, borderBottomColor: C.text, borderStyle: "dotted" as const, flex: 1, marginLeft: 8, height: 14 };
   const telClient = telephoneFr(client.telephone) ?? "";
 
   return (
@@ -158,7 +163,7 @@ export function FacturePDF({ data }: { data: FactureData }) {
               Date : <Text style={s.invoiceMetaBold}>{date}</Text>
             </Text>
             <View style={acquittee ? s.badge : [s.badge, { backgroundColor: "#ffedd5" }]}>
-              <Text style={acquittee ? s.badgeText : [s.badgeText, { color: "#9a3412" }]}>{acquittee ? "Facture acquittée" : "Reste à payer"}</Text>
+              <Text style={acquittee ? s.badgeText : [s.badgeText, { color: "#9a3412" }]}>{enLivraison ? "À encaisser à la livraison" : acquittee ? "Facture acquittée" : "Reste à payer"}</Text>
             </View>
           </View>
         </View>
@@ -184,6 +189,10 @@ export function FacturePDF({ data }: { data: FactureData }) {
             {data.vendeur ? <>
               <Text style={s.clientLabel}>Vendeur</Text>
               <Text style={{ fontSize: 8.5, fontFamily: "Inter", fontWeight: 700, color: C.text }}>{data.vendeur}</Text>
+            </> : null}
+            {data.livraison ? <>
+              <Text style={[s.clientLabel, { marginTop: 6 }]}>{data.livraison.livreurs.length > 1 ? "Livreurs" : "Livreur"}</Text>
+              <Text style={{ fontSize: 8.5, fontFamily: "Inter", fontWeight: 700, color: C.text }}>{data.livraison.livreurs.join(", ")}</Text>
             </> : null}
           </View>
         </View>
@@ -251,27 +260,31 @@ export function FacturePDF({ data }: { data: FactureData }) {
             <Text style={[s.clientLabel, { color: "#9a3412" }]}>Compte client</Text>
             {compte.argent && (
               <View style={{ marginBottom: compte.casiers.length ? 8 : 0 }}>
-                {[
+                {(enLivraison ? [
+                  ["Ancien solde dû", compte.argent.ancien],
+                  ["Achat de ce jour", compte.argent.achat],
+                ] : [
                   ["Ancien solde dû", compte.argent.ancien],
                   ["Achat de ce jour", compte.argent.achat],
                   ["Total à payer", compte.argent.total_general],
                   ["Payé", compte.argent.paye],
-                ].map(([libelle, val]) => (
+                  ...((compte.argent.regle_apres ?? 0) > 0 ? [["Réglé depuis", compte.argent.regle_apres ?? 0]] : []),
+                ]).map(([libelle, val]) => (
                   <View key={libelle as string} style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 2 }}>
                     <Text style={s.tableCellText}>{libelle}</Text>
                     <Text style={s.tableCellText}>{formatMontant(val as number, devise)}</Text>
                   </View>
                 ))}
                 <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 4, paddingTop: 4, borderTopWidth: 1, borderTopColor: "#fed7aa" }}>
-                  <Text style={[s.totalsVal, { color: "#9a3412" }]}>{compte.argent.nouveau >= 0 ? "Reste dû" : "Avoir du client"}</Text>
-                  <Text style={[s.totalsVal, { color: "#9a3412" }]}>{formatMontant(Math.abs(compte.argent.nouveau), devise)}</Text>
+                  <Text style={[s.totalsVal, { color: "#9a3412" }]}>{enLivraison ? "Total à encaisser" : compte.argent.nouveau >= 0 ? "Reste dû" : "Avoir du client"}</Text>
+                  <Text style={[s.totalsVal, { color: "#9a3412" }]}>{formatMontant(Math.abs(enLivraison ? compte.argent.total_general : compte.argent.nouveau), devise)}</Text>
                 </View>
               </View>
             )}
             {compte.casiers.length > 0 && (
               <View>
                 <View style={{ flexDirection: "row", borderBottomWidth: 1, borderBottomColor: "#fed7aa", paddingBottom: 3 }}>
-                  {["Emballage", "Dû avant", "Livrés", "Rendus", "Dû après"].map((h, i) => (
+                  {(enLivraison ? ["Emballage", "Dû avant", "Livrés", "Dû en tout"] : ["Emballage", "Dû avant", "Livrés", "Rendus", "Dû après"]).map((h, i) => (
                     <Text key={h} style={[s.clientLabel, { color: "#9a3412", marginBottom: 0 }, i === 0 ? { flex: 1 } : { width: 55, textAlign: "right" }]}>{h}</Text>
                   ))}
                 </View>
@@ -280,12 +293,31 @@ export function FacturePDF({ data }: { data: FactureData }) {
                     <Text style={[s.tableCellText, { flex: 1 }]}>{c.nom}</Text>
                     <Text style={[s.tableCellText, { width: 55, textAlign: "right" }]}>{c.avant}</Text>
                     <Text style={[s.tableCellText, { width: 55, textAlign: "right" }]}>+{c.livres}</Text>
-                    <Text style={[s.tableCellText, { width: 55, textAlign: "right" }]}>−{c.rendus}</Text>
+                    {!enLivraison && <Text style={[s.tableCellText, { width: 55, textAlign: "right" }]}>−{c.rendus}</Text>}
                     <Text style={[s.totalsVal, { width: 55, textAlign: "right", color: c.apres > 0 ? "#9a3412" : C.text }]}>{c.apres}</Text>
                   </View>
                 ))}
               </View>
             )}
+          </View>
+        )}
+
+        {/* À REMPLIR PAR LE LIVREUR : ce que le client remet, signé sur place */}
+        {enLivraison && (
+          <View wrap={false} style={{ borderWidth: 1.5, borderColor: C.primary, borderRadius: 7, padding: 10, marginBottom: 14 }}>
+            <Text style={[s.clientLabel, { color: C.primary }]}>À remplir à la livraison</Text>
+            <View style={{ flexDirection: "row", alignItems: "flex-end", marginTop: 8 }}>
+              <Text style={s.totalsVal}>Montant reçu</Text><View style={ligneVide} /><Text style={[s.tableCellText, { marginLeft: 4 }]}>{devise.symbole}</Text>
+            </View>
+            {(compte?.casiers ?? []).map((c, i) => (
+              <View key={i} style={{ flexDirection: "row", alignItems: "flex-end", marginTop: 10 }}>
+                <Text style={s.tableCellText}>Casiers vides rendus · {c.nom}</Text><View style={ligneVide} />
+              </View>
+            ))}
+            <View style={{ flexDirection: "row", marginTop: 18, gap: 20 }}>
+              <View style={{ flex: 1, flexDirection: "row", alignItems: "flex-end" }}><Text style={s.tableCellText}>Signature du client</Text><View style={ligneVide} /></View>
+              <View style={{ flex: 1, flexDirection: "row", alignItems: "flex-end" }}><Text style={s.tableCellText}>Signature du livreur</Text><View style={ligneVide} /></View>
+            </View>
           </View>
         )}
 
@@ -296,7 +328,9 @@ export function FacturePDF({ data }: { data: FactureData }) {
             <View style={{ flex: 1 }}>
               <Text style={s.legalTitle}>Conditions & mentions légales</Text>
               <Text style={s.legalText}>
-                {acquittee
+                {enLivraison
+                  ? `À encaisser à la livraison : ${formatMontant(compte?.argent?.total_general ?? total, devise)}. Le livreur note ici l'argent et les casiers reçus.`
+                  : acquittee
                   ? `Facture acquittée, réglée en espèces le ${date.split(" à")[0]}.`
                   : `Reste dû par le client : ${formatMontant(compte!.argent!.nouveau, devise)}.`}{"\n"}
                 Aucun échange ni remboursement après validation de la vente.{"\n"}
