@@ -9,7 +9,7 @@ import { mouvementsVides } from "./casiers";
 export interface SoldesClient { solde_argent: number; emballages_dus: Record<string, number>; }
 
 interface Operation {
-  id: Id; client_id: Id; type: "vente" | "paiement" | "retour_emballages" | "annulation";
+  id: Id; client_id: Id; type: "vente" | "paiement" | "retour_emballages" | "annulation" | "dette";
   montant: number; emballages: Record<string, number>; date: string;
 }
 
@@ -176,6 +176,32 @@ export const comptes: Record<string, Commande> = {
       "livraison.casiers_rendus": retour,
     });
     await mouvementsVides(batch, retour, { source: "retour client", reference_id: op.id, commentaire: `${client.nom} · ${v.numero_facture} (livraison)` });
+    await ecrire(batch.commit());
+    return soldes;
+  },
+
+  /**
+   * Dette enregistrée sans vente (gérant, admin) : reprise d'un ancien cahier, prêt de casiers…
+   * Le motif est obligatoire ; l'entrée « dette » du journal client en garde la trace.
+   */
+  ajouter_dette: async ({ clientId, montant, emballages, commentaire }) => {
+    const motif = String(commentaire ?? "").trim();
+    if (motif.length < 3) throw new Error("Indiquez le motif de la dette (ex. : reprise de l'ancien cahier).");
+    const client = await lireClient(clientId as Id);
+    if (client.est_defaut === 1) throw new Error("Choisissez un client nommé.");
+    const m = Math.round(Number(montant) || 0);
+    if (m < 0) throw new Error("Le montant ne peut pas être négatif.");
+    const casiers: Record<string, number> = {};
+    for (const [e, n] of Object.entries((emballages ?? {}) as Record<string, number>)) {
+      const q = Math.trunc(Number(n) || 0);
+      if (q < 0) throw new Error("Quantité de casiers invalide.");
+      if (q > 0) casiers[e] = q;
+    }
+    if (m === 0 && Object.keys(casiers).length === 0) throw new Error("Indiquez un montant ou des casiers dus.");
+    const batch = writeBatch(db);
+    const op = nouvelleOperation();
+    const soldes = appliquerAuCompte(batch, clientId as Id, client, m, casiers, op.id);
+    trace(batch, op, clientId as Id, client.nom, { type: "dette", montant: m, emballages: casiers, commentaire: motif });
     await ecrire(batch.commit());
     return soldes;
   },

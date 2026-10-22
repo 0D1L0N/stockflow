@@ -161,6 +161,7 @@ service cloud.firestore {
       allow read: if responsable();
       allow create: if equipe()
         && request.resource.data.utilisateur_uid == request.auth.uid
+        && (request.resource.data.type != 'dette' || responsable())
         && horodate();
       allow update, delete: if false;
     }

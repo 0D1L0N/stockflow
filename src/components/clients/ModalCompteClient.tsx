@@ -1,5 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Wallet, Package2, ShoppingCart, XCircle, Minus, Plus } from "lucide-react";
+import { Wallet, Package2, ShoppingCart, XCircle, Minus, Plus, FilePlus2 } from "lucide-react";
+import { usePeut } from "@/lib/droits";
+import { useCatalogueStore } from "@/stores/catalogueStore";
 import { invoke } from "@/lib/db";
 import { useToast } from "@/components/ui/Toast";
 import { useAppStore } from "@/stores/appStore";
@@ -14,7 +16,7 @@ export interface ClientCompte {
 }
 
 interface Operation {
-  id: string; type: "vente" | "paiement" | "retour_emballages" | "annulation";
+  id: string; type: "vente" | "paiement" | "retour_emballages" | "annulation" | "dette";
   montant: number; emballages: Record<string, number>;
   numero_facture: string | null; commentaire: string | null;
   date: string; utilisateur_nom: string;
@@ -25,6 +27,7 @@ const LIBELLES: Record<Operation["type"], { texte: string; icone: ReactNode }> =
   paiement: { texte: "Paiement", icone: <Wallet size={13} /> },
   retour_emballages: { texte: "Retour de casiers", icone: <Package2 size={13} /> },
   annulation: { texte: "Annulation de vente", icone: <XCircle size={13} /> },
+  dette: { texte: "Dette ajoutée", icone: <FilePlus2 size={13} /> },
 };
 
 interface Props {
@@ -45,6 +48,13 @@ export default function ModalCompteClient({ client, nomEmballage, onClose, onCha
   const [montant, setMontant] = useState("");
   const [retours, setRetours] = useState<Record<string, string>>({});
   const [envoi, setEnvoi] = useState(false);
+  // Dette sans vente (gérant, admin) : ancien cahier, prêt de casiers…
+  const peutDette = usePeut("clients");
+  const typesCasiers = useCatalogueStore(s => s.emballages);
+  const [detteOuverte, setDetteOuverte] = useState(false);
+  const [detteMontant, setDetteMontant] = useState("");
+  const [detteCasiers, setDetteCasiers] = useState<Record<string, string>>({});
+  const [detteMotif, setDetteMotif] = useState("");
 
   const chargerJournal = async (id: string) => {
     setLoading(true);
@@ -57,6 +67,7 @@ export default function ModalCompteClient({ client, nomEmballage, onClose, onCha
     if (!client) return;
     setSoldes({ argent: client.solde_argent ?? 0, casiers: client.emballages_dus ?? {} });
     setMontant(""); setRetours({});
+    setDetteOuverte(false); setDetteMontant(""); setDetteCasiers({}); setDetteMotif("");
     chargerJournal(client.id);
   }, [client?.id]);
 
@@ -90,6 +101,18 @@ export default function ModalCompteClient({ client, nomEmballage, onClose, onCha
     } catch (e) { toast(String(e), "error"); }
     setEnvoi(false);
   };
+
+  const enregistrerDette = async () => {
+    const emballages = Object.fromEntries(Object.entries(detteCasiers).map(([e, v]) => [e, parseInt(v) || 0]));
+    setEnvoi(true);
+    try {
+      appliquer(await invoke("ajouter_dette", { clientId: client!.id, montant: parseFloat(detteMontant) || 0, emballages, commentaire: detteMotif }));
+      toast("Dette enregistrée sur le compte", "success");
+      setDetteOuverte(false); setDetteMontant(""); setDetteCasiers({}); setDetteMotif("");
+    } catch (e) { toast(e instanceof Error ? e.message : String(e), "error"); }
+    setEnvoi(false);
+  };
+  const detteVide = !(parseFloat(detteMontant) > 0) && !Object.values(detteCasiers).some(v => parseInt(v) > 0);
 
   const resumeCasiers = (c: Record<string, number>) =>
     Object.entries(c).filter(([, n]) => n !== 0)
@@ -157,6 +180,37 @@ export default function ModalCompteClient({ client, nomEmballage, onClose, onCha
           </div>
         )}
 
+        {/* Dette sans vente : reprise d'un ancien cahier, prêt de casiers… */}
+        {peutDette && (detteOuverte ? (
+          <div className="flex flex-col gap-3 rounded-2xl border border-orange-200 bg-orange-50/40 p-4">
+            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Ajouter une dette</span>
+            <Input label="Argent dû (facultatif)" type="number" min="0" inputMode="numeric" value={detteMontant}
+              onChange={e => setDetteMontant(e.target.value)} placeholder="0" />
+            <div className="flex flex-col gap-2">
+              <span className="text-[13px] font-medium text-gray-700">Casiers dus</span>
+              {typesCasiers.map(e => (
+                <div key={e.id} className="flex items-center justify-between gap-3 text-sm">
+                  <span className="text-gray-800">{e.nom}</span>
+                  <input type="number" inputMode="numeric" min="0" placeholder="0" value={detteCasiers[e.id] ?? ""} aria-label={`Casiers dus : ${e.nom}`}
+                    onChange={ev => setDetteCasiers(c => ({ ...c, [e.id]: ev.target.value }))}
+                    className="w-20 h-10 rounded-lg border border-slate-300 text-sm font-semibold text-center focus:outline-none focus:border-secondary" />
+                </div>
+              ))}
+            </div>
+            <Input label="Motif (obligatoire)" value={detteMotif} onChange={e => setDetteMotif(e.target.value)}
+              placeholder="ex. : reprise de l'ancien cahier, prêt de casiers" />
+            <div className="grid grid-cols-[auto_1fr] gap-2">
+              <Button variant="secondary" onClick={() => setDetteOuverte(false)}>Annuler</Button>
+              <Button icon={<FilePlus2 size={15} />} onClick={enregistrerDette} loading={envoi}
+                disabled={detteVide || detteMotif.trim().length < 3}>Enregistrer la dette</Button>
+            </div>
+          </div>
+        ) : (
+          <Button variant="secondary" icon={<FilePlus2 size={15} />} onClick={() => setDetteOuverte(true)} className="w-full">
+            Ajouter une dette (sans vente)
+          </Button>
+        ))}
+
         {/* Journal : trace de tout ce qui a fait bouger le compte */}
         <div className="flex flex-col gap-2">
           <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Historique du compte</span>
@@ -177,6 +231,7 @@ export default function ModalCompteClient({ client, nomEmballage, onClose, onCha
                       {o.utilisateur_nom ? ` · par ${o.utilisateur_nom}` : ""}
                     </div>
                     {resumeCasiers(o.emballages ?? {}) && <div className="text-gray-600">{resumeCasiers(o.emballages)}</div>}
+                    {o.commentaire && <div className="text-gray-500 italic">{o.commentaire}</div>}
                   </div>
                   {o.montant !== 0 && (
                     <span className={["font-bold whitespace-nowrap", o.montant > 0 ? "text-orange-700" : "text-secondary"].join(" ")}>

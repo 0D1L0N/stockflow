@@ -557,3 +557,18 @@ describe("retour de livraison", () => {
     await assertFails(batchRetour(en("vendeur"), "vendeur", { statut: "en_cours" }).commit());
   });
 });
+
+describe("dette ajoutée sans vente", () => {
+  function batchDette(db: Firestore, uid: string) {
+    const b = writeBatch(db);
+    b.set(doc(db, "operations_client/od1"), { client_id: "c1", utilisateur_uid: uid, type: "dette", montant: 5000, cree_le: serverTimestamp() });
+    b.set(doc(db, "clients/c1"), { solde_argent: increment(5000), emballages_dus: { "casier-12": increment(3) }, derniere_operation: "od1" }, { merge: true });
+    return b;
+  }
+  it("le gérant inscrit une dette", async () => {
+    await assertSucceeds(batchDette(en("chef"), "chef").commit());
+  });
+  it("le magasinier ne peut pas", async () => {
+    await assertFails(batchDette(en("vendeur"), "vendeur").commit());
+  });
+});

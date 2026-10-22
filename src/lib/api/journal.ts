@@ -371,6 +371,14 @@ export const suivis: Record<string, Suivi> = {
         ...Object.entries((a.emballages ?? {}) as Record<string, number>).filter(([, n]) => Number(n) > 0).map(([e, n]) => `${casiers(Number(n))} rendus (${e})`)],
       restauration: null }),
   },
+  ajouter_dette: {
+    avant: async a => lire(`clients/${a.clientId}`),
+    apres: async (a, _r, c: Doc | null) => ({ categorie: "comptes", action: "ajouter_dette", libelle: `Dette ajoutée : ${c?.nom ?? "?"}`,
+      details: [Number(a.montant) > 0 ? fcfa(Number(a.montant)) : "",
+        ...Object.entries((a.emballages ?? {}) as Record<string, number>).filter(([, n]) => Number(n) > 0).map(([e, n]) => `${casiers(Number(n))} dus (${e})`),
+        String(a.commentaire ?? "")].filter(Boolean),
+      restauration: null }),
+  },
   retour_emballages: {
     avant: async a => lire(`clients/${a.clientId}`),
     apres: async (a, _r, c: Doc | null) => ({ categorie: "comptes", action: "retour_emballages", libelle: `Casiers rapportés : ${c?.nom ?? "?"}`,
