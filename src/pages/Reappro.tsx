@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, RefreshCw, History, Send, PackagePlus, CheckCircle2, PackageCheck } from "lucide-react";
+import { Plus, RefreshCw, History, Send, PackagePlus, CheckCircle2, PackageCheck, Search } from "lucide-react";
 import Avatar from "@/components/ui/Avatar";
 import EtatVide from "@/components/ui/EtatVide";
 import ModalBonCommande from "@/components/stock/ModalBonCommande";
@@ -14,7 +14,8 @@ import Input from "@/components/ui/Input";
 import Modal from "@/components/ui/Modal";
 import Skeleton from "@/components/ui/Skeleton";
 import Badge from "@/components/ui/Badge";
-import { volumeFr } from "@/lib/format";
+import { volumeFr, sansAccent } from "@/lib/format";
+import { useCatalogue } from "@/stores/catalogueStore";
 import { useTempsReel } from "@/lib/tempsReel";
 
 interface FormatAlerte { casier?: number | null;
@@ -42,6 +43,14 @@ export default function Reappro() {
   const [loading, setLoading] = useState(true);
   const [bonCommande, setBonCommande] = useState(false);
   const [reception, setReception] = useState(false);
+  // N'importe quel article, même au-dessus de son seuil (la liste ci-dessous ne montre que les alertes)
+  const { produits } = useCatalogue();
+  const [recherche, setRecherche] = useState("");
+  const termes = sansAccent(recherche).split(/s+/).filter(Boolean);
+  const trouves: FormatAlerte[] = termes.length === 0 ? [] : produits.flatMap(({ produit, formats }) => formats
+    .filter(fm => termes.every(t => `${sansAccent(produit.nom)} ${sansAccent(volumeFr(fm.volume, fm.unite, fm.casier))} ${fm.volume}`.includes(t)))
+    .map(fm => ({ ...fm, produit_nom: produit.nom, en_alerte: fm.stock <= fm.seuil_alerte ? 1 : 0, quantite_manquante: 0 }) as FormatAlerte))
+    .slice(0, 12);
 
   // Modal réapprovisionnement
   const [modal, setModal] = useState(false);
@@ -65,7 +74,7 @@ export default function Reappro() {
       ]);
       setAlertes(a);
       // Exclure les entrées générées par des annulations de vente
-      setHistorique(h.filter(m => m.source === "réapprovisionnement").slice(0, 10));
+      setHistorique(h.filter(m => m.source === "réapprovisionnement" || m.source === "réception fournisseur").slice(0, 10));
     } catch (e) {
       console.error("Reappro load:", e);
       setAlertes([]);
@@ -103,8 +112,9 @@ export default function Reappro() {
         quantite: qty,
         commentaire: commentaire || null,
       });
-      toast(`+${qty} casier${qty > 1 ? "s" : ""} ajouté${qty > 1 ? "s" : ""} — ${selectedFormat.produit_nom} ${volumeFr(selectedFormat.volume, selectedFormat.unite, selectedFormat.casier)}`, "success");
+      toast(`+${qty} casier${qty > 1 ? "s" : ""} — ${selectedFormat.produit_nom} ${volumeFr(selectedFormat.volume, selectedFormat.unite, selectedFormat.casier)} : ${selectedFormat.stock + qty} en stock`, "success");
       setModal(false);
+      setRecherche("");
       await Promise.all([load(), loadAlertes()]);
     } catch (e) { toast(String(e), "error"); }
     setSaving(false);
@@ -153,13 +163,38 @@ export default function Reappro() {
       />
 
       <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-28 lg:pb-8 [&>*]:w-full [&>*]:max-w-4xl [&>*]:mx-auto [&>*]:flex-shrink-0 flex flex-col gap-4">
+        {/* Ajouter du stock à n'importe quel article */}
+        <Card className="flex flex-col gap-3">
+          <div className="text-[13px] font-bold uppercase tracking-wide text-ink-600">Ajouter du stock à un article</div>
+          <div className="relative">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input value={recherche} onChange={e => setRecherche(e.target.value)} placeholder="ex. : kamkpe 66, castel 20…"
+              aria-label="Chercher un article" className="w-full h-12 rounded-xl border border-slate-300 pl-9 pr-3 text-[15px] focus:outline-none focus:border-secondary" />
+          </div>
+          {termes.length > 0 && (trouves.length === 0 ? (
+            <p className="text-sm text-gray-500">Aucun article ne correspond.</p>
+          ) : (
+            <div className="flex flex-col divide-y divide-slate-100">
+              {trouves.map(fm => (
+                <div key={fm.id} className="flex items-center gap-3 py-2.5">
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-sm text-gray-900 truncate">{fm.produit_nom}</div>
+                    <div className="text-xs text-gray-500">{volumeFr(fm.volume, fm.unite, fm.casier)} · <span className={fm.en_alerte ? "text-red-600 font-semibold" : ""}>{fm.stock} en stock</span></div>
+                  </div>
+                  <Button size="sm" icon={<Plus size={14} />} onClick={() => openReappro(fm)}>Ajouter</Button>
+                </div>
+              ))}
+            </div>
+          ))}
+        </Card>
+
         {/* Formats en alerte */}
         <div className="flex flex-col gap-3">
           {loading ? (
             <Skeleton variant="card" count={3} />
           ) : alertes.length === 0 ? (
-            <EtatVide icone={<CheckCircle2 size={26} />} titre="Rien à réapprovisionner"
-              texte="Tous les stocks sont au-dessus de leur seuil. Le bon de commande reste disponible en haut."/>
+            <EtatVide icone={<CheckCircle2 size={26} />} titre="Rien en alerte"
+              texte="Tous les stocks sont au-dessus de leur seuil. Pour ajouter du stock quand même, cherchez l'article ci-dessus."/>
           ) : (
             <>
               {alertes.map(f => (
