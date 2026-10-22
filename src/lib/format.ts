@@ -25,7 +25,7 @@ export const arrondi = (n: number) => Math.round(n * 100) / 100;
 
 /** « 1 casier », « 3 casiers » */
 export function casiers(n: number): string {
-  return `${n} casier${Math.abs(n) > 1 ? "s" : ""}`;
+  return `${n.toLocaleString("fr-FR")} casier${Math.abs(n) > 1 ? "s" : ""}`;
 }
 
 /**

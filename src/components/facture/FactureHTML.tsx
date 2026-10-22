@@ -92,7 +92,7 @@ export function FactureHTML({ data, apercu = false }: { data: FactureData; aperc
                 <div style={{ fontWeight: 600, fontSize: 10, color: "#1f2937" }}>{item.nom_produit}</div>
                 {item.volume && <div style={{ fontSize: 8, color: "#6b7280", marginTop: 1 }}>{item.volume}</div>}
               </td>
-              <td style={{ padding: "7px 8px", borderTop: "1px solid #e5e7eb", textAlign: "center" }}>{item.quantite}</td>
+              <td style={{ padding: "7px 8px", borderTop: "1px solid #e5e7eb", textAlign: "center" }}>{item.quantite.toLocaleString("fr-FR")}</td>
               <td style={{ padding: "7px 8px", borderTop: "1px solid #e5e7eb", textAlign: "right" }}>{fmt(item.prix_unitaire, devise)}</td>
               <td style={{ padding: "7px 8px", borderTop: "1px solid #e5e7eb", textAlign: "right", fontWeight: 700 }}>{fmt(item.sous_total, devise)}</td>
             </tr>
@@ -107,7 +107,7 @@ export function FactureHTML({ data, apercu = false }: { data: FactureData; aperc
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
         <div style={{ minWidth: 220, borderRadius: 8, border: "1px solid #e5e7eb", overflow: "hidden" }}>
           <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 14px", fontSize: 9.5 }}>
-            <span style={{ color: "#6b7280" }}>Nombre de casiers</span><strong>{totalCasiers(data)}</strong>
+            <span style={{ color: "#6b7280" }}>Nombre de casiers</span><strong>{totalCasiers(data).toLocaleString("fr-FR")}</strong>
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", padding: "9px 14px", background: "#1e3a5f" }}>
             <span style={{ color: "#fff", fontWeight: 800, fontSize: 12 }}>TOTAL</span>

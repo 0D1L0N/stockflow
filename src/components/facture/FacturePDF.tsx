@@ -214,7 +214,7 @@ export function FacturePDF({ data }: { data: FactureData }) {
               <Text style={s.prodName}>{item.nom_produit}</Text>
               {item.volume ? <Text style={s.prodDetail}>{item.volume}</Text> : null}
             </View>
-            <Text style={[s.tableCellText, s.colQty]}>{item.quantite}</Text>
+            <Text style={[s.tableCellText, s.colQty]}>{item.quantite.toLocaleString("fr-FR")}</Text>
             <Text style={[s.tableCellText, s.colPrice]}>{formatMontant(item.prix_unitaire, devise)}</Text>
             <Text style={[s.tableCellText, s.colTotal]}>{formatMontant(item.sous_total, devise)}</Text>
           </View>
@@ -225,7 +225,7 @@ export function FacturePDF({ data }: { data: FactureData }) {
           <View style={s.totalsBox}>
             <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 6, paddingHorizontal: 14 }}>
               <Text style={[s.tableCellText, { color: C.muted }]}>Nombre de casiers</Text>
-              <Text style={s.totalsVal}>{totalCasiers(data)}</Text>
+              <Text style={s.totalsVal}>{totalCasiers(data).toLocaleString("fr-FR")}</Text>
             </View>
             <View style={s.grandRow}>
               <Text style={s.grandLabel}>TOTAL</Text>

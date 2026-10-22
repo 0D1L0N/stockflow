@@ -167,7 +167,7 @@ export default function ModalConfirmationVente({
               {items.map(item => (
                 <div key={item.format_id} className="flex justify-between text-xs">
                   <span className="text-gray-600 truncate max-w-[60%]">
-                    {item.nom} {volumeFr(item.volume, item.unite, item.casier)} × {item.quantite}
+                    {item.nom} {volumeFr(item.volume, item.unite, item.casier)} × {item.quantite.toLocaleString("fr-FR")}
                   </span>
                   <span className="font-semibold text-gray-700">{formatPrix(item.sous_total)}</span>
                 </div>

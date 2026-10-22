@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { Search, ShoppingCart, Plus, Minus, Trash2, Check, User, ChevronDown, X, FileText, Mic, Wallet, Truck } from "lucide-react";
-import { sansAccent } from "@/lib/format";
 import { invoke } from "@/lib/db";
 import { useToast } from "@/components/ui/Toast";
 import { useVenteStore, type VenteItem } from "@/stores/venteStore";
@@ -13,7 +12,7 @@ import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import SoldesBandeau from "@/components/clients/SoldesBandeau";
-import { volumeFr, casiers, telephoneFr } from "@/lib/format";
+import { volumeFr, casiers, telephoneFr, sansAccent, lireNombre, arrondi } from "@/lib/format";
 import Avatar from "@/components/ui/Avatar";
 import { useTempsReel } from "@/lib/tempsReel";
 import { useAuthStore } from "@/stores/authStore";
@@ -84,6 +83,8 @@ export default function Vente() {
   const [showDictee, setShowDictee] = useState(false);
   const [venteResult, setVenteResult] = useState<VenteResult | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
+  // Quantité en cours de frappe au panier (« 3, » avant « 3,5 »)
+  const [qteSaisie, setQteSaisie] = useState<Record<string, string>>({});
 
   // Casiers et paiement partiel
   const emballages = catalogue.emballages;
@@ -235,7 +236,7 @@ export default function Vente() {
   const livres: Record<string, number> = {};
   for (const i of items) {
     const e = emballageDuFormat.get(i.format_id);
-    if (e) livres[e] = (livres[e] ?? 0) + i.quantite;
+    if (e) livres[e] = (livres[e] ?? 0) + Math.ceil(i.quantite); // casier entamé = casier consigné
   }
   // Casiers que le client doit déjà : il peut les rapporter à cette livraison
   const dusClient: Record<string, number> = selectedClient && selectedClient.est_defaut !== 1
@@ -432,15 +433,22 @@ export default function Vente() {
                   )}
                   <div className="flex items-center gap-2 mt-1.5">
                     <div className="flex items-center border border-slate-200 rounded-lg overflow-hidden">
-                      <button aria-label="Un casier de moins" onClick={() => handleUpdateQty(item.format_id, item.quantite - 1)}
+                      <button aria-label="Un casier de moins" onClick={() => handleUpdateQty(item.format_id, arrondi(item.quantite - 1))}
                         className="w-10 h-10 bg-slate-50 flex items-center justify-center hover:bg-gray-100 transition-colors">
                         <Minus size={14} />
                       </button>
-                      <input type="number" inputMode="numeric" min="1" value={item.quantite} aria-label={`Nombre de casiers ${item.nom}`}
+                      <input type="text" inputMode="decimal" aria-label={`Nombre de casiers ${item.nom}`}
+                        value={qteSaisie[item.format_id] ?? item.quantite.toLocaleString("fr-FR")}
                         onFocus={e => e.target.select()}
-                        onChange={e => { const n = parseInt(e.target.value); if (n >= 1) handleUpdateQty(item.format_id, n); }}
-                        className="w-12 h-10 text-center text-sm font-semibold text-gray-800 focus:outline-none" />
-                      <button aria-label="Un casier de plus" onClick={() => handleUpdateQty(item.format_id, item.quantite + 1)}
+                        onChange={e => {
+                          const texte = e.target.value;
+                          setQteSaisie(s => ({ ...s, [item.format_id]: texte }));
+                          const n = lireNombre(texte);
+                          if (n > 0) handleUpdateQty(item.format_id, n);
+                        }}
+                        onBlur={() => setQteSaisie(s => { const { [item.format_id]: _, ...reste } = s; return reste; })}
+                        className="w-14 h-10 text-center text-sm font-semibold text-gray-800 focus:outline-none" />
+                      <button aria-label="Un casier de plus" onClick={() => handleUpdateQty(item.format_id, arrondi(item.quantite + 1))}
                         className="w-10 h-10 bg-slate-50 flex items-center justify-center hover:bg-gray-100 transition-colors">
                         <Plus size={14} />
                       </button>
@@ -938,7 +946,7 @@ function ProduitCard({
       outOfStock ? "border-slate-200 opacity-60" : inCart ? "border-secondary-600 ring-1 ring-secondary-600" : "border-slate-200 hover:border-slate-300"].join(" ")}>
       {inCart && (
         <span className="absolute -top-2 -right-2 min-w-[24px] h-6 px-1.5 rounded-full bg-secondary-600 text-white text-xs font-bold flex items-center justify-center ring-2 ring-white">
-          {inCart.quantite}
+          {inCart.quantite.toLocaleString("fr-FR")}
         </span>
       )}
 

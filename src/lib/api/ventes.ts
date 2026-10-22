@@ -5,7 +5,7 @@ import { col, ecrire, maintenant, type Commande, type Id } from "./outils";
 import { avecCasier, type Format } from "./catalogue";
 import { appliquerAuCompte, nouvelleOperation, type SoldesClient } from "./comptes";
 import { mouvementsVides } from "./casiers";
-import { volumeFr } from "@/lib/format";
+import { volumeFr, arrondi } from "@/lib/format";
 
 interface VenteItemArg { formatId: Id; quantite: number; prixUtilise: number; }
 
@@ -40,8 +40,9 @@ function prochainNumeroFacture(jour: string): string {
 
 export const ventes: Record<string, Commande> = {
   create_vente: async ({ clientId, items, montantRecu, montantPaye, emballagesRendus, livreurs }) => {
-    const lignes = items as VenteItemArg[];
-    if (!lignes?.length) throw new Error("La vente doit contenir au moins un article.");
+    const lignes = ((items ?? []) as VenteItemArg[]).map(l => ({ ...l, quantite: arrondi(Number(l.quantite)) }));
+    if (!lignes.length) throw new Error("La vente doit contenir au moins un article.");
+    if (lignes.some(l => !(l.quantite > 0))) throw new Error("Une quantité du panier est invalide.");
     const uid = auth.currentUser?.uid;
     if (!uid) throw new Error("Session expirée : reconnectez-vous.");
 
@@ -61,7 +62,7 @@ export const ventes: Record<string, Commande> = {
       }
     });
 
-    const total = lignes.reduce((s, l) => s + l.quantite * l.prixUtilise, 0);
+    const total = lignes.reduce((s, l) => s + Math.round(l.quantite * l.prixUtilise), 0);
     // Livraison : le livreur part avec la facture, on encaisse à son retour (cloturer_livraison)
     const equipeLivraison = Array.isArray(livreurs)
       ? [...new Set((livreurs as unknown[]).map(n => String(n ?? "").trim()).filter(Boolean))] : [];
@@ -88,7 +89,8 @@ export const ventes: Record<string, Commande> = {
     const livres: Record<string, number> = {};
     lignes.forEach((l, i) => {
       const e = formats[i].emballage_id;
-      if (e) livres[e] = (livres[e] ?? 0) + l.quantite;
+      // Un casier entamé part quand même : 3,5 casiers vendus = 4 casiers consignés
+      if (e) livres[e] = (livres[e] ?? 0) + Math.ceil(l.quantite);
     });
     const rendus: Record<string, number> = {};
     for (const [e, n] of Object.entries((emballagesRendus ?? {}) as Record<string, number>)) {
@@ -162,7 +164,7 @@ export const ventes: Record<string, Commande> = {
         type: "sortie",
         quantite: l.quantite,
         stock_avant: formats[i].stock,
-        stock_apres: formats[i].stock - l.quantite,
+        stock_apres: arrondi(formats[i].stock - l.quantite),
         source: "vente",
         reference_id: venteRef.id,
         commentaire: null,

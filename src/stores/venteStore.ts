@@ -31,6 +31,9 @@ interface VenteStore {
   resetPanier: () => void;
 }
 
+/** Montant d'une ligne : 3,5 casiers × prix, arrondi au franc */
+const montant = (quantite: number, prix: number) => Math.round(quantite * prix);
+
 function sumItems(items: VenteItem[]): number {
   return items.reduce((s, i) => s + i.sous_total, 0);
 }
@@ -53,7 +56,7 @@ export const useVenteStore = create<VenteStore>()(persist((set, get) => ({
         idx >= 0
           ? state.items.map((i, index) =>
               index === idx
-                ? { ...i, quantite: i.quantite + 1, sous_total: (i.quantite + 1) * i.prix }
+                ? { ...i, quantite: i.quantite + 1, sous_total: montant(i.quantite + 1, i.prix) }
                 : i
             )
           : [...state.items, { ...newItem, quantite: 1, sous_total: newItem.prix }];
@@ -71,11 +74,11 @@ export const useVenteStore = create<VenteStore>()(persist((set, get) => ({
   updateQuantite: (format_id, quantite) =>
     set((state) => {
       const items =
-        quantite < 1
+        !(quantite > 0)
           ? state.items.filter((i) => i.format_id !== format_id)
           : state.items.map((i) =>
               i.format_id === format_id
-                ? { ...i, quantite, sous_total: quantite * i.prix }
+                ? { ...i, quantite, sous_total: montant(quantite, i.prix) }
                 : i
             );
       const total = sumItems(items);
@@ -86,7 +89,7 @@ export const useVenteStore = create<VenteStore>()(persist((set, get) => ({
     set((state) => {
       const items = state.items.map((i) =>
         i.format_id === format_id
-          ? { ...i, prix: nouveau_prix, sous_total: i.quantite * nouveau_prix }
+          ? { ...i, prix: nouveau_prix, sous_total: montant(i.quantite, nouveau_prix) }
           : i
       );
       const total = sumItems(items);

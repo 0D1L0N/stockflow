@@ -9,7 +9,7 @@ export function modePaiement(data: FactureData): string {
 }
 
 /** Nombre total de casiers (ou cartons, packs) de la facture. */
-export const totalCasiers = (data: FactureData) => data.items.reduce((t, i) => t + i.quantite, 0);
+export const totalCasiers = (data: FactureData) => Math.round(data.items.reduce((t, i) => t + i.quantite, 0) * 100) / 100;
 
 const UNITES = ["zéro", "un", "deux", "trois", "quatre", "cinq", "six", "sept", "huit", "neuf", "dix",
   "onze", "douze", "treize", "quatorze", "quinze", "seize"];

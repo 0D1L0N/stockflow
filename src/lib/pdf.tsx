@@ -59,7 +59,7 @@ export function prepareVenteData(
     volume: volumeFr(d.volume, d.unite, d.casier),
     quantite: d.quantite,
     prix_unitaire: d.prix_utilise,
-    sous_total: d.quantite * d.prix_utilise,
+    sous_total: Math.round(d.quantite * d.prix_utilise),
   }));
 
   return {

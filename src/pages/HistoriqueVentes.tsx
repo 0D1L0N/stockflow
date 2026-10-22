@@ -319,8 +319,8 @@ export default function HistoriqueVentes() {
                     {d.volume && <span className="text-gray-400 text-xs ml-1">{volumeFr(d.volume, d.unite, d.casier)}</span>}
                   </div>
                   <div className="text-right">
-                    <div className="text-gray-500 text-xs">{d.quantite} × {formatPrix(d.prix_utilise)}</div>
-                    <div className="font-semibold text-gray-800">{formatPrix(d.quantite * d.prix_utilise)}</div>
+                    <div className="text-gray-500 text-xs">{d.quantite.toLocaleString("fr-FR")} × {formatPrix(d.prix_utilise)}</div>
+                    <div className="font-semibold text-gray-800">{formatPrix(Math.round(d.quantite * d.prix_utilise))}</div>
                   </div>
                 </div>
               ))}
