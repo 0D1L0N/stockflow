@@ -372,6 +372,14 @@ export default function Vente() {
     } catch (e) { toast(String(e), "error"); }
   };
 
+  const viderPanier = () => {
+    if (!confirm(`Vider le panier (${casiers(items.reduce((s, i) => s + i.quantite, 0))}) ?`)) return;
+    useVenteStore.setState({ items: [], total: 0, montant_recu: 0, monnaie_rendue: 0 });
+    setRendusSaisis({});
+    setRemisStr("");
+    setGarderPourDette(false);
+  };
+
   const handleNouvelleVente = () => {
     resetPanier();
 
@@ -396,6 +404,13 @@ export default function Vente() {
           <span className="ml-auto text-xs font-semibold text-gray-500">
             {casiers(items.reduce((s, i) => s + i.quantite, 0))}{mobile && <span className="text-ink-900 font-bold"> · {formatPrix(total)}</span>}
           </span>
+        )}
+        {/* Vider : retire tous les articles, le client choisi reste */}
+        {items.length > 0 && (
+          <button onClick={viderPanier} aria-label="Vider le panier"
+            className="flex items-center gap-1 h-9 px-2.5 -my-1 rounded-lg text-xs font-semibold text-gray-500 hover:text-danger hover:bg-red-50 transition-colors">
+            <Trash2 size={14} /> Vider
+          </button>
         )}
       </div>
 
