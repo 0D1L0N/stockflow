@@ -9,7 +9,7 @@ import { Filter, TrendingUp, ArrowLeftRight } from "lucide-react";
 import Avatar from "@/components/ui/Avatar";
 import EtatVide from "@/components/ui/EtatVide";
 import Pastilles from "@/components/ui/Pastilles";
-import { volumeFr } from "@/lib/format";
+import { volumeFr, nombreFr } from "@/lib/format";
 
 interface Mouvement { casier?: number | null;
   id: string; format_id: string; produit_nom: string | null;
@@ -105,7 +105,7 @@ export default function Mouvements() {
                   <div className={["chiffre text-[17px] font-extrabold", m.type === "sortie" ? "text-red-600" : m.type === "entrée" ? "text-emerald-600" : "text-ink-900"].join(" ")}>
                     {m.type === "sortie" ? "−" : m.type === "entrée" ? "+" : ""}{m.type === "ajustement" ? `${m.stock_apres - m.stock_avant >= 0 ? "+" : "−"}${Math.abs(m.stock_apres - m.stock_avant)}` : m.quantite}
                   </div>
-                  <div className="text-xs text-gray-400">{m.stock_avant} → {m.stock_apres}</div>
+                  <div className="text-xs text-gray-400">{nombreFr(m.stock_avant)} → {nombreFr(m.stock_apres)}</div>
                 </div>
               </div>
             ))}

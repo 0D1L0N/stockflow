@@ -9,7 +9,7 @@ import Skeleton from "@/components/ui/Skeleton";
 import { SlidersHorizontal, ClipboardList } from "lucide-react";
 import Avatar from "@/components/ui/Avatar";
 import EtatVide from "@/components/ui/EtatVide";
-import { volumeFr } from "@/lib/format";
+import { volumeFr, lireNombre, arrondi, nombreFr } from "@/lib/format";
 import { useTempsReel } from "@/lib/tempsReel";
 
 interface Produit { id: string; nom: string; }
@@ -75,9 +75,9 @@ export default function AjustementStock() {
 
   const nouveauStock = (): number | null => {
     if (!selectedFormat || valeur === "") return null;
-    const v = parseInt(valeur);
+    const v = lireNombre(valeur);
     if (isNaN(v)) return null;
-    return mode === "absolu" ? v : selectedFormat.stock + v;
+    return mode === "absolu" ? v : arrondi(selectedFormat.stock + v);
   };
 
   const nsPreview = nouveauStock();
@@ -97,7 +97,7 @@ export default function AjustementStock() {
       });
       const diff = ns - selectedFormat.stock;
       toast(
-        `Stock ajusté : ${selectedFormat.stock} → ${ns} (${diff >= 0 ? "+" : ""}${diff})`,
+        `Stock ajusté : ${nombreFr(selectedFormat.stock)} → ${nombreFr(ns)} (${diff >= 0 ? "+" : ""}${nombreFr(arrondi(diff))})`,
         "success"
       );
       setValeur("");
@@ -201,7 +201,7 @@ export default function AjustementStock() {
                   {mode === "absolu" ? "Nouveau stock (valeur absolue)" : "Différence (+/-)"}
                 </label>
                 <input
-                  type="number" inputMode="numeric"
+                  type="text" inputMode={mode === "absolu" ? "decimal" : "text"}
                   placeholder={mode === "absolu" ? "ex. : 50" : "ex. : +10 ou -5"}
                   value={valeur}
                   onChange={e => setValeur(e.target.value)}

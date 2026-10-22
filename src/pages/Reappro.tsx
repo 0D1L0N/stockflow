@@ -14,7 +14,7 @@ import Input from "@/components/ui/Input";
 import Modal from "@/components/ui/Modal";
 import Skeleton from "@/components/ui/Skeleton";
 import Badge from "@/components/ui/Badge";
-import { volumeFr, sansAccent } from "@/lib/format";
+import { volumeFr, sansAccent, lireNombre, nombreFr, arrondi } from "@/lib/format";
 import { useCatalogue } from "@/stores/catalogueStore";
 import { useTempsReel } from "@/lib/tempsReel";
 
@@ -46,7 +46,7 @@ export default function Reappro() {
   // N'importe quel article, même au-dessus de son seuil (la liste ci-dessous ne montre que les alertes)
   const { produits } = useCatalogue();
   const [recherche, setRecherche] = useState("");
-  const termes = sansAccent(recherche).split(/s+/).filter(Boolean);
+  const termes = sansAccent(recherche).split(/\s+/).filter(Boolean);
   const trouves: FormatAlerte[] = termes.length === 0 ? [] : produits.flatMap(({ produit, formats }) => formats
     .filter(fm => termes.every(t => `${sansAccent(produit.nom)} ${sansAccent(volumeFr(fm.volume, fm.unite, fm.casier))} ${fm.volume}`.includes(t)))
     .map(fm => ({ ...fm, produit_nom: produit.nom, en_alerte: fm.stock <= fm.seuil_alerte ? 1 : 0, quantite_manquante: 0 }) as FormatAlerte))
@@ -103,8 +103,8 @@ export default function Reappro() {
 
   const saveReappro = async () => {
     if (!selectedFormat) return;
-    const qty = parseInt(quantite);
-    if (!qty || qty <= 0) { toast("Quantité invalide", "warning"); return; }
+    const qty = lireNombre(quantite);
+    if (!(qty > 0)) { toast("Quantité invalide", "warning"); return; }
     setSaving(true);
     try {
       await invoke("reapprovisionner", {
@@ -112,7 +112,7 @@ export default function Reappro() {
         quantite: qty,
         commentaire: commentaire || null,
       });
-      toast(`+${qty} casier${qty > 1 ? "s" : ""} — ${selectedFormat.produit_nom} ${volumeFr(selectedFormat.volume, selectedFormat.unite, selectedFormat.casier)} : ${selectedFormat.stock + qty} en stock`, "success");
+      toast(`+${nombreFr(qty)} casier${qty > 1 ? "s" : ""} — ${selectedFormat.produit_nom} ${volumeFr(selectedFormat.volume, selectedFormat.unite, selectedFormat.casier)} : ${nombreFr(arrondi(selectedFormat.stock + qty))} en stock`, "success");
       setModal(false);
       setRecherche("");
       await Promise.all([load(), loadAlertes()]);
@@ -122,7 +122,7 @@ export default function Reappro() {
 
   const saveAjust = async () => {
     if (!selectedFormat) return;
-    const ns = parseInt(nouvStock);
+    const ns = lireNombre(nouvStock);
     if (isNaN(ns) || ns < 0) { toast("Valeur invalide", "warning"); return; }
     setSaving(true);
     try {
@@ -139,7 +139,7 @@ export default function Reappro() {
   };
 
   const nouveauStockPreview = selectedFormat && quantite
-    ? selectedFormat.stock + (parseInt(quantite) || 0)
+    ? arrondi(selectedFormat.stock + (lireNombre(quantite) || 0))
     : null;
 
   return (
@@ -179,7 +179,7 @@ export default function Reappro() {
                 <div key={fm.id} className="flex items-center gap-3 py-2.5">
                   <div className="flex-1 min-w-0">
                     <div className="font-semibold text-sm text-gray-900 truncate">{fm.produit_nom}</div>
-                    <div className="text-xs text-gray-500">{volumeFr(fm.volume, fm.unite, fm.casier)} · <span className={fm.en_alerte ? "text-red-600 font-semibold" : ""}>{fm.stock} en stock</span></div>
+                    <div className="text-xs text-gray-500">{volumeFr(fm.volume, fm.unite, fm.casier)} · <span className={fm.en_alerte ? "text-red-600 font-semibold" : ""}>{nombreFr(fm.stock)} en stock</span></div>
                   </div>
                   <Button size="sm" icon={<Plus size={14} />} onClick={() => openReappro(fm)}>Ajouter</Button>
                 </div>
@@ -211,7 +211,7 @@ export default function Reappro() {
                     <div className="grid grid-cols-3 gap-2">
                       <div className="rounded-xl bg-red-50 px-3 py-2">
                         <div className="text-[11px] text-red-700/80">En stock</div>
-                        <div className="chiffre text-[22px] font-extrabold text-red-600 leading-tight">{f.stock}</div>
+                        <div className="chiffre text-[22px] font-extrabold text-red-600 leading-tight">{nombreFr(f.stock)}</div>
                       </div>
                       <div className="rounded-xl bg-slate-50 px-3 py-2">
                         <div className="text-[11px] text-gray-500">Seuil</div>
@@ -243,7 +243,7 @@ export default function Reappro() {
             <Card padding="none">
               {historique.map(m => (
                 <div key={m.id} className="flex items-center gap-3 px-4 py-3 border-b border-gray-50 last:border-0">
-                  <Badge variant="success">+{m.quantite}</Badge>
+                  <Badge variant="success">+{nombreFr(m.quantite)}</Badge>
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium text-gray-800 truncate">
                       {m.produit_nom} {volumeFr(m.volume, m.unite, m.casier)}
@@ -254,7 +254,7 @@ export default function Reappro() {
                     )}
                   </div>
                   <div className="text-right flex-shrink-0 text-xs text-gray-400">
-                    {m.stock_avant} → <span className="text-secondary font-semibold">{m.stock_apres}</span>
+                    {nombreFr(m.stock_avant)} → <span className="text-secondary font-semibold">{nombreFr(m.stock_apres)}</span>
                   </div>
                 </div>
               ))}
@@ -269,15 +269,15 @@ export default function Reappro() {
           <div className="p-6 flex flex-col gap-4">
             <div className="bg-slate-50 rounded-lg p-3 text-sm">
               <div className="font-semibold">{selectedFormat.produit_nom} {volumeFr(selectedFormat.volume, selectedFormat.unite, selectedFormat.casier)}</div>
-              <div className="text-gray-500 mt-0.5">Stock actuel : <strong className="text-danger">{selectedFormat.stock}</strong></div>
+              <div className="text-gray-500 mt-0.5">Stock actuel : <strong className="text-danger">{nombreFr(selectedFormat.stock)}</strong></div>
             </div>
-            <Input label="Nombre de casiers à ajouter" type="number" min="1" value={quantite}
+            <Input label="Nombre de casiers à ajouter (virgule possible : 2,5)" type="text" inputMode="decimal" value={quantite}
               onChange={e => setQuantite(e.target.value)} />
             {nouveauStockPreview !== null && (
               <div className="bg-green-50 rounded-lg px-3 py-2 text-sm flex justify-between">
                 <span className="text-green-700">Nouveau stock estimé</span>
                 <span className="font-extrabold text-secondary">
-                  {selectedFormat.stock} + {quantite || 0} = {nouveauStockPreview}
+                  {nombreFr(selectedFormat.stock)} + {quantite || 0} = {nouveauStockPreview == null ? "" : nombreFr(nouveauStockPreview)}
                 </span>
               </div>
             )}
@@ -297,17 +297,17 @@ export default function Reappro() {
           <div className="p-6 flex flex-col gap-4">
             <div className="bg-slate-50 rounded-lg p-3 text-sm">
               <div className="font-semibold">{selectedFormat.produit_nom} {volumeFr(selectedFormat.volume, selectedFormat.unite, selectedFormat.casier)}</div>
-              <div className="text-gray-500 mt-0.5">Stock actuel : <strong>{selectedFormat.stock}</strong></div>
+              <div className="text-gray-500 mt-0.5">Stock actuel : <strong>{nombreFr(selectedFormat.stock)}</strong></div>
             </div>
-            <Input label="Nouveau stock" type="number" min="0" value={nouvStock}
+            <Input label="Nouveau stock (virgule possible)" type="text" inputMode="decimal" value={nouvStock}
               onChange={e => setNouvStock(e.target.value)} />
-            {nouvStock !== "" && !isNaN(parseInt(nouvStock)) && (
+            {nouvStock !== "" && !isNaN(lireNombre(nouvStock)) && (
               <div className="bg-amber-50 rounded-lg px-3 py-2 text-sm flex justify-between">
                 <span className="text-amber-700">Changement</span>
                 <span className="font-semibold text-gray-700">
-                  {selectedFormat.stock} → <strong>{parseInt(nouvStock)}</strong>
-                  {" "}({parseInt(nouvStock) - selectedFormat.stock >= 0 ? "+" : ""}
-                  {parseInt(nouvStock) - selectedFormat.stock})
+                  {nombreFr(selectedFormat.stock)} → <strong>{nombreFr(lireNombre(nouvStock))}</strong>
+                  {" "}({lireNombre(nouvStock) - selectedFormat.stock >= 0 ? "+" : ""}
+                  {nombreFr(arrondi(lireNombre(nouvStock) - selectedFormat.stock))})
                 </span>
               </div>
             )}

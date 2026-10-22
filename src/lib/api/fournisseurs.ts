@@ -1,5 +1,5 @@
 import { deleteDoc, doc, getDoc, increment, query, serverTimestamp, setDoc, updateDoc, where, writeBatch } from "firebase/firestore";
-import { telephoneFr } from "@/lib/format";
+import { telephoneFr, arrondi } from "@/lib/format";
 import { db, auth } from "@/lib/firebase";
 import { useAuthStore } from "@/stores/authStore";
 import { col, ecrire, lister, maintenant, parNom, type Commande, type Id } from "./outils";
@@ -128,7 +128,7 @@ export const fournisseurs: Record<string, Commande> = {
     // Lignes valides, un même format regroupé
     const cumul = new Map<Id, { quantite: number; prix: number }>();
     for (const l of (lignes ?? []) as { formatId: Id; quantite: unknown; prixAchat: unknown }[]) {
-      const q = Math.trunc(Number(l.quantite)), p = Number(l.prixAchat) || 0;
+      const q = arrondi(Number(l.quantite)), p = Number(l.prixAchat) || 0;
       if (!(q > 0)) continue;
       if (p < 0) throw new Error("Un prix d'achat ne peut pas être négatif.");
       if (!parId.has(l.formatId)) throw new Error("Un produit de la réception n'existe plus.");
@@ -173,7 +173,7 @@ export const fournisseurs: Record<string, Commande> = {
     for (const l of lignesFinales) {
       const fm = parId.get(l.format_id) as Format;
       ajouterMouvement(batch, fm, l.produit_nom, {
-        type: "entrée", quantite: l.quantite, stock_apres: fm.stock + l.quantite, source: "réception fournisseur",
+        type: "entrée", quantite: l.quantite, stock_apres: arrondi(fm.stock + l.quantite), source: "réception fournisseur",
         commentaire: `${f.nom}${bl ? ` · BL ${bl}` : ""} · ${numero}`, reference_id: recRef.id,
       });
       // Le format cite la réception (les règles vérifient qu'il y figure)
@@ -196,7 +196,7 @@ export const fournisseurs: Record<string, Commande> = {
     const noms = new Map(produits.map(p => [p.id, p.nom]));
     const cumul = new Map<Id, number>();
     for (const l of (lignes ?? []) as { formatId: Id; quantite: unknown }[]) {
-      const q = Math.trunc(Number(l.quantite));
+      const q = arrondi(Number(l.quantite));
       if (!(q > 0)) continue;
       if (!parId.has(l.formatId)) throw new Error("Un produit de la commande n'existe plus.");
       cumul.set(l.formatId, (cumul.get(l.formatId) ?? 0) + q);

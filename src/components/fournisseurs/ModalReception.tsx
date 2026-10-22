@@ -7,7 +7,7 @@ import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import Avatar from "@/components/ui/Avatar";
-import { volumeFr, casiers } from "@/lib/format";
+import { volumeFr, casiers, lireNombre, arrondi, nombreFr } from "@/lib/format";
 import { familleDe, FAMILLES } from "@/lib/familles";
 import { catalogueCharge, produitsAvecFormats } from "@/stores/catalogueStore";
 
@@ -100,7 +100,7 @@ export default function ModalReception({ isOpen, onClose, onDone, fournisseurId,
 
   const ajouter = (f: FormatChoix, quantite = 1) => {
     setLignes(ls => ls.some(l => l.formatId === f.id)
-      ? ls.map(l => l.formatId === f.id ? { ...l, quantite: String((parseInt(l.quantite) || 0) + quantite) } : l)
+      ? ls.map(l => l.formatId === f.id ? { ...l, quantite: String(arrondi((lireNombre(l.quantite) || 0) + quantite)) } : l)
       : [...ls, { formatId: f.id, quantite: String(quantite), prixAchat: derniersPrix[f.id] ? String(derniersPrix[f.id]) : "" }]);
     setRecherche("");
   };
@@ -117,17 +117,17 @@ export default function ModalReception({ isOpen, onClose, onDone, fournisseurId,
     ? formats.filter(f => libelle(f).toLowerCase().includes(recherche.toLowerCase())).slice(0, 8)
     : [];
 
-  const total = lignes.reduce((t, l) => t + (parseInt(l.quantite) || 0) * (parseFloat(l.prixAchat) || 0), 0);
+  const total = lignes.reduce((t, l) => t + (lireNombre(l.quantite) || 0) * (parseFloat(l.prixAchat) || 0), 0);
   const livres: Record<string, number> = {};
   for (const l of lignes) {
     const e = parId.get(l.formatId)?.emballage_id;
-    if (e) livres[e] = (livres[e] ?? 0) + (parseInt(l.quantite) || 0);
+    if (e) livres[e] = (livres[e] ?? 0) + Math.ceil(lireNombre(l.quantite) || 0);
   }
   // Par défaut on rend autant de casiers vides qu'on en reçoit de pleins
   const rendu = (e: string) => rendus[e] ?? String(livres[e] ?? 0);
   const payeNombre = paye === "" ? 0 : parseFloat(paye) || 0;
   const reste = Math.max(0, total - payeNombre);
-  const nbCasiers = lignes.reduce((t, l) => t + (parseInt(l.quantite) || 0), 0);
+  const nbCasiers = arrondi(lignes.reduce((t, l) => t + (lireNombre(l.quantite) || 0), 0));
 
   const valider = async () => {
     if (lignes.length === 0) { toast("Ajoutez les produits reçus", "warning"); return; }
@@ -140,7 +140,7 @@ export default function ModalReception({ isOpen, onClose, onDone, fournisseurId,
       }
       const res = await invoke<{ numero: string; reste_du: number }>("creer_reception", {
         fournisseurId: fournisseur, numeroBl: bl,
-        lignes: lignes.map(l => ({ formatId: l.formatId, quantite: parseInt(l.quantite) || 0, prixAchat: parseFloat(l.prixAchat) || 0 })),
+        lignes: lignes.map(l => ({ formatId: l.formatId, quantite: lireNombre(l.quantite) || 0, prixAchat: parseFloat(l.prixAchat) || 0 })),
         montantPaye: payeNombre,
         emballagesRendus: Object.fromEntries(Object.keys(livres).map(e => [e, parseInt(rendu(e)) || 0])),
         commentaire,
@@ -234,14 +234,14 @@ export default function ModalReception({ isOpen, onClose, onDone, fournisseurId,
               {lignes.map(l => {
                 const f = parId.get(l.formatId);
                 if (!f) return null;
-                const q = parseInt(l.quantite) || 0;
+                const q = lireNombre(l.quantite) || 0;
                 const commandee = commande ? commande.lignes.find(x => x.format_id === l.formatId)?.quantite ?? 0 : null;
                 return (
                   <div key={l.formatId} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2.5">
                     <div className="flex-1 min-w-[140px]">
                       <div className="text-sm font-semibold text-gray-800 truncate">{libelle(f)}</div>
                       <div className="text-xs text-gray-400">
-                        Stock {f.stock} → {f.stock + q}
+                        Stock {nombreFr(f.stock)} → {nombreFr(arrondi(f.stock + q))}
                         {commandee !== null && (
                           <span className={commandee === q ? "" : "text-amber-700 font-semibold"}>
                             {commandee ? ` · commandé ${commandee}` : " · hors commande"}
@@ -252,7 +252,7 @@ export default function ModalReception({ isOpen, onClose, onDone, fournisseurId,
                     <div className="flex items-center border border-slate-200 rounded-lg overflow-hidden">
                       <button aria-label="Un de moins" onClick={() => modifier(l.formatId, { quantite: String(Math.max(1, q - 1)) })}
                         className="w-8 h-8 bg-slate-50 flex items-center justify-center hover:bg-gray-100"><Minus size={12} /></button>
-                      <input type="number" inputMode="numeric" min="1" value={l.quantite} aria-label="Quantité reçue"
+                      <input type="text" inputMode="decimal" value={l.quantite} aria-label="Quantité reçue"
                         onChange={e => modifier(l.formatId, { quantite: e.target.value })}
                         className="w-12 h-8 text-center text-sm font-semibold focus:outline-none" />
                       <button aria-label="Un de plus" onClick={() => modifier(l.formatId, { quantite: String(q + 1) })}

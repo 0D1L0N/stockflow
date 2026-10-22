@@ -1,6 +1,7 @@
 import { doc, getDoc, increment, limit, orderBy, query, serverTimestamp, where, writeBatch } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
 import { col, ecrire, lister, maintenant, type Commande, type Id } from "./outils";
+import { arrondi } from "@/lib/format";
 import { avecCasier, type Format } from "./catalogue";
 
 interface Mouvement { casier?: number | null;
@@ -50,13 +51,13 @@ export function ajouterMouvement(
 
 export const stock: Record<string, Commande> = {
   reapprovisionner: async ({ formatId, quantite, commentaire }) => {
-    const q = Math.trunc(Number(quantite));
+    const q = arrondi(Number(quantite));
     if (!(q > 0)) throw new Error("La quantité doit être positive.");
     const { format, produitNom } = await lireFormat(formatId as Id);
     const batch = writeBatch(db);
     // increment : ne perd pas une vente faite au même moment sur un autre appareil
     const mouvement = ajouterMouvement(batch, format, produitNom, {
-      type: "entrée", quantite: q, stock_apres: format.stock + q, source: "réapprovisionnement", commentaire,
+      type: "entrée", quantite: q, stock_apres: arrondi(format.stock + q), source: "réapprovisionnement", commentaire,
     });
     batch.update(doc(db, "formats", format.id), { stock: increment(q), dernier_mouvement: mouvement });
     await ecrire(batch.commit());
@@ -64,12 +65,12 @@ export const stock: Record<string, Commande> = {
 
   /** Inventaire : le stock compté remplace la valeur enregistrée. */
   ajuster_stock: async ({ formatId, nouveauStock, commentaire }) => {
-    const ns = Math.trunc(Number(nouveauStock));
+    const ns = arrondi(Number(nouveauStock));
     if (!(ns >= 0)) throw new Error("Le stock ne peut pas être négatif.");
     const { format, produitNom } = await lireFormat(formatId as Id);
     const batch = writeBatch(db);
     const mouvement = ajouterMouvement(batch, format, produitNom, {
-      type: "ajustement", quantite: Math.abs(ns - format.stock), stock_apres: ns, source: "inventaire", commentaire,
+      type: "ajustement", quantite: arrondi(Math.abs(ns - format.stock)), stock_apres: ns, source: "inventaire", commentaire,
     });
     batch.update(doc(db, "formats", format.id), { stock: ns, dernier_mouvement: mouvement });
     await ecrire(batch.commit());

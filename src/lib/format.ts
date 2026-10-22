@@ -12,6 +12,17 @@ export function volumeFr(volume: number | null | undefined, unite: string | null
   return casier ? `${base} (casier de ${casier})` : base;
 }
 
+/**
+ * Nombre saisi au clavier, virgule ou point : « 2,5 » → 2.5. NaN si ce n'est pas un nombre.
+ * Arrondi au centième : un stock ne garde pas de poussière de calcul (0,1 + 0,2).
+ */
+export function lireNombre(texte: string | number | null | undefined): number {
+  const n = parseFloat(String(texte ?? "").replace(/\s/g, "").replace(",", "."));
+  return isNaN(n) ? NaN : arrondi(n);
+}
+/** Arrondi au centième. */
+export const arrondi = (n: number) => Math.round(n * 100) / 100;
+
 /** « 1 casier », « 3 casiers » */
 export function casiers(n: number): string {
   return `${n} casier${Math.abs(n) > 1 ? "s" : ""}`;
