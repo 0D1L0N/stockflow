@@ -80,6 +80,7 @@ export default function ModalConfirmationVente({
     items: items.map(i => ({
       nom_produit: i.nom,
       volume: `${volumeFr(i.volume, i.unite, i.casier)}`,
+      unite: i.unite, litres: i.unite === "L" ? i.volume : null, casier: i.casier ?? null,
       quantite: i.quantite,
       prix_unitaire: i.prix,
       sous_total: i.sous_total,

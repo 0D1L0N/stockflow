@@ -1,5 +1,5 @@
 import { Document, Page, View, Text, StyleSheet, Font } from "@react-pdf/renderer";
-import { modePaiement, sommeEnLettres, totalCasiers } from "./texteFacture";
+import { emballagesFacture, groupesFacture, modePaiement, sommeEnLettres } from "./texteFacture";
 import { telephoneFr } from "@/lib/format";
 
 Font.register({
@@ -17,6 +17,8 @@ export interface FactureItem {
   quantite: number;
   prix_unitaire: number;
   sous_total: number;
+  /** Format brut, pour ranger la facture par format (absent sur les très anciennes données) */
+  unite?: string | null; litres?: number | null; casier?: number | null;
 }
 
 export interface FactureData {
@@ -48,7 +50,7 @@ export interface FactureCompte {
 function formatMontant(valeur: number, devise: FactureData["devise"]): string {
   if (devise.position === "after") {
     return (
-      new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 }).format(valeur).replace(/[  ]/g, " ") +
+      new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 }).format(valeur).replace(/[  ]/g, " ") +
       " " + devise.symbole
     );
   }
@@ -57,293 +59,225 @@ function formatMontant(valeur: number, devise: FactureData["devise"]): string {
     new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(valeur)
   );
 }
+const nb = (n: number) => n.toLocaleString("fr-FR");
 
-function initials(nom: string): string {
-  return nom.split(" ").slice(0, 2).map(w => w[0] ?? "").join("").toUpperCase() || "SF";
-}
-
-const C = {
-  primary: "#1e3a5f",
-  green: "#10b981",
-  text: "#1f2937",
-  muted: "#6b7280",
-  border: "#e5e7eb",
-  bgAlt: "#f9fafb",
-  bgTotal: "#f3f4f6",
-};
+// Même palette que l'aperçu à l'écran : encre, vert du dépôt, gris doux
+const C = { encre: "#0f1f33", vert: "#0f9f6e", vertClair: "#34d399", texte: "#1f2937", gris: "#6b7280", trait: "#e5e7eb", fond: "#f7f8fa", orange: "#9a3412" };
+const gras = { fontFamily: "Inter", fontWeight: 700 } as const;
 
 const s = StyleSheet.create({
-  page: { fontFamily: "Inter", fontSize: 10, color: C.text, paddingTop: 35, paddingBottom: 40, paddingHorizontal: 40 },
-  // Header
-  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 },
-  logoBox: { width: 44, height: 44, backgroundColor: C.primary, borderRadius: 8, justifyContent: "center", alignItems: "center", marginBottom: 6 },
-  logoText: { color: "#fff", fontSize: 17, fontFamily: "Inter", fontWeight: 700 },
-  companyName: { fontSize: 12, fontFamily: "Inter", fontWeight: 700, color: C.primary, textTransform: "uppercase", letterSpacing: 0.5, lineHeight: 1.3 },
-  companyMeta: { fontSize: 8, color: C.muted, marginTop: 4, lineHeight: 1.7 },
-  titleBlock: { alignItems: "flex-end" },
-  factureTitle: { fontSize: 28, fontFamily: "Inter", fontWeight: 700, color: C.primary, letterSpacing: -0.5, marginBottom: 6 },
-  invoiceMeta: { fontSize: 8.5, color: C.muted, textAlign: "right", lineHeight: 1.9 },
-  invoiceMetaBold: { fontFamily: "Inter", fontWeight: 700, color: C.text, fontSize: 9 },
-  badge: { backgroundColor: "#d1fae5", paddingVertical: 3, paddingHorizontal: 8, borderRadius: 10, marginTop: 5, alignSelf: "flex-end" },
-  badgeText: { color: "#065f46", fontSize: 7.5, fontFamily: "Inter", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 },
-  // Divider
-  divider: { flexDirection: "row", height: 3, borderRadius: 2, marginBottom: 14 },
-  // Client block
-  clientBlock: { flexDirection: "row", borderWidth: 1, borderColor: C.border, borderRadius: 7, padding: 10, marginBottom: 14, backgroundColor: "#fafafa" },
-  clientLabel: { fontSize: 7, fontFamily: "Inter", fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 3 },
-  clientName: { fontSize: 12, fontFamily: "Inter", fontWeight: 700, color: C.primary, marginBottom: 2 },
-  clientDetail: { fontSize: 8.5, color: C.muted, lineHeight: 1.7 },
-  infoRight: { marginLeft: "auto", alignItems: "flex-end" },
-  // Table
-  tableHeader: { flexDirection: "row", backgroundColor: C.primary, paddingVertical: 7, paddingHorizontal: 8, borderRadius: 5 },
-  tableHeaderText: { color: "#fff", fontSize: 7.5, fontFamily: "Inter", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 },
-  tableRow: { flexDirection: "row", paddingVertical: 7, paddingHorizontal: 8, borderBottomWidth: 1, borderBottomColor: C.border },
-  tableCellText: { fontSize: 9.5, color: C.text },
-  prodName: { fontSize: 10, fontFamily: "Inter", fontWeight: 700, color: C.text },
-  prodDetail: { fontSize: 8, color: C.muted, marginTop: 1 },
-  colNum: { width: 22, textAlign: "center", color: C.muted, fontSize: 9 },
-  colDesig: { flex: 1 },
-  colQty: { width: 40, textAlign: "center" },
-  colPrice: { width: 80, textAlign: "right" },
-  colTotal: { width: 90, textAlign: "right", fontFamily: "Inter", fontWeight: 700 },
-  // Totals
-  totalsSection: { alignItems: "flex-end", marginTop: 8, marginBottom: 10 },
-  totalsBox: { width: 220, borderWidth: 1, borderColor: C.border, borderRadius: 8, overflow: "hidden" },
-  totalsVal: { fontFamily: "Inter", fontWeight: 700, color: C.text, fontSize: 10 },
-  grandRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 9, paddingHorizontal: 14, backgroundColor: C.primary },
-  grandLabel: { color: "#fff", fontFamily: "Inter", fontWeight: 700, fontSize: 12 },
-  grandVal: { color: C.green, fontFamily: "Inter", fontWeight: 700, fontSize: 14 },
-  // Payment
-  paySection: { flexDirection: "row", gap: 10, marginBottom: 14 },
-  payCard: { flex: 1, borderWidth: 1, borderRadius: 7, padding: 10 },
-  payCardBlue: { backgroundColor: "#eff6ff", borderColor: "#bfdbfe" },
-  payCardGreen: { backgroundColor: "#f0fdf4", borderColor: "#bbf7d0" },
-  payLabel: { fontSize: 7.5, fontFamily: "Inter", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 3 },
-  payLabelBlue: { color: "#3b82f6" },
-  payLabelGreen: { color: "#16a34a" },
-  payAmount: { fontSize: 13, fontFamily: "Inter", fontWeight: 700 },
-  payAmountBlue: { color: C.primary },
-  payAmountGreen: { color: C.green },
-  // Footer
-  footer: { marginTop: "auto", paddingTop: 12, borderTopWidth: 1, borderTopColor: C.border, borderTopStyle: "dashed" },
-  thankYou: { textAlign: "center", fontSize: 12, fontFamily: "Inter", fontWeight: 700, color: C.primary, marginBottom: 10, letterSpacing: 0.3 },
-  footerGrid: { flexDirection: "row", justifyContent: "space-between", gap: 10 },
-  legalTitle: { fontSize: 7.5, fontFamily: "Inter", fontWeight: 700, color: C.text, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 3 },
-  legalText: { fontSize: 7, color: C.muted, lineHeight: 1.7 },
-  pageNum: { fontSize: 7, color: C.muted, textAlign: "center", marginTop: 10 },
+  page: { fontFamily: "Inter", fontSize: 9.5, color: C.texte, paddingTop: 36, paddingBottom: 40, paddingHorizontal: 40, lineHeight: 1.4 },
+  // En-tête
+  entete: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
+  depot: { ...gras, fontSize: 15, color: C.encre, textTransform: "uppercase", letterSpacing: 0.3 },
+  depotInfos: { fontSize: 8, color: C.gris, marginTop: 4, lineHeight: 1.6 },
+  motFacture: { ...gras, fontSize: 9, color: C.vert, letterSpacing: 3, textTransform: "uppercase", textAlign: "right" },
+  numero: { ...gras, fontSize: 12, color: C.encre, marginTop: 3, textAlign: "right" },
+  date: { fontSize: 8.5, color: C.gris, marginTop: 2, textAlign: "right" },
+  pastille: { marginTop: 6, paddingVertical: 2, paddingHorizontal: 9, borderRadius: 10, alignSelf: "flex-end" },
+  pastilleTexte: { ...gras, fontSize: 7, textTransform: "uppercase", letterSpacing: 0.5 },
+  filet: { height: 2, backgroundColor: C.encre, marginTop: 14, marginBottom: 12 },
+  // Bloc client
+  infos: { flexDirection: "row", gap: 16, marginBottom: 16 },
+  etiquette: { ...gras, fontSize: 6.5, color: C.gris, textTransform: "uppercase", letterSpacing: 1.2, marginBottom: 3 },
+  client: { ...gras, fontSize: 12, color: C.encre },
+  // Articles
+  enteteTable: { flexDirection: "row", paddingHorizontal: 8, paddingBottom: 6 },
+  enteteCol: { ...gras, fontSize: 6.5, color: C.gris, textTransform: "uppercase", letterSpacing: 1 },
+  groupe: { flexDirection: "row", backgroundColor: C.fond, borderTopWidth: 1, borderTopColor: C.trait, paddingVertical: 5, paddingHorizontal: 8, marginTop: 4 },
+  groupeTitre: { ...gras, fontSize: 7.5, color: C.encre, textTransform: "uppercase", letterSpacing: 0.8 },
+  rangee: { flexDirection: "row", borderTopWidth: 1, borderTopColor: C.trait, paddingVertical: 5, paddingHorizontal: 8 },
+  sousTotal: { flexDirection: "row", paddingVertical: 4, paddingHorizontal: 8, color: C.gris, fontSize: 8 },
+  colNom: { flex: 1 },
+  colQte: { width: 46, textAlign: "center" },
+  colPrix: { width: 78, textAlign: "right" },
+  colMontant: { width: 86, textAlign: "right" },
+  // Totaux en bas
+  bas: { flexDirection: "row", gap: 16, marginTop: 14, borderTopWidth: 2, borderTopColor: C.encre, paddingTop: 12 },
+  ligne: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 2.5 },
+  bandeau: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 6, paddingVertical: 8, paddingHorizontal: 12, backgroundColor: C.encre, borderRadius: 5 },
+  bandeauLibelle: { ...gras, fontSize: 7.5, color: "#fff", textTransform: "uppercase", letterSpacing: 1 },
+  bandeauMontant: { ...gras, fontSize: 14, color: C.vertClair },
+  // Pied
+  pied: { marginTop: "auto", paddingTop: 10, borderTopWidth: 1, borderTopColor: C.trait, alignItems: "center" },
+  merci: { ...gras, fontSize: 11, color: C.encre },
+  mentions: { fontSize: 7, color: C.gris, marginTop: 4, lineHeight: 1.6, textAlign: "center" },
 });
 
 export function FacturePDF({ data }: { data: FactureData }) {
-  const { numero_facture, date, client, items, total, montant_recu, monnaie_rendue, commerce, devise, compte } = data;
+  const { numero_facture, date, client, total, montant_recu, monnaie_rendue, commerce, devise, compte } = data;
   const enLivraison = !!data.livraison?.ouverte;
   const acquittee = !enLivraison && (!compte?.argent || compte.argent.nouveau <= 0);
-  const logoInitials = initials(commerce.nom);
-  const ligneVide = { borderBottomWidth: 1, borderBottomColor: C.text, borderStyle: "dotted" as const, flex: 1, marginLeft: 8, height: 14 };
   const telClient = telephoneFr(client.telephone) ?? "";
+  const groupes = groupesFacture(data);
+  const emb = emballagesFacture(data);
+  const a = compte?.argent;
+  const fmt = (v: number) => formatMontant(v, devise);
+  const statut = enLivraison ? { texte: "À encaisser à la livraison", fond: "#e0ecff", couleur: C.encre }
+    : acquittee ? { texte: "Acquittée", fond: "#dcfce7", couleur: "#166534" }
+    : { texte: "Reste à payer", fond: "#ffedd5", couleur: C.orange };
+  const ligneVide = { borderBottomWidth: 1, borderBottomColor: C.texte, borderStyle: "dotted" as const, flex: 1, marginLeft: 8, height: 14 };
+  const Ligne = ({ libelle, valeur, fort = false }: { libelle: string; valeur: string; fort?: boolean }) => (
+    <View style={s.ligne}>
+      <Text style={{ color: C.gris }}>{libelle}</Text>
+      <Text style={fort ? gras : {}}>{valeur}</Text>
+    </View>
+  );
 
   return (
     <Document title={numero_facture} author={commerce.nom}>
       <Page size="A4" style={s.page}>
 
-        {/* HEADER */}
-        <View style={s.header}>
+        {/* EN-TÊTE : le dépôt à gauche, la facture à droite */}
+        <View style={s.entete}>
           <View>
-            <View style={s.logoBox}>
-              <Text style={s.logoText}>{logoInitials}</Text>
-            </View>
-            <Text style={s.companyName}>{commerce.nom}</Text>
-            <Text style={s.companyMeta}>
-              {[commerce.adresse, telephoneFr(commerce.telephone), commerce.email].filter(Boolean).join("\n")}
-            </Text>
+            <Text style={s.depot}>{commerce.nom}</Text>
+            <Text style={s.depotInfos}>{[commerce.adresse, telephoneFr(commerce.telephone), commerce.email].filter(Boolean).join("\n")}</Text>
           </View>
-          <View style={s.titleBlock}>
-            <Text style={s.factureTitle}>FACTURE</Text>
-            <Text style={s.invoiceMeta}>
-              <Text style={s.invoiceMetaBold}>N° {numero_facture}</Text>{"\n"}
-              Date : <Text style={s.invoiceMetaBold}>{date}</Text>
-            </Text>
-            <View style={acquittee ? s.badge : [s.badge, { backgroundColor: "#ffedd5" }]}>
-              <Text style={acquittee ? s.badgeText : [s.badgeText, { color: "#9a3412" }]}>{enLivraison ? "À encaisser à la livraison" : acquittee ? "Facture acquittée" : "Reste à payer"}</Text>
+          <View>
+            <Text style={s.motFacture}>Facture</Text>
+            <Text style={s.numero}>{numero_facture}</Text>
+            <Text style={s.date}>{date}</Text>
+            <View style={[s.pastille, { backgroundColor: statut.fond }]}>
+              <Text style={[s.pastilleTexte, { color: statut.couleur }]}>{statut.texte}</Text>
             </View>
           </View>
         </View>
+        <View style={s.filet} />
 
-        {/* DIVIDER */}
-        <View style={s.divider}>
-          <View style={{ flex: 1, backgroundColor: C.green }} />
-          <View style={{ flex: 1, backgroundColor: C.primary }} />
-        </View>
-
-        {/* CLIENT BLOCK */}
-        <View style={s.clientBlock}>
+        {/* CLIENT, PAIEMENT, VENDEUR */}
+        <View style={s.infos}>
+          <View style={{ flex: 1.4 }}>
+            <Text style={s.etiquette}>Client</Text>
+            <Text style={s.client}>{client.nom}</Text>
+            {[telClient, client.adresse].filter(Boolean).map((l, i) => <Text key={i} style={{ fontSize: 8, color: C.gris }}>{l}</Text>)}
+          </View>
           <View style={{ flex: 1 }}>
-            <Text style={s.clientLabel}>Facturer à :</Text>
-            <Text style={s.clientName}>{client.nom}</Text>
-            <Text style={s.clientDetail}>
-              {[telClient, client.adresse].filter(Boolean).join("\n") || "—"}
-            </Text>
+            <Text style={s.etiquette}>Paiement</Text>
+            <Text style={gras}>{modePaiement(data)}</Text>
           </View>
-          <View style={s.infoRight}>
-            <Text style={s.clientLabel}>Mode de paiement</Text>
-            <Text style={{ fontSize: 9, fontFamily: "Inter", fontWeight: 700, color: C.text, marginBottom: 6 }}>{modePaiement(data)}</Text>
-            {data.vendeur ? <>
-              <Text style={s.clientLabel}>Vendeur</Text>
-              <Text style={{ fontSize: 8.5, fontFamily: "Inter", fontWeight: 700, color: C.text }}>{data.vendeur}</Text>
-            </> : null}
-            {data.livraison ? <>
-              <Text style={[s.clientLabel, { marginTop: 6 }]}>{data.livraison.livreurs.length > 1 ? "Livreurs" : "Livreur"}</Text>
-              <Text style={{ fontSize: 8.5, fontFamily: "Inter", fontWeight: 700, color: C.text }}>{data.livraison.livreurs.join(", ")}</Text>
-            </> : null}
+          <View style={{ flex: 1, alignItems: "flex-end" }}>
+            {data.vendeur ? <><Text style={s.etiquette}>Vendeur</Text><Text>{data.vendeur}</Text></> : null}
+            {data.livraison ? <><Text style={[s.etiquette, { marginTop: 6 }]}>{data.livraison.livreurs.length > 1 ? "Livreurs" : "Livreur"}</Text>
+              <Text>{data.livraison.livreurs.join(", ")}</Text></> : null}
           </View>
         </View>
 
-        {/* TABLE HEADER */}
-        <View style={s.tableHeader}>
-          <Text style={[s.tableHeaderText, s.colNum, { color: "#fff" }]}>N°</Text>
-          <Text style={[s.tableHeaderText, s.colDesig]}>Désignation</Text>
-          <Text style={[s.tableHeaderText, s.colQty]}>Qté</Text>
-          <Text style={[s.tableHeaderText, s.colPrice]}>Prix unit.</Text>
-          <Text style={[s.tableHeaderText, s.colTotal]}>Total</Text>
+        {/* ARTICLES rangés par format */}
+        <View style={s.enteteTable}>
+          <Text style={[s.enteteCol, s.colNom]}>Désignation</Text>
+          <Text style={[s.enteteCol, s.colQte]}>Qté</Text>
+          <Text style={[s.enteteCol, s.colPrix]}>Prix unit.</Text>
+          <Text style={[s.enteteCol, s.colMontant]}>Montant</Text>
         </View>
-
-        {/* TABLE ROWS */}
-        {items.map((item, i) => (
-          <View key={i} wrap={false} style={[s.tableRow, { backgroundColor: i % 2 === 0 ? "#fff" : C.bgAlt }]}>
-            <Text style={[s.tableCellText, s.colNum]}>{i + 1}</Text>
-            <View style={s.colDesig}>
-              <Text style={s.prodName}>{item.nom_produit}</Text>
-              {item.volume ? <Text style={s.prodDetail}>{item.volume}</Text> : null}
+        {groupes.map(g => (
+          <View key={g.cle}>
+            <View style={s.groupe} wrap={false}>
+              <Text style={s.groupeTitre}>{g.titre}</Text>
+              {!g.consigne ? <Text style={{ fontSize: 7.5, color: C.gris }}> · emballage non consigné</Text> : null}
             </View>
-            <Text style={[s.tableCellText, s.colQty]}>{item.quantite.toLocaleString("fr-FR")}</Text>
-            <Text style={[s.tableCellText, s.colPrice]}>{formatMontant(item.prix_unitaire, devise)}</Text>
-            <Text style={[s.tableCellText, s.colTotal]}>{formatMontant(item.sous_total, devise)}</Text>
+            {g.items.map((it, i) => (
+              <View key={i} style={s.rangee} wrap={false}>
+                <Text style={s.colNom}>
+                  <Text style={gras}>{it.nom_produit}</Text>
+                  {!g.consigne && it.volume ? <Text style={{ color: C.gris, fontSize: 8 }}> · {it.volume}</Text> : null}
+                </Text>
+                <Text style={s.colQte}>{nb(it.quantite)}</Text>
+                <Text style={[s.colPrix, { color: C.gris }]}>{fmt(it.prix_unitaire)}</Text>
+                <Text style={[s.colMontant, gras]}>{fmt(it.sous_total)}</Text>
+              </View>
+            ))}
+            {groupes.length > 1 && (
+              <View style={s.sousTotal} wrap={false}>
+                <Text style={[s.colNom, { textAlign: "right" }]}>Sous-total {g.titre}</Text>
+                <Text style={[s.colQte, gras, { color: C.texte }]}>{nb(g.quantite)}</Text>
+                <Text style={s.colPrix} />
+                <Text style={[s.colMontant, gras, { color: C.texte }]}>{fmt(g.montant)}</Text>
+              </View>
+            )}
           </View>
         ))}
 
-        {/* TOTALS */}
-        <View style={s.totalsSection}>
-          <View style={s.totalsBox}>
-            <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 6, paddingHorizontal: 14 }}>
-              <Text style={[s.tableCellText, { color: C.muted }]}>Nombre de casiers</Text>
-              <Text style={s.totalsVal}>{totalCasiers(data).toLocaleString("fr-FR")}</Text>
-            </View>
-            <View style={s.grandRow}>
-              <Text style={s.grandLabel}>TOTAL</Text>
-              <Text style={s.grandVal}>{formatMontant(total, devise)}</Text>
-            </View>
-          </View>
-        </View>
-
-        <Text style={{ fontSize: 8.5, color: C.text, marginBottom: 12 }}>{sommeEnLettres(total, devise.symbole)}</Text>
-
-        {/* PAYMENT CARDS */}
-        {montant_recu !== null && (
-          <View style={s.paySection}>
-            {montant_recu !== null && (
-              <View style={[s.payCard, s.payCardBlue]}>
-                <Text style={[s.payLabel, s.payLabelBlue]}>Montant reçu</Text>
-                <Text style={[s.payAmount, s.payAmountBlue]}>{formatMontant(montant_recu, devise)}</Text>
-              </View>
-            )}
-            {monnaie_rendue !== null && monnaie_rendue > 0 && (
-              <View style={[s.payCard, s.payCardGreen]}>
-                <Text style={[s.payLabel, s.payLabelGreen]}>Monnaie rendue</Text>
-                <Text style={[s.payAmount, s.payAmountGreen]}>{formatMontant(monnaie_rendue, devise)}</Text>
-              </View>
-            )}
-          </View>
-        )}
-
-        {/* COMPTE CLIENT : ancien solde + cette facture − réglé = nouveau solde */}
-        {compte && (
-          <View wrap={false} style={{ borderWidth: 1, borderColor: "#fed7aa", backgroundColor: "#fff7ed", borderRadius: 7, padding: 10, marginBottom: 14 }}>
-            <Text style={[s.clientLabel, { color: "#9a3412" }]}>Compte client</Text>
-            {compte.argent && (
-              <View style={{ marginBottom: compte.casiers.length ? 8 : 0 }}>
-                {(enLivraison ? [
-                  ["Ancien solde dû", compte.argent.ancien],
-                  ["Achat de ce jour", compte.argent.achat],
-                ] : [
-                  ["Ancien solde dû", compte.argent.ancien],
-                  ["Achat de ce jour", compte.argent.achat],
-                  ["Total à payer", compte.argent.total_general],
-                  ["Payé", compte.argent.paye],
-                  ...((compte.argent.regle_apres ?? 0) > 0 ? [["Réglé depuis", compte.argent.regle_apres ?? 0]] : []),
-                ]).map(([libelle, val]) => (
-                  <View key={libelle as string} style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 2 }}>
-                    <Text style={s.tableCellText}>{libelle}</Text>
-                    <Text style={s.tableCellText}>{formatMontant(val as number, devise)}</Text>
-                  </View>
-                ))}
-                <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 4, paddingTop: 4, borderTopWidth: 1, borderTopColor: "#fed7aa" }}>
-                  <Text style={[s.totalsVal, { color: "#9a3412" }]}>{enLivraison ? "Total à encaisser" : compte.argent.nouveau >= 0 ? "Reste dû" : "Avoir du client"}</Text>
-                  <Text style={[s.totalsVal, { color: "#9a3412" }]}>{formatMontant(Math.abs(enLivraison ? compte.argent.total_general : compte.argent.nouveau), devise)}</Text>
-                </View>
-              </View>
-            )}
-            {compte.casiers.length > 0 && (
-              <View>
-                <View style={{ flexDirection: "row", borderBottomWidth: 1, borderBottomColor: "#fed7aa", paddingBottom: 3 }}>
-                  {(enLivraison ? ["Emballage", "Dû avant", "Livrés", "Dû en tout"] : ["Emballage", "Dû avant", "Livrés", "Rendus", "Dû après"]).map((h, i) => (
-                    <Text key={h} style={[s.clientLabel, { color: "#9a3412", marginBottom: 0 }, i === 0 ? { flex: 1 } : { width: 55, textAlign: "right" }]}>{h}</Text>
+        {/* TOTAUX EN BAS : emballages à gauche, argent à droite */}
+        <View style={s.bas} wrap={false}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.etiquette}>Emballages</Text>
+            <View style={s.ligne}><Text>Casiers consignés livrés</Text><Text style={gras}>{nb(emb.consignes)}</Text></View>
+            {emb.nonConsignes > 0 && <View style={s.ligne}><Text style={{ color: C.gris }}>Packs et cartons (non consignés)</Text><Text style={{ color: C.gris }}>{nb(emb.nonConsignes)}</Text></View>}
+            {compte && compte.casiers.length > 0 && (
+              <View style={{ marginTop: 6 }}>
+                <View style={{ flexDirection: "row", paddingBottom: 3 }}>
+                  {(enLivraison ? ["Casiers à rendre", "Avant", "Livrés", "Total"] : ["Casiers à rendre", "Avant", "Livrés", "Rendus", "Après"]).map((h, i) => (
+                    <Text key={h} style={[s.enteteCol, i === 0 ? { flex: 1 } : { width: 40, textAlign: "right" }]}>{h}</Text>
                   ))}
                 </View>
                 {compte.casiers.map((c, i) => (
-                  <View key={i} style={{ flexDirection: "row", marginTop: 3 }}>
-                    <Text style={[s.tableCellText, { flex: 1 }]}>{c.nom}</Text>
-                    <Text style={[s.tableCellText, { width: 55, textAlign: "right" }]}>{c.avant}</Text>
-                    <Text style={[s.tableCellText, { width: 55, textAlign: "right" }]}>+{c.livres}</Text>
-                    {!enLivraison && <Text style={[s.tableCellText, { width: 55, textAlign: "right" }]}>−{c.rendus}</Text>}
-                    <Text style={[s.totalsVal, { width: 55, textAlign: "right", color: c.apres > 0 ? "#9a3412" : C.text }]}>{c.apres}</Text>
+                  <View key={i} style={{ flexDirection: "row", borderTopWidth: 1, borderTopColor: C.trait, paddingVertical: 2.5, fontSize: 8 }}>
+                    <Text style={{ flex: 1 }}>{c.nom}</Text>
+                    <Text style={{ width: 40, textAlign: "right" }}>{nb(c.avant)}</Text>
+                    <Text style={{ width: 40, textAlign: "right" }}>+{nb(c.livres)}</Text>
+                    {!enLivraison ? <Text style={{ width: 40, textAlign: "right" }}>−{nb(c.rendus)}</Text> : null}
+                    <Text style={[gras, { width: 40, textAlign: "right", color: c.apres > 0 ? C.orange : C.texte }]}>{nb(c.apres)}</Text>
                   </View>
                 ))}
               </View>
             )}
           </View>
-        )}
+
+          <View style={{ width: 210 }}>
+            {a && a.ancien !== 0 ? <Ligne libelle="Ancien solde dû" valeur={fmt(a.ancien)} /> : null}
+            <Ligne libelle="Achat de ce jour" valeur={fmt(total)} fort />
+            {a && !enLivraison ? <>
+              {a.ancien !== 0 ? <Ligne libelle="Total à payer" valeur={fmt(a.total_general)} /> : null}
+              <Ligne libelle="Payé" valeur={fmt(a.paye)} />
+              {(a.regle_apres ?? 0) > 0 ? <Ligne libelle="Réglé depuis" valeur={fmt(a.regle_apres ?? 0)} /> : null}
+            </> : null}
+            {montant_recu !== null ? <Ligne libelle="Montant reçu" valeur={fmt(montant_recu)} /> : null}
+            {monnaie_rendue !== null && monnaie_rendue > 0 ? <Ligne libelle="Monnaie rendue" valeur={fmt(monnaie_rendue)} /> : null}
+            <View style={s.bandeau}>
+              <Text style={s.bandeauLibelle}>
+                {enLivraison ? "À encaisser" : a ? (a.nouveau > 0 ? "Reste dû" : a.nouveau < 0 ? "Avoir du client" : "Compte soldé") : "Total"}
+              </Text>
+              <Text style={s.bandeauMontant}>{fmt(enLivraison ? a?.total_general ?? total : a ? Math.abs(a.nouveau) : total)}</Text>
+            </View>
+          </View>
+        </View>
+
+        <Text style={{ fontSize: 8, marginTop: 10, fontStyle: "italic" }}>{sommeEnLettres(total, devise.symbole)}</Text>
 
         {/* À REMPLIR PAR LE LIVREUR : ce que le client remet, signé sur place */}
         {enLivraison && (
-          <View wrap={false} style={{ borderWidth: 1.5, borderColor: C.primary, borderRadius: 7, padding: 10, marginBottom: 14 }}>
-            <Text style={[s.clientLabel, { color: C.primary }]}>À remplir à la livraison</Text>
+          <View wrap={false} style={{ borderWidth: 1.5, borderColor: C.encre, borderRadius: 6, padding: 10, marginTop: 12 }}>
+            <Text style={[s.etiquette, { color: C.encre }]}>À remplir à la livraison</Text>
             <View style={{ flexDirection: "row", alignItems: "flex-end", marginTop: 8 }}>
-              <Text style={s.totalsVal}>Montant reçu</Text><View style={ligneVide} /><Text style={[s.tableCellText, { marginLeft: 4 }]}>{devise.symbole}</Text>
+              <Text style={gras}>Montant reçu</Text><View style={ligneVide} /><Text style={{ marginLeft: 4 }}>{devise.symbole}</Text>
             </View>
             {(compte?.casiers ?? []).map((c, i) => (
               <View key={i} style={{ flexDirection: "row", alignItems: "flex-end", marginTop: 10 }}>
-                <Text style={s.tableCellText}>Casiers vides rendus · {c.nom}</Text><View style={ligneVide} />
+                <Text>Casiers vides rendus · {c.nom}</Text><View style={ligneVide} />
               </View>
             ))}
             <View style={{ flexDirection: "row", marginTop: 18, gap: 20 }}>
-              <View style={{ flex: 1, flexDirection: "row", alignItems: "flex-end" }}><Text style={s.tableCellText}>Signature du client</Text><View style={ligneVide} /></View>
-              <View style={{ flex: 1, flexDirection: "row", alignItems: "flex-end" }}><Text style={s.tableCellText}>Signature du livreur</Text><View style={ligneVide} /></View>
+              <View style={{ flex: 1, flexDirection: "row", alignItems: "flex-end" }}><Text>Signature du client</Text><View style={ligneVide} /></View>
+              <View style={{ flex: 1, flexDirection: "row", alignItems: "flex-end" }}><Text>Signature du livreur</Text><View style={ligneVide} /></View>
             </View>
           </View>
         )}
 
-        {/* FOOTER */}
-        <View style={s.footer} wrap={false}>
-          <Text style={s.thankYou}>Merci pour votre confiance !</Text>
-          <View style={s.footerGrid}>
-            <View style={{ flex: 1 }}>
-              <Text style={s.legalTitle}>Conditions & mentions légales</Text>
-              <Text style={s.legalText}>
-                {enLivraison
-                  ? `À encaisser à la livraison : ${formatMontant(compte?.argent?.total_general ?? total, devise)}. Le livreur note ici l'argent et les casiers reçus.`
-                  : acquittee
-                  ? `Facture acquittée, réglée en espèces le ${date.split(" à")[0]}.`
-                  : `Reste dû par le client : ${formatMontant(compte!.argent!.nouveau, devise)}.`}{"\n"}
-                Aucun échange ni remboursement après validation de la vente.{"\n"}
-                Tout litige doit être signalé dans les 24h suivant la livraison.{"\n"}
-                Document généré par StockFlow · {commerce.nom}
-              </Text>
-            </View>
-          </View>
-          <Text style={s.pageNum}>{numero_facture} · {commerce.nom}</Text>
+        {/* PIED */}
+        <View style={s.pied} wrap={false}>
+          <Text style={s.merci}>Merci pour votre confiance</Text>
+          <Text style={s.mentions}>
+            {enLivraison
+              ? `À encaisser à la livraison : ${fmt(a?.total_general ?? total)}. Le livreur note ici l'argent et les casiers reçus.`
+              : acquittee ? `Facture acquittée le ${date.split(" à")[0]}.` : `Reste dû par le client : ${fmt(a?.nouveau ?? 0)}.`}
+            {" "}Les casiers consignés restent la propriété du dépôt jusqu'à leur retour. Packs et cartons ne sont pas repris.{"\n"}
+            Aucun échange ni remboursement après validation · {commerce.nom} · {numero_facture}
+          </Text>
         </View>
 
         {/* Numéro de page en bas de chaque page, à l'écart du contenu */}
-        <Text style={{ position: "absolute", bottom: 14, left: 0, right: 0, textAlign: "center", fontSize: 7, color: C.muted }}
+        <Text style={{ position: "absolute", bottom: 14, left: 0, right: 0, textAlign: "center", fontSize: 7, color: C.gris }}
           render={({ pageNumber, totalPages }) => totalPages > 1 ? `Page ${pageNumber} / ${totalPages}` : ""} fixed />
       </Page>
     </Document>

@@ -231,12 +231,13 @@ export default function Vente() {
 
 
   // ── Casiers : livrés (1 par casier vendu) et rendus sur place ─────────────
-  const emballageDuFormat = new Map(produits.flatMap(p => p.formats.map(f => [f.id, f.emballage_id ?? null] as const)));
+  const emballageDuFormat = new Map(produits.flatMap(p => p.formats.map(f =>
+    [f.id, f.unite === "pack" || f.unite === "canette" ? null : f.emballage_id ?? null] as const)));
   const nomEmballage = (id: string) => emballages.find(e => e.id === id)?.nom ?? "Casier";
   const livres: Record<string, number> = {};
   for (const i of items) {
     const e = emballageDuFormat.get(i.format_id);
-    if (e) livres[e] = (livres[e] ?? 0) + Math.ceil(i.quantite); // casier entamé = casier consigné
+    if (e) livres[e] = arrondi((livres[e] ?? 0) + i.quantite); // somme exacte, sans arrondi
   }
   // Casiers que le client doit déjà : il peut les rapporter à cette livraison
   const dusClient: Record<string, number> = selectedClient && selectedClient.est_defaut !== 1
@@ -249,7 +250,7 @@ export default function Vente() {
     const max = (livres[e] ?? 0) + (dusClient[e] ?? 0);
     // En livraison, rien n'est rendu tant que le livreur n'est pas revenu
     if (modeLivraison) return [e, 0];
-    return [e, saisi === undefined ? (livres[e] ?? 0) : Math.min(max, Math.max(0, parseInt(saisi) || 0))];
+    return [e, saisi === undefined ? (livres[e] ?? 0) : Math.min(max, Math.max(0, lireNombre(saisi) || 0))];
   }));
   const casiersNonRendus = typesCasiers.reduce((s, e) => s + Math.max(0, (livres[e] ?? 0) - rendus[e]), 0);
 
@@ -278,6 +279,7 @@ export default function Vente() {
       client: { nom: selectedClient?.nom ?? "Client", telephone: selectedClient?.telephone ?? "", adresse: "" },
       items: items.map(i => ({
         nom_produit: i.nom, volume: volumeFr(i.volume, i.unite, i.casier),
+        unite: i.unite, litres: i.unite === "L" ? i.volume : null, casier: i.casier ?? null,
         quantite: i.quantite, prix_unitaire: i.prix, sous_total: i.sous_total,
       })),
       total,
@@ -830,7 +832,7 @@ export default function Vente() {
                     <button type="button" aria-label="Un casier rendu de moins"
                       onClick={() => setRendusSaisis(r => ({ ...r, [e]: String(Math.max(0, rendus[e] - 1)) }))}
                       className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center"><Minus size={13} /></button>
-                    <input type="number" inputMode="numeric" min="0" value={rendusSaisis[e] ?? String(rendus[e])} aria-label={`Casiers rendus : ${nomEmballage(e)}`}
+                    <input type="text" inputMode="decimal" value={rendusSaisis[e] ?? rendus[e].toLocaleString("fr-FR")} aria-label={`Casiers rendus : ${nomEmballage(e)}`}
                       onChange={ev => setRendusSaisis(r => ({ ...r, [e]: ev.target.value }))}
                       className="w-12 h-8 rounded-lg border border-slate-300 px-1 text-sm font-semibold text-center focus:outline-none focus:border-secondary" />
                     <button type="button" aria-label="Un casier rendu de plus"

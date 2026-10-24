@@ -15,7 +15,7 @@ import Button from "@/components/ui/Button";
 import { FactureHTML } from "@/components/facture/FactureHTML";
 import { type FactureData } from "@/components/facture/FacturePDF";
 import { prepareVenteData, downloadFacture, printFacture, type ParametresRaw } from "@/lib/pdf";
-import { volumeFr } from "@/lib/format";
+import { volumeFr, lireNombre } from "@/lib/format";
 import { useTempsReel } from "@/lib/tempsReel";
 import { usePeut } from "@/lib/droits";
 import { useNavigate } from "react-router-dom";
@@ -166,7 +166,7 @@ export default function HistoriqueVentes() {
     if (!regler) return;
     setReglerLoading(true);
     try {
-      const emballages = Object.fromEntries(Object.entries(reglerCasiers).map(([e, n]) => [e, parseInt(n) || 0]));
+      const emballages = Object.fromEntries(Object.entries(reglerCasiers).map(([e, n]) => [e, lireNombre(n) || 0]));
       await invoke("regler_vente", { venteId: regler.id, montant: parseFloat(reglerMontant) || 0, emballages });
       toast(`Règlement enregistré sur ${regler.numero_facture}`, "success");
       setRegler(null);
@@ -270,7 +270,7 @@ export default function HistoriqueVentes() {
                         : reste > 0 || dus > 0 ? (
                           <span className="flex gap-1 flex-shrink-0">
                             {reste > 0 && <Badge variant="warning">Reste {formatPrix(reste)}</Badge>}
-                            {dus > 0 && <Badge variant="info">{dus} {dus > 1 ? "casiers dus" : "casier dû"}</Badge>}
+                            {dus > 0 && <Badge variant="info">{dus.toLocaleString("fr-FR")} {dus > 1 ? "casiers dus" : "casier dû"}</Badge>}
                           </span>
                         ) : <Badge variant="success">Payée</Badge>}
                     </div>
@@ -402,8 +402,8 @@ export default function HistoriqueVentes() {
                 <label className="text-[13px] font-bold uppercase tracking-wide text-ink-600">Casiers vides rendus</label>
                 {Object.entries(casiersDus(regler)).map(([e, n]) => (
                   <div key={e} className="flex items-center justify-between gap-3">
-                    <span className="text-sm text-gray-700">{nomsEmballages[e] ?? "Casiers"} <span className="text-gray-400">({n} {n > 1 ? "dus" : "dû"})</span></span>
-                    <input type="number" inputMode="numeric" min="0" max={n} value={reglerCasiers[e] ?? ""}
+                    <span className="text-sm text-gray-700">{nomsEmballages[e] ?? "Casiers"} <span className="text-gray-400">({n.toLocaleString("fr-FR")} {n > 1 ? "dus" : "dû"})</span></span>
+                    <input type="text" inputMode="decimal" value={reglerCasiers[e] ?? ""}
                       onChange={ev => setReglerCasiers(c => ({ ...c, [e]: ev.target.value }))} aria-label={`Casiers ${nomsEmballages[e] ?? ""} rendus`}
                       className="w-24 h-11 rounded-xl border border-slate-300 px-3 text-lg font-bold text-center focus:outline-none focus:border-secondary" />
                   </div>

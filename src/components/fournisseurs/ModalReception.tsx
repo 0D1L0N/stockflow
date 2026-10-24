@@ -121,7 +121,7 @@ export default function ModalReception({ isOpen, onClose, onDone, fournisseurId,
   const livres: Record<string, number> = {};
   for (const l of lignes) {
     const e = parId.get(l.formatId)?.emballage_id;
-    if (e) livres[e] = (livres[e] ?? 0) + Math.ceil(lireNombre(l.quantite) || 0);
+    if (e) livres[e] = arrondi((livres[e] ?? 0) + (lireNombre(l.quantite) || 0));
   }
   // Par défaut on rend autant de casiers vides qu'on en reçoit de pleins
   const rendu = (e: string) => rendus[e] ?? String(livres[e] ?? 0);
@@ -142,7 +142,7 @@ export default function ModalReception({ isOpen, onClose, onDone, fournisseurId,
         fournisseurId: fournisseur, numeroBl: bl,
         lignes: lignes.map(l => ({ formatId: l.formatId, quantite: lireNombre(l.quantite) || 0, prixAchat: parseFloat(l.prixAchat) || 0 })),
         montantPaye: payeNombre,
-        emballagesRendus: Object.fromEntries(Object.keys(livres).map(e => [e, parseInt(rendu(e)) || 0])),
+        emballagesRendus: Object.fromEntries(Object.keys(livres).map(e => [e, lireNombre(rendu(e)) || 0])),
         commentaire,
         commandeId: commande?.id ?? null,
       });
@@ -279,7 +279,7 @@ export default function ModalReception({ isOpen, onClose, onDone, fournisseurId,
           <section className="flex flex-col gap-2">
             <h3 className="text-[13px] font-bold uppercase tracking-wide text-ink-600">Casiers vides rendus au fournisseur</h3>
             {Object.keys(livres).map(e => {
-              const r = parseInt(rendu(e)) || 0;
+              const r = lireNombre(rendu(e)) || 0;
               const net = livres[e] - r;
               return (
                 <div key={e} className="flex items-center gap-3">
@@ -290,7 +290,7 @@ export default function ModalReception({ isOpen, onClose, onDone, fournisseurId,
                       {net > 0 ? ` · ${net} à lui rendre plus tard` : net < 0 ? ` · ${-net} rendu${-net > 1 ? "s" : ""} en avance` : " · échange complet"}
                     </div>
                   </div>
-                  <input type="number" inputMode="numeric" min="0" value={rendu(e)} aria-label={`Vides rendus ${nomEmballage(e)}`}
+                  <input type="text" inputMode="decimal" value={rendu(e)} aria-label={`Vides rendus ${nomEmballage(e)}`}
                     onChange={ev => setRendus(x => ({ ...x, [e]: ev.target.value }))}
                     className="w-20 h-9 rounded-lg border border-slate-300 px-2 text-sm font-semibold text-right focus:outline-none focus:border-secondary" />
                 </div>

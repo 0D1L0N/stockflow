@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
+import { lireNombre, arrondi } from "@/lib/format";
 import { Wallet, Package2, ShoppingCart, XCircle, Minus, Plus, FilePlus2 } from "lucide-react";
 import { usePeut } from "@/lib/droits";
 import { useCatalogueStore } from "@/stores/catalogueStore";
@@ -92,7 +93,7 @@ export default function ModalCompteClient({ client, nomEmballage, onClose, onCha
   };
 
   const enregistrerRetour = async () => {
-    const emballages = Object.fromEntries(Object.entries(retours).map(([e, v]) => [e, parseInt(v) || 0]));
+    const emballages = Object.fromEntries(Object.entries(retours).map(([e, v]) => [e, lireNombre(v) || 0]));
     setEnvoi(true);
     try {
       appliquer(await invoke("retour_emballages", { clientId: client!.id, emballages, commentaire: null }));
@@ -103,7 +104,7 @@ export default function ModalCompteClient({ client, nomEmballage, onClose, onCha
   };
 
   const enregistrerDette = async () => {
-    const emballages = Object.fromEntries(Object.entries(detteCasiers).map(([e, v]) => [e, parseInt(v) || 0]));
+    const emballages = Object.fromEntries(Object.entries(detteCasiers).map(([e, v]) => [e, lireNombre(v) || 0]));
     setEnvoi(true);
     try {
       appliquer(await invoke("ajouter_dette", { clientId: client!.id, montant: parseFloat(detteMontant) || 0, emballages, commentaire: detteMotif }));
@@ -112,7 +113,7 @@ export default function ModalCompteClient({ client, nomEmballage, onClose, onCha
     } catch (e) { toast(e instanceof Error ? e.message : String(e), "error"); }
     setEnvoi(false);
   };
-  const detteVide = !(parseFloat(detteMontant) > 0) && !Object.values(detteCasiers).some(v => parseInt(v) > 0);
+  const detteVide = !(parseFloat(detteMontant) > 0) && !Object.values(detteCasiers).some(v => lireNombre(v) > 0);
 
   const resumeCasiers = (c: Record<string, number>) =>
     Object.entries(c).filter(([, n]) => n !== 0)
@@ -134,7 +135,7 @@ export default function ModalCompteClient({ client, nomEmballage, onClose, onCha
             {casiersDus.length === 0 ? (
               <div className="text-xl font-extrabold mt-1 text-secondary">0</div>
             ) : casiersDus.map(([e, n]) => (
-              <div key={e} className="text-sm font-bold text-orange-700 mt-1">{n} × {nomEmballage(e)}</div>
+              <div key={e} className="text-sm font-bold text-orange-700 mt-1">{n.toLocaleString("fr-FR")} × {nomEmballage(e)}</div>
             ))}
           </div>
         </div>
@@ -156,25 +157,25 @@ export default function ModalCompteClient({ client, nomEmballage, onClose, onCha
           <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 p-4">
             <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Casiers rapportés</span>
             {casiersDus.map(([e, n]) => {
-              const q = Math.max(0, Math.min(n, parseInt(retours[e] ?? "0") || 0));
+              const q = Math.max(0, Math.min(n, lireNombre(retours[e] ?? "0") || 0));
               return (
                 <div key={e} className="flex items-center gap-2 text-sm">
                   <div className="flex-1 min-w-0">
                     <div className="text-gray-800 font-medium">{nomEmballage(e)}</div>
-                    <div className="text-[11px] text-gray-400">{n} à rendre</div>
+                    <div className="text-[11px] text-gray-400">{n.toLocaleString("fr-FR")} à rendre</div>
                   </div>
-                  <button type="button" aria-label="Un de moins" onClick={() => setRetours(r => ({ ...r, [e]: String(Math.max(0, q - 1)) }))}
+                  <button type="button" aria-label="Un de moins" onClick={() => setRetours(r => ({ ...r, [e]: String(arrondi(Math.max(0, q - 1))) }))}
                     className="w-9 h-9 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center"><Minus size={14} /></button>
-                  <input type="number" inputMode="numeric" min="0" max={n} placeholder="0" value={retours[e] ?? ""} aria-label={`Casiers rapportés : ${nomEmballage(e)}`}
+                  <input type="text" inputMode="decimal" placeholder="0" value={retours[e] ?? ""} aria-label={`Casiers rapportés : ${nomEmballage(e)}`}
                     onChange={ev => setRetours(r => ({ ...r, [e]: ev.target.value }))}
                     className="w-12 h-9 rounded-lg border border-slate-300 text-sm font-semibold text-center focus:outline-none focus:border-secondary" />
-                  <button type="button" aria-label="Un de plus" onClick={() => setRetours(r => ({ ...r, [e]: String(Math.min(n, q + 1)) }))}
+                  <button type="button" aria-label="Un de plus" onClick={() => setRetours(r => ({ ...r, [e]: String(arrondi(Math.min(n, q + 1))) }))}
                     className="w-9 h-9 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center"><Plus size={14} /></button>
                 </div>
               );
             })}
             <Button icon={<Package2 size={15} />} onClick={enregistrerRetour} loading={envoi} className="w-full"
-              disabled={!Object.values(retours).some(v => parseInt(v) > 0)}>
+              disabled={!Object.values(retours).some(v => lireNombre(v) > 0)}>
               Enregistrer le retour
             </Button>
           </div>
@@ -191,7 +192,7 @@ export default function ModalCompteClient({ client, nomEmballage, onClose, onCha
               {typesCasiers.map(e => (
                 <div key={e.id} className="flex items-center justify-between gap-3 text-sm">
                   <span className="text-gray-800">{e.nom}</span>
-                  <input type="number" inputMode="numeric" min="0" placeholder="0" value={detteCasiers[e.id] ?? ""} aria-label={`Casiers dus : ${e.nom}`}
+                  <input type="text" inputMode="decimal" placeholder="0" value={detteCasiers[e.id] ?? ""} aria-label={`Casiers dus : ${e.nom}`}
                     onChange={ev => setDetteCasiers(c => ({ ...c, [e.id]: ev.target.value }))}
                     className="w-20 h-10 rounded-lg border border-slate-300 text-sm font-semibold text-center focus:outline-none focus:border-secondary" />
                 </div>

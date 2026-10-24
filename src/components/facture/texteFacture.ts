@@ -1,4 +1,4 @@
-import type { FactureData } from "./FacturePDF";
+import type { FactureData, FactureItem } from "./FacturePDF";
 
 /** Mode de paiement réel : comptant, paiement partiel ou à crédit. */
 export function modePaiement(data: FactureData): string {
@@ -8,8 +8,57 @@ export function modePaiement(data: FactureData): string {
   return a.paye > 0 ? "Espèces · paiement partiel" : "À crédit";
 }
 
-/** Nombre total de casiers (ou cartons, packs) de la facture. */
-export const totalCasiers = (data: FactureData) => Math.round(data.items.reduce((t, i) => t + i.quantite, 0) * 100) / 100;
+// Casier habituel selon le volume de la bouteille (comme les types d'emballage par défaut)
+const CASIER_DEFAUT: Record<number, number> = { 0.33: 24, 0.5: 20, 0.66: 12 };
+const arrondi = (n: number) => Math.round(n * 100) / 100;
+
+/** Les articles d'un même format (0,5 L · casier de 12, packs…), avec leur sous-total. */
+export interface GroupeFacture {
+  cle: string; titre: string;
+  /** Casier consigné : le client rend les vides. Packs et canettes : emballage perdu */
+  consigne: boolean;
+  items: FactureItem[]; quantite: number; montant: number;
+}
+
+function familleArticle(i: FactureItem): { cle: string; titre: string; ordre: number; consigne: boolean } {
+  if (i.unite === "pack") return { cle: "pack", titre: "Packs", ordre: 9000, consigne: false };
+  if (i.unite === "canette") return { cle: "canette", titre: "Canettes", ordre: 9500, consigne: false };
+  if (i.litres == null) return { cle: "articles", titre: "Articles", ordre: 9900, consigne: true };
+  const casier = i.casier ?? CASIER_DEFAUT[i.litres];
+  return {
+    cle: `${i.litres}-${casier ?? 0}`,
+    titre: `${i.litres.toLocaleString("fr-FR")} L${casier ? ` · casier de ${casier}` : ""}`,
+    ordre: i.litres * 1000 + (casier ?? 0), consigne: true,
+  };
+}
+
+/** Articles rangés par format, du plus petit au plus grand ; packs et canettes à la fin. */
+export function groupesFacture(data: FactureData): GroupeFacture[] {
+  const groupes = new Map<string, GroupeFacture & { ordre: number }>();
+  for (const item of data.items) {
+    const f = familleArticle(item);
+    const g = groupes.get(f.cle) ?? { cle: f.cle, titre: f.titre, ordre: f.ordre, consigne: f.consigne, items: [], quantite: 0, montant: 0 };
+    g.items.push(item);
+    g.quantite = arrondi(g.quantite + item.quantite);
+    g.montant += item.sous_total;
+    groupes.set(f.cle, g);
+  }
+  return [...groupes.values()].sort((a, b) => a.ordre - b.ordre)
+    .map(({ ordre: _o, ...g }) => ({ ...g, items: [...g.items].sort((a, b) => a.nom_produit.localeCompare(b.nom_produit, "fr")) }));
+}
+
+/**
+ * Emballages de la facture. Seuls les casiers sont consignés (somme exacte : 5,5 reste 5,5) ;
+ * packs et cartons de canettes partent avec le client et ne se rendent pas.
+ */
+export function emballagesFacture(data: FactureData): { consignes: number; nonConsignes: number } {
+  let consignes = 0, nonConsignes = 0;
+  for (const g of groupesFacture(data)) {
+    if (g.consigne) consignes = arrondi(consignes + g.quantite);
+    else nonConsignes = arrondi(nonConsignes + g.quantite);
+  }
+  return { consignes, nonConsignes };
+}
 
 const UNITES = ["zéro", "un", "deux", "trois", "quatre", "cinq", "six", "sept", "huit", "neuf", "dix",
   "onze", "douze", "treize", "quatorze", "quinze", "seize"];

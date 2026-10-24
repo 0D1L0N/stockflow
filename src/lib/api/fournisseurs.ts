@@ -52,7 +52,7 @@ export interface OperationFournisseur {
 const nomUtilisateur = () => useAuthStore.getState().profil?.nom ?? "";
 const entiers = (o: unknown): Record<string, number> => Object.fromEntries(
   Object.entries((o ?? {}) as Record<string, unknown>)
-    .map(([k, v]) => [k, Math.trunc(Number(v))] as const)
+    .map(([k, v]) => [k, arrondi(Number(v) || 0)] as const)
     .filter(([, v]) => v > 0));
 const plusRecent = <T extends { date: string }>(a: T, b: T) => b.date.localeCompare(a.date);
 

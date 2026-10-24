@@ -57,6 +57,7 @@ export function prepareVenteData(
   const items: FactureItem[] = details.map(d => ({
     nom_produit: d.produit_nom ?? "—",
     volume: volumeFr(d.volume, d.unite, d.casier),
+    unite: d.unite, litres: d.unite === "L" ? d.volume : null, casier: d.casier ?? null,
     quantite: d.quantite,
     prix_unitaire: d.prix_utilise,
     sous_total: Math.round(d.quantite * d.prix_utilise),

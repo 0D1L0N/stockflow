@@ -1,4 +1,5 @@
 import { doc, getDoc, increment, query, serverTimestamp, where, writeBatch } from "firebase/firestore";
+import { arrondi } from "@/lib/format";
 import { db, auth } from "@/lib/firebase";
 import { useAuthStore } from "@/stores/authStore";
 import { col, ecrire, lister, maintenant, type Commande, type Id } from "./outils";
@@ -97,9 +98,9 @@ export const casiers: Record<string, Commande> = {
    */
   valider_comptage_casiers: async ({ vides, pleins, commentaire }) => {
     const comptesVides = Object.entries((vides ?? {}) as Record<Id, unknown>)
-      .filter(([, n]) => n !== "" && n !== null && n !== undefined).map(([k, n]) => [k, Math.trunc(Number(n))] as const);
+      .filter(([, n]) => n !== "" && n !== null && n !== undefined).map(([k, n]) => [k, arrondi(Number(n))] as const);
     const comptesPleins = Object.entries((pleins ?? {}) as Record<Id, unknown>)
-      .filter(([, n]) => n !== "" && n !== null && n !== undefined).map(([k, n]) => [k, Math.trunc(Number(n))] as const);
+      .filter(([, n]) => n !== "" && n !== null && n !== undefined).map(([k, n]) => [k, arrondi(Number(n))] as const);
     if ([...comptesVides, ...comptesPleins].some(([, n]) => !(n >= 0))) throw new Error("Un nombre compté ne peut pas être négatif.");
     if (!comptesVides.length && !comptesPleins.length) throw new Error("Saisissez au moins un nombre compté.");
 
@@ -134,7 +135,7 @@ export const casiers: Record<string, Commande> = {
 
   /** Casiers vides cassés ou perdus : retirés du magasin, avec un motif à part. */
   retirer_casiers_casses: async ({ emballageId, quantite, commentaire }) => {
-    const q = Math.trunc(Number(quantite));
+    const q = arrondi(Number(quantite) || 0);
     if (!(q > 0)) throw new Error("Indiquez le nombre de casiers cassés ou perdus.");
     const batch = writeBatch(db);
     await mouvementsVides(batch, { [emballageId as Id]: -q }, { source: "cassé", commentaire: String(commentaire ?? "").trim() || null });

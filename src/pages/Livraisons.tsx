@@ -14,7 +14,7 @@ import { useAppStore } from "@/stores/appStore";
 import { invoke } from "@/lib/db";
 import { prepareVenteData, printFacture, type ParametresRaw } from "@/lib/pdf";
 import { useTempsReel } from "@/lib/tempsReel";
-import { casiers } from "@/lib/format";
+import { casiers, lireNombre } from "@/lib/format";
 
 interface Livraison {
   id: string; numero_facture: string; date: string; client_id: string; client_nom: string | null;
@@ -98,7 +98,7 @@ export default function Livraisons() {
     const s = saisies[l.id];
     return {
       montant: Math.max(0, parseFloat(s?.montant ?? "0") || 0),
-      casiers: Object.fromEntries(Object.entries(s?.casiers ?? {}).map(([e, n]) => [e, Math.max(0, parseInt(n) || 0)])),
+      casiers: Object.fromEntries(Object.entries(s?.casiers ?? {}).map(([e, n]) => [e, Math.max(0, lireNombre(n) || 0)])),
     };
   };
   const totalArgent = affichees.reduce((t, l) => t + valeurs(l).montant, 0);
@@ -226,13 +226,13 @@ export default function Livraisons() {
                 <div className="flex flex-col gap-1.5">
                   <label className="text-[12px] font-bold uppercase tracking-wide text-ink-600">Casiers vides rendus</label>
                   {Object.entries(dus).map(([e, n]) => {
-                    const rendu = parseInt(s?.casiers[e] ?? "0") || 0;
+                    const rendu = lireNombre(s?.casiers[e] ?? "0") || 0;
                     return (
                       <div key={e} className="flex items-center justify-between gap-3">
-                        <span className="text-sm text-gray-700">{nomEmballage(e)} <span className="text-gray-400">({n} livré{n > 1 ? "s" : ""})</span>
+                        <span className="text-sm text-gray-700">{nomEmballage(e)} <span className="text-gray-400">({n.toLocaleString("fr-FR")} livré{n > 1 ? "s" : ""})</span>
                           {rendu < n && <span className="block text-xs font-semibold text-orange-700">{casiers(n - rendu)} encore dû{n - rendu > 1 ? "s" : ""}</span>}
                         </span>
-                        <input type="number" inputMode="numeric" min="0" value={s?.casiers[e] ?? ""} onFocus={ev => ev.target.select()}
+                        <input type="text" inputMode="decimal" value={s?.casiers[e] ?? ""} onFocus={ev => ev.target.select()}
                           onChange={ev => majSaisie(l.id, { casiers: { ...s?.casiers, [e]: ev.target.value } })}
                           aria-label={`${nomEmballage(e)} rendus par ${l.client_nom}`}
                           className="w-24 h-11 rounded-xl border border-slate-300 px-3 text-lg font-bold text-center focus:outline-none focus:border-secondary" />

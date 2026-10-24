@@ -2,7 +2,7 @@ import { doc, getDoc, increment, query, serverTimestamp, where, writeBatch, type
 import { db, auth } from "@/lib/firebase";
 import { useAuthStore } from "@/stores/authStore";
 import { col, ecrire, lister, maintenant, type Commande, type Id } from "./outils";
-import { nombreFr } from "@/lib/format";
+import { nombreFr, arrondi } from "@/lib/format";
 import { mouvementsVides } from "./casiers";
 
 /** Ce qu'un client doit : de l'argent et des casiers (par type d'emballage). */
@@ -33,7 +33,7 @@ export function appliquerAuCompte(
     }, { merge: true });
   }
   const dus: Record<string, number> = { ...(clientData.emballages_dus ?? {}) };
-  for (const [e, d] of Object.entries(emballages)) dus[e] = (dus[e] ?? 0) + d;
+  for (const [e, d] of Object.entries(emballages)) dus[e] = arrondi((dus[e] ?? 0) + d);
   for (const e of Object.keys(dus)) if (dus[e] === 0) delete dus[e];
   return { solde_argent: ((clientData.solde_argent as number) ?? 0) + montant, emballages_dus: dus };
 }
@@ -96,7 +96,7 @@ export const comptes: Record<string, Commande> = {
     const rendusApres = (v.rendus_apres ?? {}) as Record<string, number>;
     const retour: Record<string, number> = {};
     for (const [e, n] of Object.entries((emballages ?? {}) as Record<string, number>)) {
-      const q = Math.trunc(Number(n) || 0);
+      const q = arrondi(Number(n) || 0);
       if (q < 0) throw new Error("Quantité de casiers invalide.");
       const dus = Math.max(0, (livres[e] ?? 0) - (rendus[e] ?? 0) - (rendusApres[e] ?? 0));
       if (q > dus) throw new Error("Plus de casiers rendus que ceux dus sur cette facture.");
@@ -148,7 +148,7 @@ export const comptes: Record<string, Commande> = {
     const dusCompte = (client.emballages_dus ?? {}) as Record<string, number>;
     const retour: Record<string, number> = {}, surFacture: Record<string, number> = {};
     for (const [e, n] of Object.entries((emballages ?? {}) as Record<string, number>)) {
-      const q = Math.trunc(Number(n) || 0);
+      const q = arrondi(Number(n) || 0);
       if (q < 0) throw new Error("Quantité de casiers invalide.");
       const dusFacture = Math.max(0, (livres[e] ?? 0) - (rendus[e] ?? 0) - (rendusApres[e] ?? 0));
       if (q > Math.max(dusFacture, dusCompte[e] ?? 0)) throw new Error("Plus de casiers rendus que ceux que le client doit.");
@@ -193,7 +193,7 @@ export const comptes: Record<string, Commande> = {
     if (m < 0) throw new Error("Le montant ne peut pas être négatif.");
     const casiers: Record<string, number> = {};
     for (const [e, n] of Object.entries((emballages ?? {}) as Record<string, number>)) {
-      const q = Math.trunc(Number(n) || 0);
+      const q = arrondi(Number(n) || 0);
       if (q < 0) throw new Error("Quantité de casiers invalide.");
       if (q > 0) casiers[e] = q;
     }
@@ -212,7 +212,7 @@ export const comptes: Record<string, Commande> = {
     const dus = (client.emballages_dus ?? {}) as Record<string, number>;
     const retour: Record<string, number> = {};
     for (const [e, n] of Object.entries((emballages ?? {}) as Record<string, number>)) {
-      const q = Math.trunc(Number(n));
+      const q = arrondi(Number(n) || 0);
       if (q < 0) throw new Error("Quantité invalide.");
       if (q > (dus[e] ?? 0)) throw new Error("Le client rend plus de casiers qu'il n'en doit.");
       if (q > 0) retour[e] = -q;

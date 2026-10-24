@@ -88,13 +88,14 @@ export const ventes: Record<string, Commande> = {
     // Casiers livrés (1 casier vendu = 1 casier consigné) et casiers rendus sur place
     const livres: Record<string, number> = {};
     lignes.forEach((l, i) => {
-      const e = formats[i].emballage_id;
-      // Un casier entamé part quand même : 3,5 casiers vendus = 4 casiers consignés
-      if (e) livres[e] = (livres[e] ?? 0) + Math.ceil(l.quantite);
+      // Packs et canettes : emballage perdu, rien à rendre
+      const e = formats[i].unite === "pack" || formats[i].unite === "canette" ? null : formats[i].emballage_id;
+      // Casiers consignés : la somme exacte des casiers vendus (3,5 + 2 = 5,5)
+      if (e) livres[e] = arrondi((livres[e] ?? 0) + l.quantite);
     });
     const rendus: Record<string, number> = {};
     for (const [e, n] of Object.entries((emballagesRendus ?? {}) as Record<string, number>)) {
-      const q = Math.trunc(Number(n));
+      const q = arrondi(Number(n) || 0);
       if (q < 0) throw new Error("Le nombre de casiers rendus ne peut pas être négatif.");
       if (q > 0) rendus[e] = q;
     }

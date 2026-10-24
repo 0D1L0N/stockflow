@@ -9,7 +9,7 @@ import Input from "@/components/ui/Input";
 import Card from "@/components/ui/Card";
 import Skeleton from "@/components/ui/Skeleton";
 import EtatVide from "@/components/ui/EtatVide";
-import { volumeFr, casiers } from "@/lib/format";
+import { volumeFr, casiers, lireNombre } from "@/lib/format";
 
 interface Plein { casier?: number | null; format_id: string; produit_nom: string; volume: number; unite: string; stock: number; }
 interface TypeCasier {
@@ -29,7 +29,7 @@ const SOURCES: Record<string, string> = {
 };
 
 const dateCourte = (d: string) => new Date(d.replace(" ", "T")).toLocaleDateString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
-const lu = (v: string | undefined) => v === undefined || v.trim() === "" ? null : Math.max(0, parseInt(v) || 0);
+const lu = (v: string | undefined) => v === undefined || v.trim() === "" ? null : Math.max(0, lireNombre(v) || 0);
 
 /** Écart entre le nombre compté et celui de l'app. */
 function Ecart({ app, compte }: { app: number; compte: number | null }) {
@@ -52,7 +52,7 @@ function LigneComptage({ libelle, detail, app, valeur, onChange }: {
         <div className="text-sm font-semibold text-gray-800 truncate">{libelle}</div>
         <div className="text-xs text-gray-400">App : {app}{detail ? ` · ${detail}` : ""}</div>
       </div>
-      <input type="number" min="0" inputMode="numeric" placeholder={String(app)} value={valeur ?? ""}
+      <input type="text" inputMode="decimal" placeholder={app.toLocaleString("fr-FR")} value={valeur ?? ""}
         onChange={e => onChange(e.target.value)} aria-label={`Compté : ${typeof libelle === "string" ? libelle : ""}`}
         className="w-20 h-9 rounded-lg border border-slate-300 px-2 text-sm font-semibold text-right focus:outline-none focus:border-secondary" />
       <Ecart app={app} compte={lu(valeur)} />

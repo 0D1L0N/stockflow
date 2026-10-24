@@ -297,7 +297,7 @@ export const suivis: Record<string, Suivi> = {
     avant: async a => lire(`formats/${a.formatId}`),
     apres: async (a, _r, avant: Doc | null) => {
       if (!avant) return null;
-      const nouveau = Math.trunc(Number(a.nouveauStock));
+      const nouveau = Number(a.nouveauStock);
       if (nouveau === avant.stock) return null;
       return { categorie: "stock", action: "ajuster_stock", libelle: `Stock corrigé : ${await nomFormat(avant)}`,
         details: [`${casiers(avant.stock)} → ${casiers(nouveau)}`, ...(a.commentaire ? [String(a.commentaire)] : [])],
@@ -307,7 +307,7 @@ export const suivis: Record<string, Suivi> = {
   reapprovisionner: {
     avant: async a => lire(`formats/${a.formatId}`),
     apres: async (a, _r, avant: Doc | null) => avant && ({ categorie: "stock", action: "reapprovisionner", libelle: `Réapprovisionnement : ${await nomFormat(avant)}`,
-      details: [`+${casiers(Math.trunc(Number(a.quantite)))}`], restauration: { stock: [{ format_id: avant.id, delta: -Math.trunc(Number(a.quantite)) }] } }),
+      details: [`+${casiers(Number(a.quantite))}`], restauration: { stock: [{ format_id: avant.id, delta: -Number(a.quantite) }] } }),
   },
   valider_comptage_casiers: {
     avant: async a => {
@@ -316,7 +316,7 @@ export const suivis: Record<string, Suivi> = {
       return { formats: (await Promise.all(pleins.map(id => lire(`formats/${id}`)))).filter(Boolean) as Doc[], vides: await videsActuels(vides) };
     },
     apres: async (a, _r, c: { formats: Doc[]; vides: Record<Id, number> }) => {
-      const lu = (v: unknown) => v === "" || v === null || v === undefined ? null : Math.trunc(Number(v));
+      const lu = (v: unknown) => v === "" || v === null || v === undefined ? null : Number(v);
       const stock = c.formats.map(f => ({ f, n: lu((a.pleins as Record<string, unknown>)[f.id]) })).filter(x => x.n !== null && x.n !== x.f.stock);
       const vides = Object.entries(c.vides).map(([e, avant]) => ({ e, avant, n: lu((a.vides as Record<string, unknown>)[e]) })).filter(x => x.n !== null && x.n !== x.avant);
       if (!stock.length && !vides.length) return null;
@@ -328,8 +328,8 @@ export const suivis: Record<string, Suivi> = {
   retirer_casiers_casses: {
     avant: async () => null,
     apres: async a => ({ categorie: "stock", action: "retirer_casiers_casses", libelle: `Casiers cassés ou perdus : ${a.emballageId}`,
-      details: [`−${casiers(Math.trunc(Number(a.quantite)))}${a.commentaire ? ` · ${a.commentaire}` : ""}`],
-      restauration: { vides: [{ emballage_id: a.emballageId as Id, delta: Math.trunc(Number(a.quantite)) }] } }),
+      details: [`−${casiers(Number(a.quantite))}${a.commentaire ? ` · ${a.commentaire}` : ""}`],
+      restauration: { vides: [{ emballage_id: a.emballageId as Id, delta: Number(a.quantite) }] } }),
   },
   create_emballage: {
     avant: async () => null,

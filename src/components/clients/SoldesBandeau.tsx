@@ -21,7 +21,7 @@ export default function SoldesBandeau({ client, nomEmballage, className = "mt-2"
         <span className="flex items-center gap-1"><Wallet size={12} />{formatPrix(argent)}</span>
       )}
       {casiers.map(([e, n]) => (
-        <span key={e} className="flex items-center gap-1"><Package2 size={12} />{n} × {nomEmballage(e)}</span>
+        <span key={e} className="flex items-center gap-1"><Package2 size={12} />{n.toLocaleString("fr-FR")} × {nomEmballage(e)}</span>
       ))}
     </div>
   );

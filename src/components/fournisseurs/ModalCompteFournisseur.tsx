@@ -7,7 +7,7 @@ import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import Skeleton from "@/components/ui/Skeleton";
-import { volumeFr, casiers } from "@/lib/format";
+import { volumeFr, casiers, lireNombre } from "@/lib/format";
 import { usePeut } from "@/lib/droits";
 
 interface Ligne { casier?: number | null; format_id: string; produit_nom: string; volume: number; unite: string; quantite: number; prix_achat: number; sous_total: number; }
@@ -74,7 +74,7 @@ export default function ModalCompteFournisseur({ fournisseur, onClose, onChange,
     try {
       await invoke("regler_fournisseur", {
         fournisseurId: fournisseur!.id, montant: parseFloat(montant) || 0,
-        emballagesRendus: Object.fromEntries(Object.entries(rendus).map(([k, v]) => [k, parseInt(v) || 0])), commentaire,
+        emballagesRendus: Object.fromEntries(Object.entries(rendus).map(([k, v]) => [k, lireNombre(v) || 0])), commentaire,
       });
       toast("Règlement enregistré", "success");
       setMontant(""); setRendus({}); setCommentaire("");
@@ -163,14 +163,14 @@ export default function ModalCompteFournisseur({ fournisseur, onClose, onChange,
                   {emballages.map(e => (
                     <label key={e.id} className="flex items-center gap-2 text-xs text-gray-600">
                       <span className="flex-1 truncate">{e.nom}</span>
-                      <input type="number" inputMode="numeric" min="0" placeholder="0" value={rendus[e.id] ?? ""} onChange={ev => setRendus(r => ({ ...r, [e.id]: ev.target.value }))}
+                      <input type="text" inputMode="decimal" placeholder="0" value={rendus[e.id] ?? ""} onChange={ev => setRendus(r => ({ ...r, [e.id]: ev.target.value }))}
                         className="w-16 h-8 rounded-lg border border-slate-300 px-2 text-sm text-right focus:outline-none focus:border-secondary" />
                     </label>
                   ))}
                 </div>
               )}
               <Input placeholder="Commentaire (facultatif)" value={commentaire} onChange={e => setCommentaire(e.target.value)} />
-              <Button onClick={regler} loading={saving} disabled={!(parseFloat(montant) > 0) && !Object.values(rendus).some(v => parseInt(v) > 0)}>
+              <Button onClick={regler} loading={saving} disabled={!(parseFloat(montant) > 0) && !Object.values(rendus).some(v => lireNombre(v) > 0)}>
                 Enregistrer le règlement
               </Button>
             </section>
