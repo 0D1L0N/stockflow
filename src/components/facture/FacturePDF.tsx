@@ -243,7 +243,7 @@ export function FacturePDF({ data }: { data: FactureData }) {
           </View>
         </View>
 
-        <Text style={{ fontSize: 8, marginTop: 10, fontStyle: "italic" }}>{sommeEnLettres(total, devise.symbole)}</Text>
+        <Text style={{ fontSize: 8, marginTop: 10, color: C.gris }}>{sommeEnLettres(total, devise.symbole)}</Text>
 
         {/* À REMPLIR PAR LE LIVREUR : ce que le client remet, signé sur place */}
         {enLivraison && (
