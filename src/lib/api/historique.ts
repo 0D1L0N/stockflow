@@ -72,6 +72,19 @@ export const historique: Record<string, Commande> = {
       .map(resume);
   },
 
+  /**
+   * Dernière vente d'un client, pour la refaire en un geste (les dépôts servent souvent la même commande).
+   * Le magasinier ne lit que ses propres ventes : on ne cherche alors que parmi elles.
+   */
+  get_derniere_vente_client: async ({ clientId }) => {
+    const responsable = ["admin", "gerant"].includes(useAuthStore.getState().profil?.role ?? "");
+    const q = responsable
+      ? query(col("ventes"), where("client_id", "==", clientId))
+      : query(col("ventes"), where("client_id", "==", clientId), where("vendeur_uid", "==", auth.currentUser?.uid ?? ""));
+    const v = (await lister<VenteDoc>(q)).filter(x => x.statut === "validée").sort((a, b) => b.date.localeCompare(a.date))[0];
+    return v ? { numero_facture: v.numero_facture, date: v.date, items: v.items.map(a => ({ format_id: a.format_id, quantite: a.quantite })) } : null;
+  },
+
   /** Livraisons pas encore clôturées (toute l'équipe les voit, pour noter le retour du livreur). */
   get_livraisons: async () =>
     (await lister<VenteDoc>(query(col("ventes"), where("livraison.statut", "==", "en_cours"))))

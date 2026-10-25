@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Search, ShoppingCart, Plus, Minus, Trash2, Check, User, ChevronDown, X, FileText, Mic, Wallet, Truck } from "lucide-react";
+import { Search, ShoppingCart, Plus, Minus, Trash2, Check, User, ChevronDown, X, FileText, Mic, Wallet, Truck, RotateCcw } from "lucide-react";
 import { invoke } from "@/lib/db";
 import { useToast } from "@/components/ui/Toast";
 import { useVenteStore, type VenteItem } from "@/stores/venteStore";
@@ -218,6 +218,36 @@ export default function Vente() {
       setPrixClient(prev => ({ ...prev, [item.format_id]: p }));
       toast(`Prix de ${selectedClient.nom} mis à jour`, "success");
     } catch (e) { toast(String(e), "error"); }
+  };
+
+  // Dernière commande du client sélectionné : la refaire en un geste
+  const [derniere, setDerniere] = useState<{ numero_facture: string; date: string; items: { format_id: string; quantite: number }[] } | null>(null);
+  useEffect(() => {
+    setDerniere(null);
+    const c = clients.find(x => x.id === client_id);
+    if (!c || c.est_defaut === 1) return;
+    let annule = false;
+    invoke<typeof derniere>("get_derniere_vente_client", { clientId: client_id })
+      .then(d => { if (!annule) setDerniere(d); }).catch(() => {});
+    return () => { annule = true; };
+  }, [client_id, clients.length]);
+
+  const refaireDerniere = () => {
+    if (!derniere) return;
+    const parId = new Map(produits.flatMap(p => p.formats.map(f => [f.id, { f, nom: p.produit.nom }] as const)));
+    const manques: string[] = [];
+    let ajoutes = 0;
+    for (const l of derniere.items) {
+      const e = parId.get(l.format_id);
+      if (!e) { manques.push("un article retiré"); continue; }
+      if (prixDe(e.f) <= 0 || e.f.stock <= 0) { manques.push(`${e.nom} (${e.f.stock <= 0 ? "rupture" : "sans prix"})`); continue; }
+      const deja = useVenteStore.getState().items.find(i => i.format_id === e.f.id)?.quantite ?? 0;
+      if (deja === 0) addItem({ format_id: e.f.id, nom: e.nom, volume: e.f.volume, unite: e.f.unite, casier: e.f.casier ?? null, prix: prixDe(e.f), stock: e.f.stock });
+      updateQuantite(e.f.id, Math.min(e.f.stock, arrondi(deja + l.quantite)));
+      ajoutes++;
+    }
+    if (ajoutes) toast(`Commande du ${new Date(derniere.date.replace(" ", "T")).toLocaleDateString("fr-FR")} remise au panier : vérifiez les quantités`, "success");
+    if (manques.length) toast(`Non repris : ${manques.join(", ")}`, "warning");
   };
 
   const handleUpdateQty = (format_id: string, newQty: number) => {
@@ -557,7 +587,7 @@ export default function Vente() {
         <div ref={listeRef} className="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col gap-4 pb-40 lg:pb-6">
           {/* Sélection client */}
           <div className="relative">
-            <label className="text-[13px] font-medium text-gray-700 block mb-1.5">Client</label>
+            <label className="text-[13px] font-medium text-gray-700 mb-1.5 hidden sm:block">Client</label>
             <button onClick={() => setShowClientDrop(!showClientDrop)}
               className={["w-full flex items-center gap-2.5 px-3.5 h-12 bg-white border rounded-xl text-[15px] shadow-sm transition-colors",
                 showClientDrop ? "border-secondary-600 ring-2 ring-secondary/20" : "border-slate-300 hover:border-slate-400"].join(" ")}>
@@ -590,6 +620,13 @@ export default function Vente() {
             )}
             {/* Ce que le client doit déjà (rappel avant de servir) */}
             {selectedClient && selectedClient.est_defaut !== 1 && <SoldesBandeau client={selectedClient} nomEmballage={nomEmballage} />}
+            {derniere && items.length === 0 && (
+              <button onClick={refaireDerniere}
+                className="mt-2 w-full h-11 px-3 rounded-xl border border-dashed border-secondary-600 text-secondary-700 bg-secondary-50/50 font-semibold text-[14px] flex items-center justify-center gap-2 active:scale-[0.99]">
+                <RotateCcw size={16} /> Refaire sa dernière commande
+                <span className="font-normal text-secondary-700/80">· {casiers(arrondi(derniere.items.reduce((t, i) => t + i.quantite, 0)))} · {new Date(derniere.date.replace(" ", "T")).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" })}</span>
+              </button>
+            )}
           </div>
 
           {/* Recherche et familles : collées en haut pendant qu'on fait défiler les produits */}
@@ -645,7 +682,20 @@ export default function Vente() {
                   <h2 className="text-[12px] font-bold uppercase tracking-wide text-ink-600 mb-2.5 flex items-center gap-2">
                     {g.label}<span className="flex-1 h-px bg-slate-200" /><span className="text-gray-400 normal-case">{g.items.length}</span>
                   </h2>
-                  <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
+                  {/* Téléphone : lignes compactes, la quantité se règle sans ouvrir le panier */}
+                  <div className="lg:hidden bg-white rounded-2xl border border-slate-200 divide-y divide-slate-100 overflow-hidden shadow-card">
+                    {g.items.flatMap(({ produit, formats }) => formats.map(fm => ({ produit, fm })))
+                      // Ce qui ne se vend pas encore (sans prix, rupture) passe en bas du groupe
+                      .sort((a, b) => Number(prixDe(a.fm) <= 0 || a.fm.stock <= 0) - Number(prixDe(b.fm) <= 0 || b.fm.stock <= 0))
+                      .map(({ produit, fm }) => (
+                      <LigneFormat key={fm.id} nom={produit.nom} f={fm} prix={prixDe(fm)}
+                        prixClient={prixClient[fm.id] != null && prixClient[fm.id] !== fm.prix}
+                        quantite={items.find(i => i.format_id === fm.id)?.quantite ?? 0}
+                        onAjouter={() => handleAddToCart(fm, produit.nom)}
+                        onQuantite={q => q > 0 ? handleUpdateQty(fm.id, q) : removeItem(fm.id)} />
+                    ))}
+                  </div>
+                  <div className="hidden lg:grid grid-cols-3 xl:grid-cols-4 gap-4">
                     {g.items.map(({ cle, produit, formats }) => (
                       <ProduitCard key={`${produit.id}-${cle}`} nom={produit.nom} formats={formats}
                         cartItems={items} onAdd={handleAddToCart} prixClient={prixClient} />
@@ -673,18 +723,25 @@ export default function Vente() {
 
       {/* Barre « Voir le panier » sur téléphone : le panier toujours à portée de pouce */}
       {items.length > 0 && !showCart && !clavierOuvert && (
-        <button onClick={() => setShowCart(true)}
-          className="lg:hidden fixed left-3 right-3 z-30 bottom-[calc(84px+env(safe-area-inset-bottom))] h-14 px-4 rounded-2xl
-            bg-secondary-600 text-white shadow-modal flex items-center gap-3 animate-slide-up active:scale-[0.98] transition-transform">
-          <span className="relative">
-            <ShoppingCart size={20} />
-            <span className="absolute -top-2 -right-2 min-w-[18px] h-[18px] px-1 bg-white text-secondary-700 rounded-full text-[10px] font-bold flex items-center justify-center">
-              {items.reduce((s, i) => s + i.quantite, 0)}
+        <div className="lg:hidden fixed left-3 right-3 z-30 bottom-[calc(84px+env(safe-area-inset-bottom))] h-16 rounded-2xl
+            bg-ink-900 text-white shadow-modal flex items-stretch overflow-hidden animate-slide-up">
+          <button onClick={() => setShowCart(true)} aria-label="Voir le panier" className="flex-1 min-w-0 flex items-center gap-3 px-4 text-left active:bg-white/10">
+            <span className="relative flex-shrink-0">
+              <ShoppingCart size={20} />
+              <span className="absolute -top-2 -right-2.5 min-w-[18px] h-[18px] px-1 bg-secondary-500 text-white rounded-full text-[10px] font-bold flex items-center justify-center">
+                {items.length}
+              </span>
             </span>
-          </span>
-          <span className="flex-1 text-left text-sm font-semibold">Voir le panier</span>
-          <span className="font-extrabold tabular-nums">{formatPrix(total)}</span>
-        </button>
+            <span className="min-w-0">
+              <span className="block text-[11px] text-ink-300 truncate">Panier · {casiers(arrondi(items.reduce((s, i) => s + i.quantite, 0)))}</span>
+              <span className="block chiffre font-extrabold text-[17px] leading-tight">{formatPrix(total)}</span>
+            </span>
+          </button>
+          <button onClick={() => { setModeLivraison(false); setShowEncaissement(true); }}
+            className="px-5 bg-secondary-600 font-semibold flex items-center gap-2 text-[15px] active:bg-secondary-700">
+            <Wallet size={18} /> Encaisser
+          </button>
+        </div>
       )}
 
       {/* Mobile cart sheet */}
@@ -1002,6 +1059,55 @@ function ProduitCard({
         className="w-full h-10 flex items-center justify-center gap-1.5 rounded-lg text-sm font-semibold transition-colors bg-secondary-600 text-white hover:bg-secondary-700 active:translate-y-px disabled:bg-slate-200 disabled:text-gray-400 disabled:cursor-not-allowed">
         {sansPrix ? "Pas encore en vente" : <><Plus size={15} strokeWidth={2.5} /> Ajouter</>}
       </button>
+    </div>
+  );
+}
+
+/** Une ligne de la liste sur téléphone : nom, format, prix, stock, et la quantité réglable sur place. */
+function LigneFormat({ nom, f, prix, prixClient, quantite, onAjouter, onQuantite }: {
+  nom: string; f: Format; prix: number; prixClient: boolean; quantite: number;
+  onAjouter: () => void; onQuantite: (q: number) => void;
+}) {
+  const formatPrix = useAppStore((s) => s.formatMontant);
+  // Texte en cours de frappe (« 3, » avant « 3,5 »)
+  const [saisie, setSaisie] = useState<string | null>(null);
+  const rupture = f.stock <= 0;
+  const sansPrix = prix <= 0;
+  const bas = !rupture && f.stock <= f.seuil_alerte;
+  const vendable = !rupture && !sansPrix;
+  return (
+    <div className={["flex items-center gap-2 pl-3.5 pr-2 py-2 min-h-[60px]", quantite > 0 ? "bg-secondary-50" : "", vendable ? "" : "opacity-55"].join(" ")}>
+      <div className="flex-1 min-w-0">
+        <div className="text-[15px] text-gray-900 truncate leading-tight">
+          <span className="font-bold">{nom}</span> <span className="text-gray-500 text-[13px]">{volumeFr(f.volume, f.unite, f.casier)}</span>
+        </div>
+        <div className="text-[12px] mt-0.5 flex items-center gap-2 flex-wrap">
+          <span className={["chiffre font-extrabold", sansPrix ? "text-amber-700" : "text-ink-900"].join(" ")}>{sansPrix ? "Prix à fixer" : formatPrix(prix)}</span>
+          {prixClient && <span className="font-semibold text-secondary-700">prix client</span>}
+          <span className={rupture ? "text-danger font-semibold" : bas ? "text-amber-600" : "text-gray-400"}>
+            {rupture ? "Rupture" : `${f.stock.toLocaleString("fr-FR")} en stock`}
+          </span>
+        </div>
+      </div>
+      {quantite > 0 ? (
+        <div className="flex items-center rounded-xl border border-secondary-600 bg-white overflow-hidden flex-shrink-0">
+          <button aria-label={`Un casier de moins : ${nom}`} onClick={() => onQuantite(arrondi(quantite - 1))}
+            className="w-10 h-11 flex items-center justify-center text-secondary-700 active:bg-secondary-50"><Minus size={16} strokeWidth={2.5} /></button>
+          <input type="text" inputMode="decimal" aria-label={`Nombre de casiers : ${nom}`}
+            value={saisie ?? quantite.toLocaleString("fr-FR")}
+            onFocus={e => { setSaisie(quantite.toLocaleString("fr-FR")); setTimeout(() => e.target.select(), 0); }}
+            onChange={e => { setSaisie(e.target.value); const n = lireNombre(e.target.value); if (n > 0) onQuantite(n); }}
+            onBlur={() => setSaisie(null)}
+            className="w-11 h-11 text-center text-[16px] font-extrabold text-ink-900 focus:outline-none" />
+          <button aria-label={`Un casier de plus : ${nom}`} onClick={() => onQuantite(arrondi(quantite + 1))}
+            className="w-10 h-11 flex items-center justify-center text-secondary-700 active:bg-secondary-50"><Plus size={16} strokeWidth={2.5} /></button>
+        </div>
+      ) : (
+        <button onClick={onAjouter} disabled={!vendable} aria-label={`Ajouter ${nom} ${volumeFr(f.volume, f.unite, f.casier)}`}
+          className="w-11 h-11 rounded-xl bg-secondary-600 text-white flex items-center justify-center flex-shrink-0 active:scale-95 transition-transform disabled:bg-slate-200 disabled:text-gray-400">
+          <Plus size={20} strokeWidth={2.5} />
+        </button>
+      )}
     </div>
   );
 }
