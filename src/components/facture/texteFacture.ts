@@ -24,15 +24,19 @@ function familleArticle(i: FactureItem): { cle: string; titre: string; ordre: nu
   if (i.unite === "pack") return { cle: "pack", titre: "Packs", ordre: 9000, consigne: false };
   if (i.unite === "canette") return { cle: "canette", titre: "Canettes", ordre: 9500, consigne: false };
   if (i.litres == null) return { cle: "articles", titre: "Articles", ordre: 9900, consigne: true };
+  // Rangement par casier, quelle que soit la bouteille : 0,5 L et 0,66 L en casier de 12 vont ensemble
   const casier = i.casier ?? CASIER_DEFAUT[i.litres];
-  return {
-    cle: `${i.litres}-${casier ?? 0}`,
-    titre: `${i.litres.toLocaleString("fr-FR")} L${casier ? ` · casier de ${casier}` : ""}`,
-    ordre: i.litres * 1000 + (casier ?? 0), consigne: true,
-  };
+  if (!casier) return { cle: `l-${i.litres}`, titre: `${i.litres.toLocaleString("fr-FR")} L`, ordre: 5000 + i.litres, consigne: true };
+  return { cle: `casier-${casier}`, titre: `Casiers de ${casier}`, ordre: 1000 - casier, consigne: true };
 }
 
-/** Articles rangés par format, du plus petit au plus grand ; packs et canettes à la fin. */
+/** Précision sous le nom : la bouteille pour les casiers (0,66 L), le conditionnement sinon (pack de 6). */
+export function detailArticle(i: FactureItem, consigne: boolean): string {
+  if (!consigne) return i.volume;
+  return i.litres != null ? `${i.litres.toLocaleString("fr-FR")} L` : i.volume;
+}
+
+/** Articles rangés par casier (24, 20, 12…), puis packs et canettes ; par nom puis bouteille dans chaque groupe. */
 export function groupesFacture(data: FactureData): GroupeFacture[] {
   const groupes = new Map<string, GroupeFacture & { ordre: number }>();
   for (const item of data.items) {
@@ -44,7 +48,7 @@ export function groupesFacture(data: FactureData): GroupeFacture[] {
     groupes.set(f.cle, g);
   }
   return [...groupes.values()].sort((a, b) => a.ordre - b.ordre)
-    .map(({ ordre: _o, ...g }) => ({ ...g, items: [...g.items].sort((a, b) => a.nom_produit.localeCompare(b.nom_produit, "fr")) }));
+    .map(({ ordre: _o, ...g }) => ({ ...g, items: [...g.items].sort((a, b) => a.nom_produit.localeCompare(b.nom_produit, "fr") || (a.litres ?? 0) - (b.litres ?? 0)) }));
 }
 
 /**
